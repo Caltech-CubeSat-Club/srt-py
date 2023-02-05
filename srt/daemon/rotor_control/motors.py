@@ -8,6 +8,7 @@ import serial
 from abc import ABC, abstractmethod
 from time import sleep
 from math import cos, acos, pi, sqrt, floor
+from parse import parse, search
 
 
 class Motor(ABC):
@@ -780,3 +781,143 @@ class PushRodMotor(Motor):  # TODO: Test!
             Current Azimuth and Elevation Coordinate as a Tuple of Floats
         """
         return self.az, self.el
+
+class Caltech6m(Motor):
+    """
+
+    """
+    # 5000 line encoder, quadrature encoded (X4) = 20000 cnts/rev
+    # az and el motor deg per motor encoder count
+    # AZCOUNTS_PER_DEG = 20000
+    # ELCOUNTS_PER_DEG = 20000
+    # LPR,0.4,0.4,2.0,2.0,0.01,0.01,1.5,1.0,2.5,1.0,1.0,5.0,2.0,1.2,1.0,1.0,0.8,1.5,0.0,0.0,1.0,1.0,800,1200,-800,-1300,1.0,1.0,150,144000,144000,20000,20000,-301.087,118.5,1522.5,19749
+
+    def __init__(
+        self,
+        port,
+        az_limits,
+        el_limits
+    ):
+        """
+
+        Parameters
+        ----------
+        port : str
+            Serial Port Identifier String for Communicating with the Motor
+        az_limits : (float, float)
+            Tuple of Lower and Upper Azimuth Limits
+        el_limits : (float, float)
+            Tuple of Lower and Upper Elevation Limits
+        """
+        Motor.__init__(self, port, az_limits, el_limits)
+        self.serial = serial.Serial(
+            port=port,
+            baudrate=115200,
+            timeout=0.5,
+        )
+        self.error_state = 'NONE'
+        self.az = az_limits[0]
+        self.el = el_limits[0]
+        self.azatstow = 179
+        self.elatstow = 81
+        self.mode = 'Stop'
+        self.ElUpPreLim = False
+        self.ElDnPreLim = False
+        self.ElUpFinLim = False
+        self.ElDnFinLim = False
+        self.AzCwPreLim = False
+        self.AzCcwPreLim = False
+        self.AzCwFinLim = False
+        self.AzCcwFinLim = False
+        self.AzLT180 = False
+        self.AzBrkOn = True
+        self.ElBrkOn = True
+        self.EmStopOn = False
+        self.CalSts = 'Not Calibrated'
+        # TODO: add currently_calibrating, currently_moving, etc.
+        self.startup()
+        self.get_info()
+
+    def startup(self):
+        # clear out any junk in the serial buffer
+        for i in range(8):
+            self.serial.write(b'\r')
+            sleep(.003)
+        seq = [
+            ['2A01RST', ''],
+            ['2A01RST', ''],
+            ['2A02RST', ''],
+            ['2A03RST', ''],
+            ['2A01EN1', ''],
+            ['2A02EN1', ''],
+            ['2A03EN1', ''],
+            ['VER', ''],
+            ['VER', 'Ver 6mCBASS4'],
+        ]
+        for cmd, pattern in seq:
+            resp = self.serial_send_recv(cmd, send_delay=0.008, recv_delay=0.105)
+            if pattern:
+                if parse(pattern, resp) is None:
+                    self.error_state = 'STARTUP_BAD_RESPONSE'
+
+    
+    def serial_send_recv(self, cmd, send_delay=0.008, recv_delay=0):
+        if isinstance(cmd, str): cmd = cmd.encode('utf-8')
+        if cmd.endswith(b'\r') is False: cmd += b'\r'
+        self.serial.write(cmd)
+        sleep(send_delay)
+        response = self.serial.read_until(b'\r')
+        response = response.strip().decode('utf-8')
+        sleep(recv_delay)
+        return response if response is not None else ''
+
+    def point(self, az, el):
+        # TODO: SPA, TMD,0 and TON commands after calibrating, before moving
+        self.serial_send_recv('AZEL,{:.2f},{:.2f},1000'.format(az, el))
+
+    def get_info(self):
+        sts = self.serial_send_recv('STS')
+        sts = parse('STS,{mode:d}{ElUpPreLim:l}{ElDnPreLim:l}{ElUpFinLim:l}{ElDnFinLim:l}{AzCwPreLim:l}{AzCcwPreLim:l}{AzCwFinLim:l}{AzCcwFinLim:l}{AzLT180:l}{AzBrkOn:l}{ElBrkOn:l}{EmStopOn:l}{CalSts:d}{idk}', sts).named
+        if sts is not None:
+            for k,v in sts.items():
+                if isinstance(v, str):
+                    if len(v) == 1:
+                        sts[k] = (v == 'T')
+                if isinstance(v, int):
+                    if k == 'mode':
+                        sts[k] = {0:'Stop', 1:'Calibrate', 5:'Track'}[v]
+                    if k == 'CalSts':
+                        sts[k] = {0:'Not Calibrated', 1:'Calibrating Now', 2:'Calibration OK'}[v]
+            self.__dict__.update(sts)
+        else:
+            self.error_state = 'STS_BAD_RESPONSE'
+
+        azel = self.serial_send_recv('GAE')
+        azel = parse('GAE,{az:f},{el:f}', azel).named
+        if azel is not None:
+            self.__dict__.update(azel)
+        else:
+            self.error_state = 'GAE_BAD_RESPONSE'
+
+    def status(self):
+        self.get_info()
+        return self.az, self.el
+
+    @property
+    def calibrated(self):
+        return self.CalSts == 'Calibration OK'
+    
+    def calibrate(self):
+        seq = [
+            ['SPA', 'SPA'],
+            ['LPR,0.4,0.4,2.0,2.0,0.01,0.01,1.5,1.0,2.5,1.0,1.0,5.0,2.0,1.2,1.0,1.0,0.8,1.5,0.0,0.0,1.0,1.0,800,1200,-800,-1300,1.0,1.0,150,144000,144000,20000,20000,-301.087,118.5,1522.5,19749', 'LPR'],
+            ['CLE', 'CLE'],
+        ]
+        for cmd, pattern in seq:
+            resp = self.serial_send_recv(cmd, send_delay=0.008, recv_delay=0.105)
+            if pattern:
+                if parse(pattern, resp) is None:
+                    self.error_state = 'CAL_BAD_RESPONSE'
+                    
+    def stop(self):
+        self.serial_send_recv('SPA')

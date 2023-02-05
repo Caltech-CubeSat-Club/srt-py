@@ -5,7 +5,7 @@ Module for Managing Different Motor Objects
 """
 from enum import Enum
 
-from .motors import NoMotor, Rot2Motor, H180Motor, PushRodMotor
+from .motors import NoMotor, Rot2Motor, H180Motor, PushRodMotor, Caltech6m
 
 
 def angle_within_range(angle, limits):
@@ -25,6 +25,7 @@ class RotorType(Enum):
     ROT2 = "ALFASPID"
     H180 = "H180MOUNT"
     PUSH_ROD = "PUSHROD"
+    CALTECH6M = "CALTECH6M"
 
 
 class Rotor:
@@ -58,6 +59,8 @@ class Rotor:
             self.motor = H180Motor(port, az_limits, el_limits)
         elif motor_type == RotorType.PUSH_ROD == RotorType.PUSH_ROD.value:
             self.motor = PushRodMotor(port, az_limits, el_limits)
+        elif motor_type == RotorType.CALTECH6M or motor_type == RotorType.CALTECH6M.value:
+            self.motor = Caltech6m(port, az_limits, el_limits)
         else:
             raise ValueError("Not a known motor type")
 
