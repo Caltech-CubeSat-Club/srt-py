@@ -877,9 +877,9 @@ class Caltech6m(Motor):
 
     def get_info(self):
         sts = self.serial_send_recv('STS')
-        sts = parse('STS,{mode:d}{ElUpPreLim:l}{ElDnPreLim:l}{ElUpFinLim:l}{ElDnFinLim:l}{AzCwPreLim:l}{AzCcwPreLim:l}{AzCwFinLim:l}{AzCcwFinLim:l}{AzLT180:l}{AzBrkOn:l}{ElBrkOn:l}{EmStopOn:l}{CalSts:d}{idk}', sts).named
+        sts = parse('STS,{mode:d}{ElUpPreLim:l}{ElDnPreLim:l}{ElUpFinLim:l}{ElDnFinLim:l}{AzCwPreLim:l}{AzCcwPreLim:l}{AzCwFinLim:l}{AzCcwFinLim:l}{AzLT180:l}{AzBrkOn:l}{ElBrkOn:l}{EmStopOn:l}{CalSts:d}{idk}', sts)
         if sts is not None:
-            for k,v in sts.items():
+            for k,v in sts.named.items():
                 if isinstance(v, str):
                     if len(v) == 1:
                         sts[k] = (v == 'T')
@@ -893,9 +893,9 @@ class Caltech6m(Motor):
             self.error_state = 'STS_BAD_RESPONSE'
 
         azel = self.serial_send_recv('GAE')
-        azel = parse('GAE,{az:f},{el:f}', azel).named
+        azel = parse('GAE,{az:f},{el:f}', azel)
         if azel is not None:
-            self.__dict__.update(azel)
+            self.__dict__.update(azel.named)
         else:
             self.error_state = 'GAE_BAD_RESPONSE'
 
