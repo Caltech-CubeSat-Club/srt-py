@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """srt_runner.py
 
 Starts the SRT Daemon and/or Dashboard
