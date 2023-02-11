@@ -15,10 +15,10 @@ class Caltech6m:
     Pasadena = EarthLocation.from_geodetic('-118d7.4650m', '34d8.3860m', '204.7m')
     obs = Observer(location=Pasadena, timezone='US/Pacific')
     
-    def __init__(self):
+    def __init__(self, port='/dev/ttyUSB0'):
         logging.info('initializing telescope interface')
         self.serial = serial.Serial(
-            port='/dev/ttyUSB0',
+            port=port,
             baudrate=115200,
             timeout=0.5,
         )
@@ -30,6 +30,8 @@ class Caltech6m:
         self.azccwlim, self.azcwlim, self.eluplim, self.eldnlim = -89, 449, 81, 15
         self.startup()
         self.get_info()
+        if input('calibrate telescope? [Y/n]: ') in ['Y', 'y', '']:
+            self.calibrate()
         
     @property
     def currently_moving(self):
@@ -74,14 +76,17 @@ class Caltech6m:
             if pattern:
                 if parse(pattern, resp) is None:
                     self.error_state = 'STARTUP_BAD_RESPONSE'
+        logging.info('startup sequence complete')
 
     def send_command(self, cmd, send_delay=0.008, recv_delay=0.008):
         if isinstance(cmd, str): cmd = cmd.encode('utf-8')
         if cmd.endswith(b'\r') is False: cmd += b'\r'
         self.serial.write(cmd)
+        logging.debug('Sent: {}'.format(cmd))
         sleep(send_delay)
         response = self.serial.read_until(b'\r')
         response = response.strip().decode('utf-8')
+        logging.debug('Recv: {}'.format(response))
         sleep(recv_delay)
         if not response:
             self.error_state = 'NO_RESPONSE'
