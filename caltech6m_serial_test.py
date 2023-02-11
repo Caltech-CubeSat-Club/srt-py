@@ -51,7 +51,7 @@ class Caltech6m:
         if value != 'NONE':
             logging.error('something weird happened: {}'.format(value))
             if input('continue? [Y/n]: ') not in ['Y', 'y', '']:
-                self.spa()
+                self.serial.write(b'SPA\r')
                 self.serial.close()
                 raise Exception('user aborted')
     
