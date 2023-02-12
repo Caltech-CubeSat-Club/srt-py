@@ -8,14 +8,13 @@ from parse import parse
 from time import sleep
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
-
 class Caltech6m:
     
     Pasadena = EarthLocation.from_geodetic('-118d7.4650m', '34d8.3860m', '204.7m')
     obs = Observer(location=Pasadena, timezone='US/Pacific')
     
-    def __init__(self, port='/dev/ttyUSB0'):
+    def __init__(self, port='/dev/ttyUSB0', loglevel=logging.INFO):
+        logging.basicConfig(level=loglevel, format='%(asctime)s %(levelname)s: %(message)s')
         logging.info('initializing telescope interface')
         self.serial = serial.Serial(
             port=port,
@@ -191,19 +190,25 @@ class Caltech6m:
             self.azerr = errs['azerr']
             self.elerr = errs['elerr']
             
+        sic1 = parse('2A01SIC{current:g}', self.send_command('2A01SIC')) or {'current': -999999}
+        sia1 = parse('2A01SIA{current:g}', self.send_command('2A01SIA')) or {'current': -999999}
+        sic2 = parse('2A02SIC{current:g}', self.send_command('2A02SIC')) or {'current': -999999}
+        sia2 = parse('2A02SIA{current:g}', self.send_command('2A02SIA')) or {'current': -999999}
+        sic3 = parse('2A03SIC{current:g}', self.send_command('2A03SIC')) or {'current': -999999}
+        sia3 = parse('2A03SIA{current:g}', self.send_command('2A03SIA')) or {'current': -999999}
         self.amp_currents = {
             '2A01': {
-                'commanded': parse('2A01SIC{current:g}', self.send_command('2A01SIC'))['current'] or -999999,
-                'actual': parse('2A01SIA{current:g}', self.send_command('2A01SIA'))['current'] or -999999,
+                'commanded': sic1['current'],
+                'actual': sia1['current'],
             },
             '2A02': {
-                'commanded': parse('2A02SIC{current:g}', self.send_command('2A02SIC'))['current'] or -999999,
-                'actual': parse('2A02SIA{current:g}', self.send_command('2A02SIA'))['current'] or -999999,
+                'commanded': sic2['current'],
+                'actual': sia2['current'],
             },
             '2A03': {
-                'commanded': parse('2A03SIC{current:g}', self.send_command('2A03SIC'))['current'] or -999999,
-                'actual': parse('2A03SIA{current:g}', self.send_command('2A03SIA'))['current'] or -999999,
-            },
+                'commanded': sic3['current'],
+                'actual': sia3['current'],
+            },                    
         }
 
     def status(self):
