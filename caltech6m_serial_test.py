@@ -35,10 +35,10 @@ class Caltech6m:
     @property
     def currently_moving(self):
         self.get_info()
-        if self.azerr > 1.0 or self.elerr > 1.0:
+        if abs(self.azerr) > 10.0 or abs(self.elerr) > 10.0:
             sleep(1)
             self.get_info()
-        return self.azerr > 1.0 or self.elerr > 1.0
+        return abs(self.azerr) > 10.0 or abs(self.elerr) > 10.0
     
     @property
     def error_state(self):
@@ -59,6 +59,7 @@ class Caltech6m:
         for i in range(8):
             self.serial.write(b'\r')
             sleep(.003)
+        self.serial.read_until()
         seq = [
             ['2A01RST', ''],
             ['2A01RST', ''],
@@ -190,12 +191,12 @@ class Caltech6m:
             self.azerr = errs['azerr']
             self.elerr = errs['elerr']
             
-        sic1 = parse('2A01SIC{current:g}', self.send_command('2A01SIC')) or {'current': -999999}
-        sia1 = parse('2A01SIA{current:g}', self.send_command('2A01SIA')) or {'current': -999999}
-        sic2 = parse('2A02SIC{current:g}', self.send_command('2A02SIC')) or {'current': -999999}
-        sia2 = parse('2A02SIA{current:g}', self.send_command('2A02SIA')) or {'current': -999999}
-        sic3 = parse('2A03SIC{current:g}', self.send_command('2A03SIC')) or {'current': -999999}
-        sia3 = parse('2A03SIA{current:g}', self.send_command('2A03SIA')) or {'current': -999999}
+        sic1 = parse('2A01{current:d}', self.send_command('2A01SIC')) or {'current': -999999}
+        sia1 = parse('2A01{current:d}', self.send_command('2A01SIA')) or {'current': -999999}
+        sic2 = parse('2A02{current:d}', self.send_command('2A02SIC')) or {'current': -999999}
+        sia2 = parse('2A02{current:d}', self.send_command('2A02SIA')) or {'current': -999999}
+        sic3 = parse('2A03{current:d}', self.send_command('2A03SIC')) or {'current': -999999}
+        sia3 = parse('2A03{current:d}', self.send_command('2A03SIA')) or {'current': -999999}
         self.amp_currents = {
             '2A01': {
                 'commanded': sic1['current'],
@@ -251,3 +252,8 @@ class Caltech6m:
     def spa(self):
         self.send_command('SPA')
         self._status = 'ALL_STOP'
+        
+    def cleanup(self):
+        self.spa()
+        self.brakes_on()
+        self.serial.close()
