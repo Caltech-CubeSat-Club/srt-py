@@ -60,7 +60,7 @@ class Rotor:
         elif motor_type == RotorType.PUSH_ROD == RotorType.PUSH_ROD.value:
             self.motor = PushRodMotor(port, baudrate, az_limits, el_limits)
         elif motor_type == RotorType.CALTECH6M or motor_type == RotorType.CALTECH6M.value:
-            self.motor = Caltech6m(port, baudrate)
+            self.motor = Caltech6m(port, baudrate, az_limits, el_limits)
         else:
             raise ValueError("Not a known motor type")
 

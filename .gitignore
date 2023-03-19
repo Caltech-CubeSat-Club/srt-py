@@ -108,3 +108,7 @@ venv.bak/
 
 # Rever
 rever/
+
+.gitconfig
+
+config/config.yaml

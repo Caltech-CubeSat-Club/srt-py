@@ -807,46 +807,20 @@ class Caltech6m:
     Pasadena = EarthLocation.from_geodetic('-118d7.4650m', '34d8.3860m', '204.7m')
     obs = Observer(location=Pasadena, timezone='US/Pacific')
     
-    def __init__(self, port='/dev/ttyUSB0', loglevel=logging.INFO):
-        logging.basicConfig(level=loglevel, format='%(asctime)s %(levelname)s: %(message)s')
-        logging.info('initializing telescope interface')
+    def __init__(self, port='/dev/ttyUSB0', baudrate=115200, az_limits=(-89,449), el_limits=(15,81)):
+        logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(levelname)s: %(message)s')
+        logging.warning('initializing telescope interface')
+        Motor.__init__(self, port, baudrate, az_limits, el_limits)
         self.serial = serial.Serial(
             port=port,
-            baudrate=115200,
+            baudrate=baudrate,
             timeout=0.5,
         )
-        logging.info('serial port opened')
-        # TODO: better bookkeeping of _states. can't really trust them rn
-        self._err_state = 'NONE'
-        self._status = 'ALL_STOP'
-        self.azatstow , self.elatstow, self.azmaint, self.elmaint = 179, 81, 270, 15
-        self.azccwlim, self.azcwlim, self.eluplim, self.eldnlim = -89, 449, 81, 15
+        logging.warning('serial port opened')
         self.startup()
         self.get_info()
-        # if input('calibrate telescope? [Y/n]: ') in ['Y', 'y', '']:
-        self.calibrate()
-        
-    @property
-    def currently_moving(self):
-        self.get_info()
-        if abs(self.azerr) > 10.0 or abs(self.elerr) > 10.0:
-            sleep(1)
-            self.get_info()
-        return (abs(self.azerr) > 10.0 or abs(self.elerr) > 10.0) and self._status != 'ALL_STOP' # TODO: make this not suck
-    
-    @property
-    def error_state(self):
-        return self._err_state
-    
-    @error_state.setter
-    def error_state(self, value):
-        self._err_state = value
-        if value != 'NONE':
-            logging.error('something weird happened: {}'.format(value))
-            # if input('continue? [Y/n]: ') not in ['Y', 'y', '']:
-            #     self.serial.write(b'SPA\r')
-            #     self.serial.close()
-            #     raise Exception('user aborted')
+        if not self.calibrated:
+            self.calibrate()
     
     def startup(self):
         # clear out any junk in the serial buffer
@@ -869,8 +843,8 @@ class Caltech6m:
             resp = self.send_command(cmd, send_delay=0.008, recv_delay=0.105)
             if pattern:
                 if parse(pattern, resp) is None:
-                    self.error_state = 'STARTUP_BAD_RESPONSE'
-        logging.info('startup sequence complete')
+                    logging.error('startup sequence - no response')
+        logging.warning('startup sequence complete')
 
     def send_command(self, cmd, send_delay=0.008, recv_delay=0.008):
         if isinstance(cmd, str): cmd = cmd.encode('utf-8')
@@ -883,8 +857,15 @@ class Caltech6m:
         logging.debug('Recv: {}'.format(response))
         sleep(recv_delay)
         if not response:
-            self.error_state = 'NO_RESPONSE'
-            return ''
+            self.serial.write(b'\r')
+            sleep(send_delay)
+            response = self.serial.read_until(b'\r')
+            response = response.strip().decode('utf-8')
+            if not response:
+                logging.error('no response')
+                response = ''
+        self.serial.write(b'\r')
+        self.serial.read_until()
         return response
 
     def brakes_on(self):
@@ -904,29 +885,10 @@ class Caltech6m:
         self.get_info()
 
     def point(self, az, el):
-        self.get_info()
+        self.brakes_off()
         if not self.calibrated:
             logging.error('cannot point telescope, it is not calibrated')
             return
-        # if self.currently_moving:
-        #     logging.warning('telecope is currently moving, command ignored')
-        #     return
-        if el < self.eldnlim:
-            logging.error('requested elevation is below horizon')
-            return
-        if el > self.eluplim:
-            logging.error('requested elevation is above zenith')
-            return
-        if az < self.azccwlim:
-            logging.error('requested azimuth is below azimuth limit')
-            return
-        if az > self.azcwlim:
-            logging.error('requested azimuth is above azimuth limit')
-            return
-        if self.AzBrkOn:
-            self.send_command('ABF')
-        if self.ElBrkOn:
-            self.send_command('EBF')
         return self.send_command('AZL,{:.3f},{:.3f}'.format(az, el))
     
     def point_radec(self, ra, dec):
@@ -953,13 +915,9 @@ class Caltech6m:
         altaz = self.obs.altaz(t, obj)
         return self.point(altaz.az.deg, altaz.alt.deg)
 
-    def stow(self):
-        return self.point(self.azatstow, self.elatstow)
-    
-    def goto_maintenance_pos(self):
-        return self.point(self.azmaint, self.elmaint)
-
     def get_info(self):
+        self.serial.write(b'\r')
+        self.serial.read_until()
         sts = self.send_command('STS')
         sts = parse('STS,{mode:d}{ElUpPreLim:l}{ElDnPreLim:l}{ElUpFinLim:l}{ElDnFinLim:l}{AzCwPreLim:l}{AzCcwPreLim:l}{AzCwFinLim:l}{AzCcwFinLim:l}{AzLT180:l}{AzBrkOn:l}{ElBrkOn:l}{EmStopOn:l}{CalSts:d}{idk}', sts)
         if sts is not None:
@@ -1005,6 +963,8 @@ class Caltech6m:
                 'actual': sia3['current'],
             },                    
         }
+        self.serial.write(b'\r')
+        self.serial.read_until()
 
     def status(self):
         self.get_info()
@@ -1017,35 +977,28 @@ class Caltech6m:
         return self.CalSts == 'Calibration OK'
     
     def calibrate(self):
-        # if self.currently_moving:
-        #     logging.warning('telecope is currently moving, command ignored')
-        #     return
-        
         seq = [
             ['SPA', 'SPA'],
             ['LPR,0.4,0.4,2.0,2.0,0.01,0.01,1.5,1.0,2.5,1.0,1.0,5.0,2.0,1.2,1.0,1.0,0.8,1.5,0.0,0.0,1.0,1.0,800,1200,-800,-1300,1.0,1.0,150,144000,144000,20000,20000,-301.087,118.5,1522.5,19749', 'LPR'],
             ['CLE', 'CLE'],
         ]
-        self._status = 'CALIBRATING'
-        logging.info('starting calibration')
+        logging.warning('starting calibration')
         for cmd, pattern in seq:
             resp = self.send_command(cmd, send_delay=0.008, recv_delay=0.105)
             if pattern:
                 if parse(pattern, resp) is None:
-                    self.error_state = 'CAL_BAD_RESPONSE'
+                    logging.error('calibration bad response: {}'.format(resp))
                     return
         self.get_info()
         while self.CalSts != 'Calibration OK':
             sleep(0.5)
             self.get_info()
-        self._status = 'IDLE'
-        logging.info('calibration complete')
+        logging.warning('calibration complete')
         self.send_command('TMD,0')
         self.send_command('TON')
                 
     def spa(self):
         self.send_command('SPA')
-        self._status = 'ALL_STOP'
         
     def cleanup(self):
         self.spa()
