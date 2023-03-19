@@ -38,7 +38,7 @@ class Caltech6m:
         if abs(self.azerr) > 10.0 or abs(self.elerr) > 10.0:
             sleep(1)
             self.get_info()
-        return abs(self.azerr) > 10.0 or abs(self.elerr) > 10.0
+        return (abs(self.azerr) > 10.0 or abs(self.elerr) > 10.0) and self._status != 'ALL_STOP'
     
     @property
     def error_state(self):
