@@ -164,6 +164,8 @@ srt_controller.py status --status_parameter=motor_azel
 - plotly
 - pandas
 - waitress
+- parse
+- astroplan
 
 ## Accommodating Different Hardware
 
