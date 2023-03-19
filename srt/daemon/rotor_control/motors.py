@@ -824,7 +824,7 @@ class Caltech6m:
         self.startup()
         self.get_info()
         # if input('calibrate telescope? [Y/n]: ') in ['Y', 'y', '']:
-        #     self.calibrate()
+        self.calibrate()
         
     @property
     def currently_moving(self):
