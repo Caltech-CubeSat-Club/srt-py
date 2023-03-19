@@ -823,8 +823,8 @@ class Caltech6m:
         self.azccwlim, self.azcwlim, self.eluplim, self.eldnlim = -89, 449, 81, 15
         self.startup()
         self.get_info()
-        if input('calibrate telescope? [Y/n]: ') in ['Y', 'y', '']:
-            self.calibrate()
+        # if input('calibrate telescope? [Y/n]: ') in ['Y', 'y', '']:
+        #     self.calibrate()
         
     @property
     def currently_moving(self):
@@ -843,10 +843,10 @@ class Caltech6m:
         self._err_state = value
         if value != 'NONE':
             logging.error('something weird happened: {}'.format(value))
-            if input('continue? [Y/n]: ') not in ['Y', 'y', '']:
-                self.serial.write(b'SPA\r')
-                self.serial.close()
-                raise Exception('user aborted')
+            # if input('continue? [Y/n]: ') not in ['Y', 'y', '']:
+            #     self.serial.write(b'SPA\r')
+            #     self.serial.close()
+            #     raise Exception('user aborted')
     
     def startup(self):
         # clear out any junk in the serial buffer
