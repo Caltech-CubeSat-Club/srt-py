@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!python
 """srt_controller.py
 
 Sends Instructions to the SRT via the Command Line
