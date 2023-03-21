@@ -532,13 +532,13 @@ class SmallRadioTelescopeDaemon:
                     self.rotor_location, current_rotor_cmd_location
                 ):
                     self.rotor.set_azimuth_elevation(*current_rotor_cmd_location)
-                    sleep(1)
-                    start_time = time()
+                    # sleep(1)
+                    # start_time = time()
                     while (
                         not azel_within_range(
                             self.rotor_location, current_rotor_cmd_location
                         )
-                    ) and (time() - start_time) < 10:
+                    ): # and (time() - start_time) < 10:
                         past_rotor_location = self.rotor_location
                         self.rotor_location = self.rotor.get_azimuth_elevation()
                         if not self.rotor_location == past_rotor_location:
@@ -553,7 +553,7 @@ class SmallRadioTelescopeDaemon:
                             )
                             self.radio_queue.put(("glat", g_lat))
                             self.radio_queue.put(("glon", g_lon))
-                        sleep(0.5)
+                        sleep(0.1)
                 else:
                     past_rotor_location = self.rotor_location
                     self.rotor_location = self.rotor.get_azimuth_elevation()
@@ -570,7 +570,7 @@ class SmallRadioTelescopeDaemon:
                         self.radio_queue.put(("glat", g_lat))
                         self.radio_queue.put(("glon", g_lon))
 
-                    sleep(1)
+                    sleep(0.1)
             except AssertionError as e:
                 self.log_message(str(e))
             except ValueError as e:

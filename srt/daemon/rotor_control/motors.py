@@ -807,10 +807,10 @@ class Caltech6m:
     Pasadena = EarthLocation.from_geodetic('-118d7.4650m', '34d8.3860m', '204.7m')
     obs = Observer(location=Pasadena, timezone='US/Pacific')
     
-    def __init__(self, port='/dev/ttyUSB0', baudrate=115200, az_limits=(-89,449), el_limits=(15,81)):
-        logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(levelname)s: %(message)s')
-        logging.warning('initializing telescope interface')
+    def __init__(self, port='/dev/ttyUSB0', baudrate=115200, az_limits=(-89,449), el_limits=(15,81), verbose=False):
         Motor.__init__(self, port, baudrate, az_limits, el_limits)
+        logging.basicConfig(level=logging.INFO if verbose else logging.WARNING, format='%(asctime)s %(levelname)s: %(message)s')
+        logging.warning('initializing telescope interface')
         self.serial = serial.Serial(
             port=port,
             baudrate=baudrate,
@@ -850,11 +850,11 @@ class Caltech6m:
         if isinstance(cmd, str): cmd = cmd.encode('utf-8')
         if cmd.endswith(b'\r') is False: cmd += b'\r'
         self.serial.write(cmd)
-        logging.debug('Sent: {}'.format(cmd))
+        logging.info('Sent: {}'.format(cmd))
         sleep(send_delay)
         response = self.serial.read_until(b'\r')
         response = response.strip().decode('utf-8')
-        logging.debug('Recv: {}'.format(response))
+        logging.info('Recv: {}'.format(response))
         sleep(recv_delay)
         if not response:
             self.serial.write(b'\r')
@@ -864,8 +864,8 @@ class Caltech6m:
             if not response:
                 logging.error('no response')
                 response = ''
-        self.serial.write(b'\r')
-        self.serial.read_until()
+        # self.serial.write(b'\r')
+        # self.serial.read_until(b'\r')
         return response
 
     def brakes_on(self):
@@ -889,7 +889,7 @@ class Caltech6m:
         if not self.calibrated:
             logging.error('cannot point telescope, it is not calibrated')
             return
-        return self.send_command('AZL,{:.3f},{:.3f}'.format(az, el))
+        return self.send_command(f"AZL,{az},{el}")
     
     def point_radec(self, ra, dec):
         c = SkyCoord(ra, dec, unit='deg')
@@ -914,10 +914,52 @@ class Caltech6m:
             return
         altaz = self.obs.altaz(t, obj)
         return self.point(altaz.az.deg, altaz.alt.deg)
+    
+    def stow(self):
+        self.brakes_off()
+        if not self.calibrated:
+            logging.warning('telescope is not calibrated, only moving elevation')
+            return self.send_command('ELV,1200')
+        return self.point(179,81)
+    
+    def maint(self):
+        self.brakes_off()
+        if not self.calibrated:
+            logging.warning('telescope is not calibrated, only moving elevation')
+            return self.send_command('ELV,-1200')
+        return self.point(270,15)
+    
+    def cw(self, time=-1, speed=500):
+        self.brakes_off()
+        self.send_command(f"AZV,{abs(speed)}")
+        if time>0: 
+            sleep(time)
+            self.send_command('AZV,0')
+        
+    def ccw(self, time=-1, speed=-500):
+        self.brakes_off()
+        self.send_command(f"AZV,{-abs(speed)}")
+        if time>0: 
+            sleep(time)
+            self.send_command('AZV,0')
+        
+    def up(self, time=-1, speed=1100):
+        self.brakes_off()
+        self.send_command(f"ELV,{abs(speed)}")
+        if time>0: 
+            sleep(time)
+            self.send_command('ELV,0')
+    
+    def down(self, time=-1, speed=-1100):
+        self.brakes_off()
+        self.send_command(f"ELV,{-abs(speed)}")
+        if time>0: 
+            sleep(time)
+            self.send_command('ELV,0')
 
     def get_info(self):
-        self.serial.write(b'\r')
-        self.serial.read_until()
+        # self.serial.write(b'\r')
+        # self.serial.read_until(b'\r')
         sts = self.send_command('STS')
         sts = parse('STS,{mode:d}{ElUpPreLim:l}{ElDnPreLim:l}{ElUpFinLim:l}{ElDnFinLim:l}{AzCwPreLim:l}{AzCcwPreLim:l}{AzCwFinLim:l}{AzCcwFinLim:l}{AzLT180:l}{AzBrkOn:l}{ElBrkOn:l}{EmStopOn:l}{CalSts:d}{idk}', sts)
         if sts is not None:
@@ -930,6 +972,7 @@ class Caltech6m:
                         self.mode = {0:'Stop', 1:'Calibrate', 5:'Track'}[v]
                     if k == 'CalSts':
                         self.CalSts = {0:'Not Calibrated', 1:'Calibrating Now', 2:'Calibration OK'}[v]
+                logging.info('{}: {}'.format(k, v))
 
         azel = self.send_command('GAE')
         azel = parse('AZEL,{az:f},{el:f}', azel)
@@ -963,8 +1006,8 @@ class Caltech6m:
                 'actual': sia3['current'],
             },                    
         }
-        self.serial.write(b'\r')
-        self.serial.read_until()
+        # self.serial.write(b'\r')
+        # self.serial.read_until(b'\r')
 
     def status(self):
         self.get_info()
