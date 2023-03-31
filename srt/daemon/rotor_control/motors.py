@@ -807,7 +807,7 @@ class Caltech6m:
     Pasadena = EarthLocation.from_geodetic('-118d7.4650m', '34d8.3860m', '204.7m')
     obs = Observer(location=Pasadena, timezone='US/Pacific')
     
-    def __init__(self, port='/dev/ttyUSB0', baudrate=115200, az_limits=(-89,449), el_limits=(15,81), verbose=False):
+    def __init__(self, port='COM1', baudrate=115200, az_limits=(-89,449), el_limits=(15,81), verbose=False):
         Motor.__init__(self, port, baudrate, az_limits, el_limits)
         logging.basicConfig(level=logging.INFO if verbose else logging.WARNING, format='%(asctime)s %(levelname)s: %(message)s')
         logging.warning('initializing telescope interface')
@@ -958,56 +958,66 @@ class Caltech6m:
             self.send_command('ELV,0')
 
     def get_info(self):
-        # self.serial.write(b'\r')
-        # self.serial.read_until(b'\r')
-        sts = self.send_command('STS')
-        sts = parse('STS,{mode:d}{ElUpPreLim:l}{ElDnPreLim:l}{ElUpFinLim:l}{ElDnFinLim:l}{AzCwPreLim:l}{AzCcwPreLim:l}{AzCwFinLim:l}{AzCcwFinLim:l}{AzLT180:l}{AzBrkOn:l}{ElBrkOn:l}{EmStopOn:l}{CalSts:d}{idk}', sts)
-        if sts is not None:
-            for k,v in sts.named.items():
-                if isinstance(v, str):
-                    if len(v) == 1:
-                        setattr(self, k, (v == 'T'))
-                if isinstance(v, int):
-                    if k == 'mode':
-                        self.mode = {0:'Stop', 1:'Calibrate', 5:'Track'}[v]
-                    if k == 'CalSts':
-                        self.CalSts = {0:'Not Calibrated', 1:'Calibrating Now', 2:'Calibration OK'}[v]
-                logging.info('{}: {}'.format(k, v))
-
-        azel = self.send_command('GAE')
-        azel = parse('AZEL,{az:f},{el:f}', azel)
-        if azel is not None:
-            self.az = azel['az']
-            self.el = azel['el']
+        responses = [
+            self.send_command('STS'),
+            self.send_command('GAE'),
+            self.send_command('ERR'),
+            self.send_command('2A01SIC'),
+            self.send_command('2A01SIA'),
+            self.send_command('2A02SIC'),
+            self.send_command('2A02SIA'),
+            self.send_command('2A03SIC'),
+            self.send_command('2A03SIA')
+        ]
+        for response in responses:
+            if response:
+                if response.startswith('STS'):
+                    sts = parse('STS,{mode:d}{ElUpPreLim:l}{ElDnPreLim:l}{ElUpFinLim:l}{ElDnFinLim:l}{AzCwPreLim:l}{AzCcwPreLim:l}{AzCwFinLim:l}{AzCcwFinLim:l}{AzLT180:l}{AzBrkOn:l}{ElBrkOn:l}{EmStopOn:l}{CalSts:d}{idk}', response)
+                    if sts is not None:
+                        for k,v in sts.named.items():
+                            if isinstance(v, str):
+                                if len(v) == 1:
+                                    setattr(self, k, (v == 'T'))
+                            if isinstance(v, int):
+                                if k == 'mode':
+                                    self.mode = {0:'Stop', 1:'Calibrate', 5:'Track'}[v]
+                                if k == 'CalSts':
+                                    self.CalSts = {0:'Not Calibrated', 1:'Calibrating Now', 2:'Calibration OK'}[v]
+                            logging.info('{}: {}'.format(k, v))
+                if response.startswith('AZEL'):
+                    azel = parse('AZEL,{az:f},{el:f}', response)
+                    if azel is not None:
+                        self.az = azel['az']
+                        self.el = azel['el']
+                if response.startswith('ERR'):
+                    errs = parse('ERR,{azerr:f},{elerr:f}', response)
+                    if errs is not None:
+                        self.azerr = errs['azerr']
+                        self.elerr = errs['elerr']
+                if response.startswith('2A'):
+                    pass
+                    # TODO
             
-        errs = self.send_command('ERR')
-        errs = parse('ERR,{azerr:f},{elerr:f}', errs)
-        if errs is not None:
-            self.azerr = errs['azerr']
-            self.elerr = errs['elerr']
-            
-        sic1 = parse('2A01{current:d}', self.send_command('2A01SIC')) or {'current': -999999}
-        sia1 = parse('2A01{current:d}', self.send_command('2A01SIA')) or {'current': -999999}
-        sic2 = parse('2A02{current:d}', self.send_command('2A02SIC')) or {'current': -999999}
-        sia2 = parse('2A02{current:d}', self.send_command('2A02SIA')) or {'current': -999999}
-        sic3 = parse('2A03{current:d}', self.send_command('2A03SIC')) or {'current': -999999}
-        sia3 = parse('2A03{current:d}', self.send_command('2A03SIA')) or {'current': -999999}
-        self.amp_currents = {
-            '2A01': {
-                'commanded': sic1['current'],
-                'actual': sia1['current'],
-            },
-            '2A02': {
-                'commanded': sic2['current'],
-                'actual': sia2['current'],
-            },
-            '2A03': {
-                'commanded': sic3['current'],
-                'actual': sia3['current'],
-            },                    
-        }
-        # self.serial.write(b'\r')
-        # self.serial.read_until(b'\r')
+        # sic1 = parse('2A01{current:d}', self.send_command('2A01SIC')) or {'current': -999999}
+        # sia1 = parse('2A01{current:d}', self.send_command('2A01SIA')) or {'current': -999999}
+        # sic2 = parse('2A02{current:d}', self.send_command('2A02SIC')) or {'current': -999999}
+        # sia2 = parse('2A02{current:d}', self.send_command('2A02SIA')) or {'current': -999999}
+        # sic3 = parse('2A03{current:d}', self.send_command('2A03SIC')) or {'current': -999999}
+        # sia3 = parse('2A03{current:d}', self.send_command('2A03SIA')) or {'current': -999999}
+        # self.amp_currents = {
+        #     '2A01': {
+        #         'commanded': sic1['current'],
+        #         'actual': sia1['current'],
+        #     },
+        #     '2A02': {
+        #         'commanded': sic2['current'],
+        #         'actual': sia2['current'],
+        #     },
+        #     '2A03': {
+        #         'commanded': sic3['current'],
+        #         'actual': sia3['current'],
+        #     },                    
+        # }
 
     def status(self):
         self.get_info()
