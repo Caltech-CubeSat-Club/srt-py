@@ -148,6 +148,13 @@ class Caltech6m:
         if time>0: 
             sleep(time)
             self.send_command('AZV,0')
+                    
+    def up(self, time=-1, speed=1100):
+        self.brakes_off()
+        self.send_command(f"ELV,{abs(speed)}")
+        if time>0: 
+            sleep(time)
+            self.send_command('ELV,0')
     
     def down(self, time=-1, speed=-1100):
         self.brakes_off()
