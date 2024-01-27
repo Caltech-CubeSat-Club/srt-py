@@ -26,7 +26,8 @@ class Caltech6m:
         self.startup()
         self.get_info()
         if not self.calibrated:
-            self.calibrate()
+            if input('telescope is not calibrated, would you like to calibrate now? [y]/n') != 'n':
+                self.calibrate()
     
     def startup(self):
         # clear out any junk in the serial buffer
@@ -95,6 +96,12 @@ class Caltech6m:
         if not self.calibrated:
             logging.error('cannot point telescope, it is not calibrated')
             return
+        if el < 15:
+            logging.error('requested location is below horizon (min 15 deg elevation)')
+            return
+        if el > 81:
+            logging.error('requested object is higher than zenith (max 81 deg elevation)')
+            return
         return self.send_command(f"AZL,{az},{el}")
     
     def point_radec(self, ra, dec):
@@ -142,7 +149,7 @@ class Caltech6m:
             sleep(time)
             self.send_command('AZV,0')
         
-    def ccw(self, time=-1, speed=-500):
+    def ccw(self, time=-1, speed=500):
         self.brakes_off()
         self.send_command(f"AZV,{-abs(speed)}")
         if time>0: 
@@ -156,7 +163,7 @@ class Caltech6m:
             sleep(time)
             self.send_command('ELV,0')
     
-    def down(self, time=-1, speed=-1100):
+    def down(self, time=-1, speed=1100):
         self.brakes_off()
         self.send_command(f"ELV,{-abs(speed)}")
         if time>0: 
@@ -246,6 +253,9 @@ class Caltech6m:
         self.send_command('TON')
                 
     def spa(self):
+        self.send_command('SPA')
+
+    def stop(self):
         self.send_command('SPA')
         
     def cleanup(self):
