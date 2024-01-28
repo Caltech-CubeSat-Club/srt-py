@@ -25,9 +25,9 @@ class Caltech6m:
         logging.warning('serial port opened')
         self.startup()
         self.get_info()
-        if not self.calibrated:
-            if input('telescope is not calibrated, would you like to calibrate now? [y]/n') != 'n':
-                self.calibrate()
+        # if not self.calibrated:
+        #     if input('telescope is not calibrated, would you like to calibrate now? [y]/n') != 'n':
+        #         self.calibrate()
     
     def startup(self):
         # clear out any junk in the serial buffer
@@ -93,6 +93,7 @@ class Caltech6m:
 
     def point(self, az, el):
         self.brakes_off()
+        self.send_command('TON')
         if not self.calibrated:
             logging.error('cannot point telescope, it is not calibrated')
             return
@@ -197,6 +198,7 @@ class Caltech6m:
         errs = parse('ERR,{azerr:f},{elerr:f}', errs)
         if errs is not None:
             self.azerr = errs['azerr']
+            self.elerr = errs['elerr']
             
         sic1 = parse('2A01{current:d}', self.send_command('2A01SIC')) or {'current': -999999}
         sia1 = parse('2A01{current:d}', self.send_command('2A01SIA')) or {'current': -999999}

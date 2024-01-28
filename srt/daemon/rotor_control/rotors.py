@@ -3,9 +3,8 @@
 Module for Managing Different Motor Objects
 
 """
-from enum import Enum
 
-from .motors import NoMotor, Rot2Motor, H180Motor, PushRodMotor, Caltech6m
+from .motors import Caltech6m
 
 
 def angle_within_range(angle, limits):
@@ -14,19 +13,6 @@ def angle_within_range(angle, limits):
         return lower_limit <= angle <= upper_limit
     else:
         return not lower_limit < angle < upper_limit
-
-
-class RotorType(Enum):
-    """
-    Enum Class for the Different Types of
-    """
-
-    NONE = "NONE"
-    ROT2 = "ALFASPID"
-    H180 = "H180MOUNT"
-    PUSH_ROD = "PUSHROD"
-    CALTECH6M = "CALTECH6M"
-
 
 class Rotor:
     """
@@ -37,13 +23,11 @@ class Rotor:
     motors.py
     """
 
-    def __init__(self, motor_type, port, baudrate, az_limits, el_limits):
+    def __init__(self, port, baudrate, az_limits, el_limits):
         """Initializes the Rotor with its Motor Object
 
         Parameters
         ----------
-        motor_type : RotorType
-            String enum Identifying the Type of Motor
         port : str
             Serial Port Identifier String for Communicating with the Motor
         az_limits : (float, float)
@@ -51,19 +35,7 @@ class Rotor:
         el_limits : (float, float)
             Tuple of Lower and Upper Elevation Limits
         """
-        if motor_type == RotorType.NONE or motor_type == RotorType.NONE.value:
-            self.motor = NoMotor(port, baudrate, az_limits, el_limits)
-        elif motor_type == RotorType.ROT2 or motor_type == RotorType.ROT2.value:
-            self.motor = Rot2Motor(port, baudrate, az_limits, el_limits)
-        elif motor_type == RotorType.H180 or motor_type == RotorType.H180.value:
-            self.motor = H180Motor(port, baudrate, az_limits, el_limits)
-        elif motor_type == RotorType.PUSH_ROD == RotorType.PUSH_ROD.value:
-            self.motor = PushRodMotor(port, baudrate, az_limits, el_limits)
-        elif motor_type == RotorType.CALTECH6M or motor_type == RotorType.CALTECH6M.value:
-            self.motor = Caltech6m(port, baudrate, az_limits, el_limits)
-        else:
-            raise ValueError("Not a known motor type")
-
+        self.motor = Caltech6m(port, baudrate, az_limits, el_limits)
         self.az_limits = az_limits
         self.el_limits = el_limits
 

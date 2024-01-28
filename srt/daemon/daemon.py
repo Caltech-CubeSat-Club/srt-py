@@ -113,7 +113,6 @@ class SmallRadioTelescopeDaemon:
 
         # Create Rotor Command Helper Object
         self.rotor = Rotor(
-            self.motor_type,
             self.motor_port,
             self.motor_baudrate,
             self.az_limits,
@@ -532,45 +531,23 @@ class SmallRadioTelescopeDaemon:
                     self.rotor_location, current_rotor_cmd_location
                 ):
                     self.rotor.set_azimuth_elevation(*current_rotor_cmd_location)
-                    # sleep(1)
-                    # start_time = time()
-                    while (
-                        not azel_within_range(
-                            self.rotor_location, current_rotor_cmd_location
-                        )
-                    ): # and (time() - start_time) < 10:
-                        past_rotor_location = self.rotor_location
-                        self.rotor_location = self.rotor.get_azimuth_elevation()
-                        if not self.rotor_location == past_rotor_location:
-                            g_lat, g_lon = self.ephemeris_tracker.convert_to_gal_coord(
-                                self.rotor_location
-                            )
-                            self.radio_queue.put(
-                                ("motor_az", float(self.rotor_location[0]))
-                            )
-                            self.radio_queue.put(
-                                ("motor_el", float(self.rotor_location[1]))
-                            )
-                            self.radio_queue.put(("glat", g_lat))
-                            self.radio_queue.put(("glon", g_lon))
-                        sleep(0.1)
-                else:
-                    past_rotor_location = self.rotor_location
-                    self.rotor_location = self.rotor.get_azimuth_elevation()
-                    if not self.rotor_location == past_rotor_location:
-                        g_lat, g_lon = self.ephemeris_tracker.convert_to_gal_coord(
-                            self.rotor_location
-                        )
-                        self.radio_queue.put(
-                            ("motor_az", float(self.rotor_location[0]))
-                        )
-                        self.radio_queue.put(
-                            ("motor_el", float(self.rotor_location[1]))
-                        )
-                        self.radio_queue.put(("glat", g_lat))
-                        self.radio_queue.put(("glon", g_lon))
 
-                    sleep(0.1)
+                past_rotor_location = self.rotor_location
+                self.rotor_location = self.rotor.get_azimuth_elevation()
+                if not self.rotor_location == past_rotor_location:
+                    g_lat, g_lon = self.ephemeris_tracker.convert_to_gal_coord(
+                        self.rotor_location
+                    )
+                    self.radio_queue.put(
+                        ("motor_az", float(self.rotor_location[0]))
+                    )
+                    self.radio_queue.put(
+                        ("motor_el", float(self.rotor_location[1]))
+                    )
+                    self.radio_queue.put(("glat", g_lat))
+                    self.radio_queue.put(("glon", g_lon))
+
+                sleep(0.1)
             except AssertionError as e:
                 self.log_message(str(e))
             except ValueError as e:
@@ -796,7 +773,7 @@ class SmallRadioTelescopeDaemon:
 
         # On End, Return to Stow and End Recordings
         self.stop_recording()
-        self.stow()
+        # self.stow()
         if self.radio_autostart:
             sleep(1)
             self.radio_process_task.terminate()
