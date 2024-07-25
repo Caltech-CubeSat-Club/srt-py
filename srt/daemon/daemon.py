@@ -113,6 +113,7 @@ class SmallRadioTelescopeDaemon:
 
         # Create Rotor Command Helper Object
         self.rotor = Rotor(
+            self.motor_type,
             self.motor_port,
             self.motor_baudrate,
             self.az_limits,
@@ -170,10 +171,11 @@ class SmallRadioTelescopeDaemon:
         None
         """
         self.ephemeris_cmd_location = None
-        self.radio_queue.put(("soutrack", object_id))
-        # Send vlsr to radio queue
-        cur_vlsr = self.ephemeris_vlsr[object_id]
-        self.radio_queue.put(("vlsr", float(cur_vlsr)))
+        if self.radio_autostart:
+            self.radio_queue.put(("soutrack", object_id))
+            # Send vlsr to radio queue
+            cur_vlsr = self.ephemeris_vlsr[object_id]
+            self.radio_queue.put(("vlsr", float(cur_vlsr)))
         self.current_vlsr = cur_vlsr
         N_pnt_default = 25
         rotor_loc = []
@@ -195,7 +197,10 @@ class SmallRadioTelescopeDaemon:
                 self.point_at_offset(*new_rotor_offsets)
             rotor_loc.append(self.rotor_location)
             sleep(5)
-            raw_spec = get_spectrum(port=5561)
+            if self.radio_autostart:
+                raw_spec = get_spectrum(port=5561)
+            else:
+                raw_spec = np.zeros(self.radio_num_bins)
             p = np.sum(raw_spec)
             a = len(raw_spec)
             pwr = (self.temp_sys + self.temp_cal) * p / (a * self.cal_power)
@@ -688,7 +693,8 @@ class SmallRadioTelescopeDaemon:
         rotor_pointing_thread.start()
         command_queueing_thread.start()
         status_thread.start()
-        radio_thread.start()
+        if self.radio_autostart:
+            radio_thread.start()
 
         while self.keep_running:
             try:

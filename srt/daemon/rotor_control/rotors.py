@@ -4,7 +4,7 @@ Module for Managing Different Motor Objects
 
 """
 
-from .motors import Caltech6m
+from .motors import Caltech6m, NoMotor
 
 
 def angle_within_range(angle, limits):
@@ -23,7 +23,7 @@ class Rotor:
     motors.py
     """
 
-    def __init__(self, port, baudrate, az_limits, el_limits):
+    def __init__(self, motor_type, port, baudrate, az_limits, el_limits):
         """Initializes the Rotor with its Motor Object
 
         Parameters
@@ -35,7 +35,10 @@ class Rotor:
         el_limits : (float, float)
             Tuple of Lower and Upper Elevation Limits
         """
-        self.motor = Caltech6m(port, baudrate, az_limits, el_limits)
+        if motor_type == "CALTECH6M":
+            self.motor = Caltech6m(port, baudrate, az_limits, el_limits)
+        else:
+            self.motor = NoMotor(port, baudrate, az_limits, el_limits)
         self.az_limits = az_limits
         self.el_limits = el_limits
 
