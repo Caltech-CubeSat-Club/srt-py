@@ -31,11 +31,29 @@ import numpy as np
 from .navbar import generate_navbar
 from .graphs import (
     generate_az_el_graph,
+    generate_az_time_graph,
+    generate_el_time_graph,
     generate_power_history_graph,
     generate_spectrum_graph,
+    generate_zoom_graph,
     generate_npoint,
     emptygraph,
 )
+
+from astropy.table import Table
+from srt import config_loader
+
+
+root_folder = Path(__file__).parent.parent.parent.parent
+
+
+def get_all_objects(config_file="config/sky_coords.csv",):
+    table = Table.read(Path(root_folder, config_file), format="ascii.csv")
+    all_objects = ["Sun", "Moon"]
+    for index, row in enumerate(table):
+        name = row["name"]
+        all_objects.append(name)
+    return all_objects
 
 
 def generate_first_row():
@@ -71,12 +89,35 @@ def generate_first_row():
     )
 
 
-def generate_fig_row():
-    """Generates First Row (Power and Spectrum) Display
+def generate_srt_azel():
+    """Generates AzEl  Display
 
     Returns
     -------
-    Div Containing First Row Objects
+    Div: html.Div 
+        containing n point graph az el pointing
+    """
+    return html.Div(
+        html.Div(
+            [
+                html.Div(
+                    [dcc.Graph(id="az-el-graph")],
+                    className="pretty_container twelve columns",
+                ),
+
+            ],
+            className="flex-display",
+            style={"margin": dict(l=10, r=5, t=5, b=5)},
+        ),
+    )
+
+def generate_npointlayout():
+    """Generates N Point Display
+
+    Returns
+    -------
+    Div: html.Div 
+        containing n point graph if srt
     """
     return html.Div(
         [
@@ -101,30 +142,281 @@ def generate_fig_row():
         ]
     )
 
+def generate_srt_second_row():
+    """Generates N Point Display and zoomed in map
 
-def generate_popups():
+    Returns
+    -------
+    Div: html.Div 
+        containing n point graph if srt
+    """
+    return html.Div(
+        [
+            html.Div(
+                [
+                    dcc.Store(id="npoint_info", storage_type="session"),
+                    html.Div(
+                        [dcc.Graph(id="npoint-graph")],
+                        className="pretty_container six columns",
+                    ),
+                    html.Div(
+                        [dcc.Graph(id="zoom-graph")],
+                        className="pretty_container six columns",
+                    ),
+                ],
+                className="flex-display",
+                style={
+                    "justify-content": "left",
+                    "margin": "5px",
+                },
+            ),
+        ]
+    )
+
+
+def generate_second_row():
+    """Generates Second Row (AzEl and AzEl Zoom) Display
+
+    Returns
+    -------
+    Div Containing Second Row Objects
+    """
+    return html.Div(
+        html.Div(
+            [
+                html.Div(
+                    [dcc.Graph(id="az-el-graph")],
+                    className="pretty_container six columns",
+                ),
+
+                html.Div(
+                    [dcc.Graph(id="zoom-graph")],
+                    className="pretty_container six columns",
+                ),
+            ],
+            className="flex-display",
+            style={"margin": dict(l=10, r=5, t=5, b=5)},
+        ),
+    )
+
+
+def generate_third_row():
+    """Generates Third Row (AzEl Time) Display
+
+    Returns
+    -------
+    Div Containing Second Row Objects
+    """
+    return html.Div([
+        html.Div(
+                    [
+                        html.Label("Select Time Range in Minutes", style={
+                            "color": "darkgray", "margin-top": "10px", "margin-left": "20px"}),
+                        dcc.Slider(5, 60, 5, id="timeinput"),
+                        dbc.Button("Azimuth", id="graphaz",
+                                   className="ml-auto",
+                                   color="secondary",
+                                   style={"margin-top": "10px",
+                                          "margin-left": "20px"}
+                                   ),
+                        dbc.Button("Elevation", id="graphel",
+                                   className="ml-auto",
+                                   color="secondary",
+                                   style={"margin-top": "10px",
+                                          "margin-left": "10px"}
+                                   ),
+
+                        dcc.Graph(id="az-el-elevation")],
+                    className="pretty_container twelve columns",
+                    ),
+    ],
+        className="flex-display",
+        style={"margin": dict(l=10, r=5, t=5, b=5)},
+    )
+
+
+# def generate_point_popup():
+
+#     return html.Div(
+#         [dbc.Modal(
+#             [
+#                 dbc.ModalHeader("Point at Object"),
+#                 dbc.ModalBody(
+#                     [
+#                         html.H5("Confirm Pointing to This Object?"),
+#                         dcc.RadioItems(
+#                             options=[
+#                                 {"label": "Direct Point", "value": ""},
+#                                 {"label": "N-Point Scan", "value": " n"},
+#                                 {"label": "Beam-switch", "value": " b"},
+#                             ],
+#                             id="point-options",
+#                             value="",
+#                         ),
+#                     ]
+#                 ),
+#                 dbc.ModalFooter(
+#                     [
+#                         dbc.Button(
+#                             "Yes",
+#                             id="az-el-graph-btn-yes",
+#                             className="ml-auto",
+#                             # block=True,
+#                             color="primary",
+#                         ),
+#                         dbc.Button(
+#                             "No",
+#                             id="az-el-graph-btn-no",
+#                             className="ml-auto",
+#                             # block=True,
+#                             color="secondary",
+#                         ),
+#                     ]
+#                 ),
+#             ],
+#             id="az-el-graph-modal",
+
+#         ),]
+#     )
+
+
+def generate_popups(software):
     """Generates all 'Pop-up' Modal Components
 
     Returns
     -------
     Div Containing all Modal Components
     """
+    all_objects = get_all_objects()
+
+    if software == "Very Small Radio Telescope":
+        vsrt_open = True
+        srt_open = False
+    else:
+        vsrt_open = False
+        srt_open = True
+
     return html.Div(
-        [
+        [dbc.Modal(
+            [
+                dbc.ModalHeader("Point at Object"),
+                dbc.ModalBody(
+                    [
+                        html.H5("Confirm Pointing to This Object?"),
+                        dcc.RadioItems(
+                            options=[
+                                {"label": "Direct Point", "value": ""},
+                                {"label": "N-Point Scan", "value": " n"},
+                                {"label": "Beam-switch", "value": " b"},
+                            ],
+                            id="point-options",
+                            value="",
+                        ),
+                    ]
+                ),
+                dbc.ModalFooter(
+                    [
+                        dbc.Button(
+                            "Yes",
+                            id="az-el-graph-btn-yes",
+                            className="ml-auto",
+                            # block=True,
+                            color="primary",
+                        ),
+                        dbc.Button(
+                            "No",
+                            id="az-el-graph-btn-no",
+                            className="ml-auto",
+                            # block=True,
+                            color="secondary",
+                        ),
+                    ]
+                ),
+            ],
+            id="az-el-graph-modal",
+            # is_open=srt_open,
+        ),
+
+            dbc.Modal(
+            [
+                dbc.ModalHeader("Point at Object"),
+                dbc.ModalBody(
+                    [
+                        html.H5("Confirm Pointing to This Object?"),
+                    ]
+                ),
+                dbc.ModalFooter(
+                    [
+                        dbc.Button(
+                            "Yes",
+                            id="az-el-vsrt-btn-yes",
+                            className="ml-auto",
+                            # block=True,
+                            color="primary",
+                        ),
+                        dbc.Button(
+                            "No",
+                            id="az-el-vsrt-btn-no",
+                            className="ml-auto",
+                            # block=True,
+                            color="secondary",
+                        ),
+                    ]
+                ),
+            ],
+            id="az-el-vsrt-modal",
+            # is_open=vsrt_open,
+        ),
+
             dbc.Modal(
                 [
-                    dbc.ModalHeader("Point at Object"),
+                    dbc.ModalHeader("Select Object to Observe"),
                     dbc.ModalBody(
                         [
-                            html.H5("Confirm Pointing to This Object?"),
-                            dcc.RadioItems(
-                                options=[
-                                    {"label": "Direct Point", "value": ""},
-                                    {"label": "N-Point Scan", "value": " n"},
-                                    {"label": "Beam-switch", "value": " b"},
-                                ],
-                                id="point-options",
-                                value="",
+                            dcc.Dropdown(
+                                all_objects, placeholder='Select an Object', id='obj-dropdown')
+                        ]
+                    ),
+                    dbc.ModalFooter(
+                        [
+                            dbc.Button(
+                                "Yes",
+                                id="obs-obj-btn-yes",
+                                className="ml-auto",
+                                # block=True,
+                                color="primary",
+                            ),
+                            dbc.Button(
+                                "No",
+                                id="obs-obj-btn-no",
+                                className="ml-auto",
+                                # block=True,
+                                color="secondary",
+                            ),
+                        ]
+
+                    ),
+                ],
+                id="obs-obj-modal",
+
+        ),
+
+            dbc.Modal(
+                [
+                    dbc.ModalHeader("Enter Aim Coordinates"),
+                    dbc.ModalBody(
+                        [
+                            dcc.Input(
+                                id="obj-az",
+                                type="number",
+                                debounce=True,
+                                placeholder="Azimuth",
+                            ),
+                            dcc.Input(
+                                id="obj-el",
+                                type="number",
+                                debounce=True,
+                                placeholder="Elevation",
                             ),
                         ]
                     ),
@@ -132,14 +424,14 @@ def generate_popups():
                         [
                             dbc.Button(
                                 "Yes",
-                                id="az-el-graph-btn-yes",
+                                id="obs-coords-btn-yes",
                                 className="ml-auto",
                                 # block=True,
                                 color="primary",
                             ),
                             dbc.Button(
                                 "No",
-                                id="az-el-graph-btn-no",
+                                id="obs-coords-btn-no",
                                 className="ml-auto",
                                 # block=True,
                                 color="secondary",
@@ -147,8 +439,53 @@ def generate_popups():
                         ]
                     ),
                 ],
-                id="az-el-graph-modal",
-            ),
+                id="obs-coords-modal",
+        ),
+
+
+
+            dbc.Modal(
+                [
+                    dbc.ModalHeader("Enter Location Coordinates"),
+                    dbc.ModalBody(
+                        [
+                            dcc.Input(
+                                id="coords-lat",
+                                type="number",
+                                debounce=True,
+                                placeholder="Latitude",
+                            ),
+                            dcc.Input(
+                                id="coords-long",
+                                type="number",
+                                debounce=True,
+                                placeholder="Longitude",
+                            ),
+                        ]
+                    ),
+                    dbc.ModalFooter(
+                        [
+                            dbc.Button(
+                                "Yes",
+                                id="coords-btn-yes",
+                                className="ml-auto",
+                                # block=True,
+                                color="primary",
+                            ),
+                            dbc.Button(
+                                "No",
+                                id="coords-btn-no",
+                                className="ml-auto",
+                                # block=True,
+                                color="secondary",
+                            ),
+                        ]
+                    ),
+                ],
+                id="coords-modal",
+        ),
+
+
             dbc.Modal(
                 [
                     dbc.ModalHeader("Enter Azimuth and Elevation"),
@@ -188,7 +525,7 @@ def generate_popups():
                     ),
                 ],
                 id="point-modal",
-            ),
+        ),
             dbc.Modal(
                 [
                     dbc.ModalHeader("Enter the New Center Frequency"),
@@ -223,7 +560,7 @@ def generate_popups():
                     ),
                 ],
                 id="freq-modal",
-            ),
+        ),
             dbc.Modal(
                 [
                     dbc.ModalHeader("Enter the New Sample Frequency"),
@@ -258,7 +595,7 @@ def generate_popups():
                     ),
                 ],
                 id="samp-modal",
-            ),
+        ),
             dbc.Modal(
                 [
                     dbc.ModalHeader("Enter the Motor Offsets"),
@@ -298,7 +635,7 @@ def generate_popups():
                     ),
                 ],
                 id="offset-modal",
-            ),
+        ),
             dbc.Modal(
                 [
                     dbc.ModalHeader("Start Recording"),
@@ -307,7 +644,8 @@ def generate_popups():
                             html.H5("Select a File Type"),
                             dcc.RadioItems(
                                 options=[
-                                    {"label": "Digital RF (Raw Data)", "value": ""},
+                                    {"label": "Digital RF (Raw Data)",
+                                     "value": ""},
                                     {
                                         "label": ".rad Format (Spectrum)",
                                         "value": "*.rad",
@@ -342,7 +680,7 @@ def generate_popups():
                     ),
                 ],
                 id="record-modal",
-            ),
+        ),
             dbc.Modal(
                 [
                     dbc.ModalHeader("Command File"),
@@ -352,7 +690,8 @@ def generate_popups():
                             dcc.Upload(
                                 id="upload-data",
                                 children=html.Div(
-                                    ["Drag and Drop or ", html.A("Select Files")]
+                                    ["Drag and Drop or ",
+                                        html.A("Select Files")]
                                 ),
                                 style={
                                     "width": "95%",
@@ -374,7 +713,7 @@ def generate_popups():
                     ),
                 ],
                 id="cmd-file-modal",
-            ),
+        ),
             dbc.Modal(
                 [
                     dbc.ModalHeader("Start Daemon"),
@@ -383,7 +722,8 @@ def generate_popups():
                             html.H6(
                                 "Are you sure you want to try to start the background SRT Process?"
                             ),
-                            html.H6("If the process is already running, this may fail"),
+                            html.H6(
+                                "If the process is already running, this may fail"),
                             html.H5(
                                 "Process is Already Running",
                                 id="start-warning",
@@ -416,12 +756,12 @@ def generate_popups():
                     ),
                 ],
                 id="start-modal",
-            ),
+        ),
         ]
     )
 
 
-def generate_layout():
+def generate_layout(software):
     """Generates the Basic Layout for the Monitor Page
 
     Returns
@@ -429,7 +769,34 @@ def generate_layout():
     layout: html.div
         Monitor Page Layout
     """
-    drop_down_buttons = {
+    drop_down_buttons_vsrt = {
+        "Coordinates": [
+            dbc.DropdownMenuItem("Set Location", id="btn-set-coords"),
+        ],
+        "Observe": [
+            dbc.DropdownMenuItem("Select Object", id="btn-obs-obj"),
+            dbc.DropdownMenuItem("Enter Coordinates", id="btn-obs-coords"),
+        ],
+        "Radio": [
+            dbc.DropdownMenuItem("Set Frequency", id="btn-set-freq"),
+            dbc.DropdownMenuItem("Set Bandwidth", id="btn-set-samp"),
+        ],
+        "Routine": [
+            dbc.DropdownMenuItem("Start Recording", id="btn-start-record"),
+            dbc.DropdownMenuItem("Stop Recording", id="btn-stop-record"),
+            dbc.DropdownMenuItem("Calibrate", id="btn-calibrate"),
+            dbc.DropdownMenuItem("Upload CMD File", id="btn-cmd-file"),
+        ],
+        "Power": [
+            dbc.DropdownMenuItem("Start Daemon", id="btn-start"),
+            dbc.DropdownMenuItem("Shutdown", id="btn-quit"),
+        ],
+    }
+    drop_down_buttons_srt = {
+        # "Observe": [
+        #     dbc.DropdownMenuItem("Select Object", id="btn-obs-obj"),
+        #     dbc.DropdownMenuItem("Enter Coordinates", id="btn-obs-coords"),
+        # ],
         "Antenna": [
             dbc.DropdownMenuItem("Stow", id="btn-stow"),
             dbc.DropdownMenuItem("Set AzEl", id="btn-point-azel"),
@@ -450,30 +817,38 @@ def generate_layout():
             dbc.DropdownMenuItem("Shutdown", id="btn-quit"),
         ],
     }
-    layout = html.Div(
-        [
-            generate_navbar(drop_down_buttons),
-            generate_first_row(),
-            html.Div(
-                [
-                    html.Div(
-                        [dcc.Graph(id="az-el-graph")],
-                        className="pretty_container twelve columns",
-                    ),
-                ],
-                className="flex-display",
-                style={"margin": dict(l=10, r=5, t=5, b=5)},
-            ),
-            generate_fig_row(),
-            generate_popups(),
-            html.Div(id="signal", style={"display": "none"}),
-        ]
-    )
+    if software == "Very Small Radio Telescope":
+        layout = html.Div(
+            [
+                generate_navbar(drop_down_buttons_vsrt),
+                dbc.Alert("Recording", color="danger",
+                          id="recording-alert", is_open=False),
+                generate_first_row(),
+                generate_second_row(),
+                generate_third_row(),
+                generate_popups(software),
+                html.Div(id="signal", style={"display": "none"}),
+            ]
+        )
+    else:
+        layout = html.Div(
+            [
+                generate_navbar(drop_down_buttons_srt),
+                dbc.Alert("Recording", color="danger",
+                          id="recording-alert", is_open=False),
+                generate_first_row(),
+                generate_srt_azel(),
+                generate_srt_second_row(),
+                generate_third_row(),
+                generate_popups(software),
+                html.Div(id="signal", style={"display": "none"}),
+            ]
+        )
     return layout
 
 
 def register_callbacks(
-    app, config, status_thread, command_thread, raw_spectrum_thread, cal_spectrum_thread
+    app, config, status_thread, command_thread, raw_spectrum_thread, cal_spectrum_thread, software
 ):
     """Registers the Callbacks for the Monitor Page
 
@@ -496,6 +871,13 @@ def register_callbacks(
     -------
     None
     """
+    # config_path = Path(config["CONFIG_DIR"], config_file)
+    # config_dict = config_loader.load_yaml(config_path)
+
+    if software == "Very Small Radio Telescope":
+        vsrt = True
+    else:
+        vsrt = False
 
     @app.callback(
         Output("cal-spectrum-histogram", "figure"),
@@ -525,7 +907,8 @@ def register_callbacks(
         return generate_spectrum_graph(bandwidth, cf, spectrum, is_spec_cal=False)
 
     @app.callback(
-        Output("power-graph", "figure"), [Input("interval-component", "n_intervals")]
+        Output("power-graph",
+               "figure"), [Input("interval-component", "n_intervals")]
     )
     def update_power_graph(n):
         status = status_thread.get_status()
@@ -541,7 +924,8 @@ def register_callbacks(
 
     @app.callback(
         Output("npoint_info", "data"),
-        [Input("interval-component", "n_intervals"), State("npoint_info", "data")],
+        [Input("interval-component", "n_intervals"),
+         State("npoint_info", "data")],
     )
     def npointstore(n, npdata):
         """Update the npoint track info
@@ -652,7 +1036,8 @@ def register_callbacks(
     @app.callback(
         Output("output-data-upload", "children"),
         [Input("upload-data", "contents")],
-        [State("upload-data", "filename"), State("upload-data", "last_modified")],
+        [State("upload-data", "filename"),
+         State("upload-data", "last_modified")],
     )
     def update_output(contents, name, date):
         if contents is not None:
@@ -673,7 +1058,8 @@ def register_callbacks(
             return html.Div(["Awaiting Command File"])
 
     @app.callback(
-        Output("az-el-graph", "figure"), [Input("interval-component", "n_intervals")]
+        Output("az-el-graph",
+               "figure"), [Input("interval-component", "n_intervals")]
     )
     def update_az_el_graph(n):
         status = status_thread.get_status()
@@ -686,17 +1072,90 @@ def register_callbacks(
                 status["stow_loc"],
                 status["cal_loc"],
                 status["horizon_points"],
+                status["beam_width"],
             )
         return ""
 
     @app.callback(
+        Output("zoom-graph",
+               "figure"), [Input("interval-component", "n_intervals")]
+    )
+    def update_zoom_graph(n):
+        status = status_thread.get_status()
+        if status is not None:
+            return generate_zoom_graph(
+                status["az_limits"],
+                status["el_limits"],
+                status["object_locs"],
+                status["motor_azel"],
+                status["stow_loc"],
+                status["cal_loc"],
+                status["horizon_points"],
+                status["beam_width"],
+            )
+        return ""
+
+    @app.callback(
+        Output("az-el-elevation",
+               "figure"),
+        [
+            Input("interval-component", "n_intervals"),
+            Input("graphaz", "n_clicks_timestamp"),
+            Input("graphel", "n_clicks_timestamp"),
+            Input("timeinput", "value")]
+    )
+    def update_az_el_time_graph(n, clicksaz, clicksel, range):
+        status = status_thread.get_status()
+        if not clicksel:
+            axisstatus = 0
+        elif not clicksaz:
+            axisstatus = 1
+        elif clicksaz > clicksel:
+            axisstatus = 0
+        elif clicksaz < clicksel:
+            axisstatus = 1
+
+        if status is not None:
+            # if (not clicksaz and not clicksel) or clicksaz > clicksel:
+            # if clicksaz > clicksel:
+            if axisstatus == 0:
+                return generate_az_time_graph(
+                    status["az_limits"],
+                    status["el_limits"],
+                    status["object_locs"],
+                    status["object_time_locs"],
+                    status["motor_azel"],
+                    status["stow_loc"],
+                    status["cal_loc"],
+                    status["horizon_points"],
+                    status["beam_width"],
+                    range
+                )
+            # if clicksaz < clicksel:
+            if axisstatus == 1:
+                return generate_el_time_graph(
+                    status["az_limits"],
+                    status["el_limits"],
+                    status["object_locs"],
+                    status["object_time_locs"],
+                    status["motor_azel"],
+                    status["stow_loc"],
+                    status["cal_loc"],
+                    status["horizon_points"],
+                    status["beam_width"],
+                    range
+                )
+        return ""
+
+    @ app.callback(
         Output("az-el-graph-modal", "is_open"),
         [
             Input("az-el-graph", "clickData"),
             Input("az-el-graph-btn-yes", "n_clicks"),
             Input("az-el-graph-btn-no", "n_clicks"),
         ],
-        [State("az-el-graph-modal", "is_open"), State("point-options", "value")],
+        [State("az-el-graph-modal", "is_open"),
+         State("point-options", "value")],
     )
     def az_el_click_func(clickData, n_clicks_yes, n_clicks_no, is_open, mode):
         ctx = dash.callback_context
@@ -705,7 +1164,12 @@ def register_callbacks(
         else:
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
             if button_id == "az-el-graph-btn-yes":
-                command_thread.add_to_queue(f"{clickData['points'][0]['text']}{mode}")
+                if not vsrt:
+                    command_thread.add_to_queue(
+                        f"{clickData['points'][0]['text']}{mode}")
+                elif vsrt:
+                    command_thread.add_to_queue(
+                        f"object {clickData['points'][0]['text']}")
             if (
                 n_clicks_yes
                 or n_clicks_no
@@ -717,7 +1181,107 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    @app.callback(
+    # @ app.callback(
+    #     Output("az-el-vsrt-modal", "is_open"),
+    #     [
+    #         Input("az-el-graph", "clickData"),
+    #         Input("az-el-vsrt-btn-yes", "n_clicks"),
+    #         Input("az-el-vsrt-btn-no", "n_clicks"),
+    #     ],
+    #     [State("az-el-vsrt-modal", "is_open"),
+    #      State("point-options", "value"),],
+    # )
+    # def az_el_click_vsrt_func(clickData, n_clicks_yes, n_clicks_no, is_open, mode):
+
+    #     ctx = dash.callback_context
+    #     if not ctx.triggered:
+    #         return is_open
+    #     else:
+    #         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    #         if button_id == "az-el-graph-btn-yes":
+    #             command_thread.add_to_queue(f"object {object}")
+    #         if (
+    #             n_clicks_yes
+    #             or n_clicks_no
+    #             or (
+    #                 clickData
+    #                 and not clickData["points"][0]["text"] == "Antenna Location"
+    #             )
+    #         ):
+    #             return not is_open
+    #         return is_open
+
+    @ app.callback(
+        Output("obs-obj-modal", "is_open"),
+        [
+            Input("btn-obs-obj", "n_clicks"),
+            Input("obs-obj-btn-yes", "n_clicks"),
+            Input("obs-obj-btn-no", "n_clicks"),
+        ],
+        [State("obs-obj-modal", "is_open"),
+         State("obj-dropdown", "value")
+         ],
+    )
+    def set_obs_obj_func(n_clicks_btn, n_clicks_yes, n_clicks_no, is_open, object):
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            return is_open
+        else:
+            button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+            if button_id == "obs-obj-btn-yes":
+                command_thread.add_to_queue(f"object {object}")
+            if n_clicks_yes or n_clicks_no or n_clicks_btn:
+                return not is_open
+            return is_open
+
+    @ app.callback(
+        Output("obs-coords-modal", "is_open"),
+        [
+            Input("btn-obs-coords", "n_clicks"),
+            Input("obs-coords-btn-yes", "n_clicks"),
+            Input("obs-coords-btn-no", "n_clicks"),
+        ],
+        [State("obs-coords-modal", "is_open"),
+         State("obj-az", "value"),
+         State("obj-el", "value")
+         ],
+    )
+    def set_obs_coords_func(n_clicks_btn, n_clicks_yes, n_clicks_no, is_open, az, el):
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            return is_open
+        else:
+            button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+            if button_id == "obs-coords-btn-yes":
+                command_thread.add_to_queue(f"obj_coords {az} {el}")
+            if n_clicks_yes or n_clicks_no or n_clicks_btn:
+                return not is_open
+            return is_open
+
+    @ app.callback(
+        Output("coords-modal", "is_open"),
+        [
+            Input("btn-set-coords", "n_clicks"),
+            Input("coords-btn-yes", "n_clicks"),
+            Input("coords-btn-no", "n_clicks"),
+        ],
+        [State("coords-modal", "is_open"),
+         State("coords-lat", "value"),
+         State("coords-long", "value")],
+    )
+    def coords_click_func(n_clicks_btn, n_clicks_yes, n_clicks_no, is_open, lat, long):
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            return is_open
+        else:
+            button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+            if button_id == "coords-btn-yes":
+                command_thread.add_to_queue(f"coords {lat} {long}")
+            if n_clicks_yes or n_clicks_no or n_clicks_btn:
+                return not is_open
+            return is_open
+
+    @ app.callback(
         Output("point-modal", "is_open"),
         [
             Input("btn-point-azel", "n_clicks"),
@@ -742,7 +1306,7 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    @app.callback(
+    @ app.callback(
         Output("freq-modal", "is_open"),
         [
             Input("btn-set-freq", "n_clicks"),
@@ -766,7 +1330,7 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    @app.callback(
+    @ app.callback(
         Output("samp-modal", "is_open"),
         [
             Input("btn-set-samp", "n_clicks"),
@@ -790,7 +1354,7 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    @app.callback(
+    @ app.callback(
         Output("offset-modal", "is_open"),
         [
             Input("btn-set-offset", "n_clicks"),
@@ -815,17 +1379,18 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    @app.callback(
+    @ app.callback(
         Output("record-modal", "is_open"),
         [
             Input("btn-start-record", "n_clicks"),
             Input("record-btn-yes", "n_clicks"),
             Input("record-btn-no", "n_clicks"),
         ],
-        [State("record-modal", "is_open"), State("record-options", "value")],
+        [State("record-modal", "is_open"), State("record-options",
+                                                 "value"), State("recording-alert", "is_open")],
     )
     def record_click_func(
-        n_clicks_btn, n_clicks_yes, n_clicks_no, is_open, record_option
+        n_clicks_btn, n_clicks_yes, n_clicks_no, is_open, record_option, is_open_alert
     ):
         ctx = dash.callback_context
         if not ctx.triggered:
@@ -834,11 +1399,33 @@ def register_callbacks(
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
             if button_id == "record-btn-yes":
                 command_thread.add_to_queue(f"record {record_option}")
+                print("alert")
+
             if n_clicks_yes or n_clicks_no or n_clicks_btn:
+                print("open")
                 return not is_open
             return is_open
 
-    @app.callback(
+    @ app.callback(
+        Output("recording-alert", "is_open"),
+        [Input("record-btn-yes", "n_clicks"),
+         Input("btn-stop-record", "n_clicks")],
+        [],
+    )
+    def record_alert_func(n_clicks_start, n_clicks_stop):
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            return False
+        else:
+            if not n_clicks_start:
+                return False
+            if not n_clicks_stop:
+                return True
+            if n_clicks_start == n_clicks_stop:
+                return False
+            return True
+
+    @ app.callback(
         Output("cmd-file-modal", "is_open"),
         [
             Input("btn-cmd-file", "n_clicks"),
@@ -854,7 +1441,7 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    @app.callback(
+    @ app.callback(
         Output("start-modal", "is_open"),
         [
             Input("btn-start", "n_clicks"),
@@ -899,20 +1486,22 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    @app.callback(
+    @ app.callback(
         Output("signal", "children"),
         [
-            Input("btn-stow", "n_clicks"),
+            # Input("btn-stow", "n_clicks"),
             Input("btn-stop-record", "n_clicks"),
             Input("btn-quit", "n_clicks"),
             Input("btn-calibrate", "n_clicks"),
         ],
+        [State("recording-alert", "is_open")]
     )
     def cmd_button_pressed(
-        n_clicks_stow,
+        # n_clicks_stow,
         n_clicks_stop_record,
         n_clicks_shutdown,
         n_clicks_calibrate,
+        is_open
     ):
         ctx = dash.callback_context
         if not ctx.triggered:
@@ -921,8 +1510,9 @@ def register_callbacks(
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
             if button_id == "btn-stow":
                 command_thread.add_to_queue("stow")
-            elif button_id == "btn-stop-record":
+            if button_id == "btn-stop-record":
                 command_thread.add_to_queue("roff")
+                return not is_open
             elif button_id == "btn-quit":
                 command_thread.add_to_queue("quit")
             elif button_id == "btn-calibrate":
