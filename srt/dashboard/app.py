@@ -25,6 +25,8 @@ import numpy as np
 from time import time
 from pathlib import Path
 import base64
+import math
+from typing import Any, cast
 
 from .layouts import monitor_page, system_page  # , figure_page
 from .layouts.sidebar import generate_sidebar
@@ -50,16 +52,15 @@ def generate_app(config_dir, config_dict):
     config_dict["CONFIG_DIR"] = config_dir
     software = config_dict["SOFTWARE"]
 
-    # Set Up Flash and Dash Objects
-    server = flask.Flask(__name__)
+    # Set Up Dash app/server objects
     app = dash.Dash(
         __name__,
-        server=server,
         external_stylesheets=[dbc.themes.BOOTSTRAP],
         meta_tags=[
             {"name": "viewport", "content": "width=device-width, initial-scale=1"}
         ],
     )
+    server = cast(Any, app.server)
     app.title = software
 
     # Start Listening for Radio and Status Data
@@ -159,7 +160,7 @@ def generate_app(config_dir, config_dict):
     app.validation_layout = html.Div(
         [
             layout,
-            monitor_page.generate_layout(config_dict["SOFTWARE"]),
+            monitor_page.generate_layout(config_dict["SOFTWARE"], config_dict),
             system_page.generate_layout(),
             #    figure_page.generate_layout()
         ]
@@ -267,52 +268,36 @@ def generate_app(config_dir, config_dict):
         """
         status = status_thread.get_status()
         if status is None:
-            lat = lon = np.nan
-            az = el = np.nan
-            az_offset = el_offset = np.nan
-            cf = np.nan
-            bandwidth = np.nan
-            status_string = "SRT Not Connected"
-            vlsr = np.nan
+            return """
+            #### SRT Not Connected
+            - Waiting for daemon status stream
+            """
         else:
-            lat = status["location"]["latitude"]
-            lon = status["location"]["longitude"]
             az = status["motor_azel"][0]
             el = status["motor_azel"][1]
             az_offset = status["motor_offsets"][0]
             el_offset = status["motor_offsets"][1]
-            cf = status["center_frequency"]
-            bandwidth = status["bandwidth"]
-            vlsr = status["vlsr"]
             time_dif = time() - status["time"]
             if time_dif > 5:
                 status_string = "SRT Daemon Not Available"
-            elif status["queue_size"] == 0 and status["queued_item"] == "None":
-                status_string = "SRT Inactive"
             else:
-                status_string = "SRT In Use!"
+                status_string = "SRT Active"
 
-        if config_dict["SOFTWARE"] == "Very Small Radio Telescope":
-            status_string = f"""
-            #### {status_string}
-            - Location Lat, Long: {lat:.1f}, {lon:.1f} deg
-            - Motor Az, El: {az:.1f}, {el:.1f} deg
-            - Center Frequency: {cf / pow(10, 6)} MHz
-            - Bandwidth: {bandwidth / pow(10, 6)} MHz
-            - VLSR: {vlsr:.1f} km/s
-            """
-        else:
-            status_string = f"""
-            #### {status_string}
-            - Location Lat, Long: {lat:.1f}, {lon:.1f} deg
-            - Motor Az, El: {az:.1f}, {el:.1f} deg
-            - Motor Offsets: {az_offset:.1f}, {el_offset:.1f} deg
-            - Center Frequency: {cf / pow(10, 6)} MHz
-            - Bandwidth: {bandwidth / pow(10, 6)} MHz
-            - VLSR: {vlsr:.1f} km/s
-            """
+        lines = [
+            f"#### {status_string}",
+            f"- Motor Az, El: {az:.1f}, {el:.1f} deg",
+        ]
 
-        return status_string
+        point_err = status.get("pointing_error")
+        if point_err is not None and len(point_err) == 2:
+            lines.append(
+                f"- Pointing Err Az, El: {point_err[0]:.1f}, {point_err[1]:.1f} mdeg"
+            )
+
+        if config_dict["SOFTWARE"] != "Very Small Radio Telescope":
+            lines.append(f"- Motor Offsets: {az_offset:.1f}, {el_offset:.1f} deg")
+
+        return "\n".join(lines)
 
     @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
     def render_page_content(pathname):
@@ -329,7 +314,7 @@ def generate_app(config_dir, config_dict):
         """
 
         if pathname in ["/", f"/{pages['Monitor Page']}"]:
-            return monitor_page.generate_layout(config_dict["SOFTWARE"])
+            return monitor_page.generate_layout(config_dict["SOFTWARE"], config_dict)
         elif pathname == f"/{pages['System Page']}":
             return system_page.generate_layout()
         # elif pathname == f"/{pages['Figure Page']}":

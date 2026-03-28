@@ -25,6 +25,7 @@ from dash.dependencies import Input, Output, State
 from pathlib import Path
 from time import time
 import base64
+import csv
 import io
 import numpy as np
 
@@ -33,11 +34,10 @@ from .graphs import (
     generate_az_el_graph,
     generate_az_time_graph,
     generate_el_time_graph,
+    generate_pointing_error_graph,
     generate_power_history_graph,
     generate_spectrum_graph,
     generate_zoom_graph,
-    generate_npoint,
-    emptygraph,
 )
 
 from astropy.table import Table
@@ -45,6 +45,14 @@ from srt import config_loader
 
 
 root_folder = Path(__file__).parent.parent.parent.parent
+
+
+def run_srt_daemon(configuration_dir, configuration_dict):
+    """Module-level multiprocessing target for launching the daemon."""
+    from srt.daemon import daemon as srt_d
+
+    daemon = srt_d.SmallRadioTelescopeDaemon(configuration_dir, configuration_dict)
+    daemon.srt_daemon_main()
 
 
 def get_all_objects(config_file="config/sky_coords.csv",):
@@ -143,21 +151,24 @@ def generate_npointlayout():
     )
 
 def generate_srt_second_row():
-    """Generates N Point Display and zoomed in map
+    """Generates Mount Status Display and zoomed in map
 
     Returns
     -------
     Div: html.Div 
-        containing n point graph if srt
+        containing mount status diagnostics if srt
     """
     return html.Div(
         [
             html.Div(
                 [
-                    dcc.Store(id="npoint_info", storage_type="session"),
                     html.Div(
-                        [dcc.Graph(id="npoint-graph")],
+                        [
+                            html.H5("6m Mount Status"),
+                            dcc.Markdown(id="mount-status-panel"),
+                        ],
                         className="pretty_container six columns",
+                        style={"maxHeight": "420px", "overflowY": "auto"},
                     ),
                     html.Div(
                         [dcc.Graph(id="zoom-graph")],
@@ -761,14 +772,27 @@ def generate_popups(software):
     )
 
 
-def generate_layout(software):
+def generate_layout(software, config_dict=None):
     """Generates the Basic Layout for the Monitor Page
+
+    Parameters
+    ----------
+    software : str
+        Name of the software/system
+    config_dict : dict, optional
+        Configuration dictionary
 
     Returns
     -------
     layout: html.div
         Monitor Page Layout
     """
+    # Check if we should hide radio plots
+    radio_enabled = True
+    if config_dict:
+        control_profile = config_dict.get("CONTROL_PROFILE", "FULL_SRT").upper()
+        radio_enabled = control_profile != "POINTING_ONLY"
+    
     drop_down_buttons_vsrt = {
         "Coordinates": [
             dbc.DropdownMenuItem("Set Location", id="btn-set-coords"),
@@ -784,7 +808,8 @@ def generate_layout(software):
         "Routine": [
             dbc.DropdownMenuItem("Start Recording", id="btn-start-record"),
             dbc.DropdownMenuItem("Stop Recording", id="btn-stop-record"),
-            dbc.DropdownMenuItem("Calibrate", id="btn-calibrate"),
+            dbc.DropdownMenuItem("Calibrate Encoders", id="btn-calibrate"),
+            dbc.DropdownMenuItem("Export Obs CSV", id="btn-export-obs"),
             dbc.DropdownMenuItem("Upload CMD File", id="btn-cmd-file"),
         ],
         "Power": [
@@ -809,7 +834,8 @@ def generate_layout(software):
         "Routine": [
             dbc.DropdownMenuItem("Start Recording", id="btn-start-record"),
             dbc.DropdownMenuItem("Stop Recording", id="btn-stop-record"),
-            dbc.DropdownMenuItem("Calibrate", id="btn-calibrate"),
+            dbc.DropdownMenuItem("Calibrate Encoders", id="btn-calibrate"),
+            dbc.DropdownMenuItem("Export Obs CSV", id="btn-export-obs"),
             dbc.DropdownMenuItem("Upload CMD File", id="btn-cmd-file"),
         ],
         "Power": [
@@ -817,33 +843,44 @@ def generate_layout(software):
             dbc.DropdownMenuItem("Shutdown", id="btn-quit"),
         ],
     }
+    
+    # Build layout content, conditionally including radio plots
+    base_vsrt = [
+        generate_navbar(drop_down_buttons_vsrt),
+        dbc.Alert("Recording", color="danger",
+                  id="recording-alert", is_open=False),
+    ]
+    if radio_enabled:
+        base_vsrt.append(generate_first_row())
+    base_vsrt.extend([
+        generate_second_row(),
+        generate_third_row(),
+        generate_popups(software),
+        html.Div(id="signal", style={"display": "none"}),
+        dcc.Download(id="obs-events-download"),
+    ])
+    
+    base_srt = [
+        generate_navbar(drop_down_buttons_srt),
+        dbc.Alert("Recording", color="danger",
+                  id="recording-alert", is_open=False),
+    ]
+    if radio_enabled:
+        base_srt.append(generate_first_row())
+    base_srt.extend([
+        generate_srt_azel(),
+        generate_srt_second_row(),
+        generate_third_row(),
+        generate_popups(software),
+        html.Div(id="signal", style={"display": "none"}),
+        dcc.Download(id="obs-events-download"),
+    ])
+    
     if software == "Very Small Radio Telescope":
-        layout = html.Div(
-            [
-                generate_navbar(drop_down_buttons_vsrt),
-                dbc.Alert("Recording", color="danger",
-                          id="recording-alert", is_open=False),
-                generate_first_row(),
-                generate_second_row(),
-                generate_third_row(),
-                generate_popups(software),
-                html.Div(id="signal", style={"display": "none"}),
-            ]
-        )
+        layout = html.Div(base_vsrt)
     else:
-        layout = html.Div(
-            [
-                generate_navbar(drop_down_buttons_srt),
-                dbc.Alert("Recording", color="danger",
-                          id="recording-alert", is_open=False),
-                generate_first_row(),
-                generate_srt_azel(),
-                generate_srt_second_row(),
-                generate_third_row(),
-                generate_popups(software),
-                html.Div(id="signal", style={"display": "none"}),
-            ]
-        )
+        layout = html.Div(base_srt)
+    
     return layout
 
 
@@ -923,89 +960,196 @@ def register_callbacks(
         return generate_power_history_graph(tsys, tcal, cal_pwr, spectrum_history)
 
     @app.callback(
-        Output("npoint_info", "data"),
-        [Input("interval-component", "n_intervals"),
-         State("npoint_info", "data")],
+        Output("mount-status-panel", "children"),
+        [Input("interval-component", "n_intervals")],
     )
-    def npointstore(n, npdata):
-        """Update the npoint track info
-
-        Parameters
-        ----------
-        n : int
-            number of Update intervals
-        npdata : dict
-            will hold N- point data.
-
-        Returns
-        -------
-        npdata : dict
-            Updated data for the N point scan plot.
-        """
-        if npdata is None:
-            return {"scan_center": (0, 0)}
+    def update_mount_status_panel(n):
+        """Render a real-time diagnostic panel for Caltech 6m status and serial comms."""
         status = status_thread.get_status()
-
         if status is None:
-            return {"scan_center": (0, 0)}
+            return "#### 6m Mount\n- Waiting for daemon status"
 
-        data = status["n_point_data"]
-        if data:
-            scan_center, maxdiff, rotor_loc, pwr_list, npsides = data
-            c_azn, c_eln = scan_center
-            c_az, c_el = npdata["scan_center"]
-            if c_azn == c_az and c_eln == c_el:
-                raise PreventUpdate
-            else:
-                npdata["scan_center"] = scan_center
-                npdata["maxdiff"] = maxdiff
-                npdata["rotor_loc"] = rotor_loc
-                npdata["pwr"] = pwr_list
-                npdata["sides"] = npsides
-                return npdata
+        diagnostics = status.get("rotor_diagnostics", {}) or {}
+        fsm = status.get("rotor_fsm_status", {}) or diagnostics.get("fsm_status", {})
+        lines = ["#### 6m Mount"]
+
+        mode = diagnostics.get("mode")
+        cal_sts = diagnostics.get("CalSts")
+        az_brk = diagnostics.get("AzBrkOn")
+        el_brk = diagnostics.get("ElBrkOn")
+        estop = diagnostics.get("EmStopOn")
+
+        if mode is not None:
+            lines.append(f"- Mode: {mode}")
+        if cal_sts is not None:
+            lines.append(f"- Calibration: {cal_sts}")
+        if az_brk is not None:
+            lines.append(f"- Az Brake: {'ON' if az_brk else 'OFF'}")
+        if el_brk is not None:
+            lines.append(f"- El Brake: {'ON' if el_brk else 'OFF'}")
+        if estop is not None:
+            lines.append(f"- E-Stop: {'ON' if estop else 'OFF'}")
+
+        if isinstance(fsm, dict) and fsm:
+            lines.append("\n#### FSM")
+            state = fsm.get("state")
+            transition = fsm.get("last_transition")
+            retries = fsm.get("retry_count")
+            last_error = fsm.get("last_error")
+            if state is not None:
+                lines.append(f"- State: {state}")
+            if transition:
+                lines.append(f"- Last Transition: {transition}")
+            if retries is not None:
+                lines.append(f"- Last Command Retries: {retries}")
+            if last_error:
+                lines.append(f"- Last Error: {last_error}")
+
+        point_err = status.get("pointing_error")
+        if point_err is not None and len(point_err) == 2:
+            lines.append(
+                f"- Pointing Err (mdeg): Az {point_err[0]:.1f}, El {point_err[1]:.1f}"
+            )
+
+        lines.append(
+            f"- Motor Az, El (deg): {status['motor_azel'][0]:.3f}, {status['motor_azel'][1]:.3f}"
+        )
+        lines.append(
+            f"- Cmd Az, El (deg): {status['motor_cmd_azel'][0]:.3f}, {status['motor_cmd_azel'][1]:.3f}"
+        )
+
+        amp = diagnostics.get("amp_currents")
+        if isinstance(amp, dict) and amp:
+            lines.append("\n#### Amplifier Currents")
+            for axis in ["2A01", "2A02", "2A03"]:
+                vals = amp.get(axis)
+                if not isinstance(vals, dict):
+                    continue
+                cmd = vals.get("commanded", "?")
+                act = vals.get("actual", "?")
+                lines.append(f"- {axis}: cmd {cmd}, act {act}")
+
+        comms = status.get("serial_communications", [])
+        cmd_hist = status.get("command_history", [])
+        obs_events = status.get("observation_events", [])
+        lines.append("\n#### Serial")
+        if not comms:
+            lines.append("- No serial messages yet")
         else:
-            raise PreventUpdate
+            for entry in reversed(comms[-10:]):
+                direction = str(entry.get("direction", "sent")).upper()
+                payload = entry.get("payload", "")
+                prefix = "RX" if direction == "RECV" else "TX"
+                lines.append(f"- {prefix}: {payload}")
+
+        lines.append("\n#### Commands")
+        if not cmd_hist:
+            lines.append("- No command history yet")
+        else:
+            for entry in reversed(cmd_hist[-8:]):
+                command = entry.get("command", "")
+                success = entry.get("success", False)
+                retries = entry.get("retries", 0)
+                total_ms = entry.get("total_ms", 0.0)
+                queue_wait_ms = entry.get("queue_wait_ms", 0.0)
+                status_label = "OK" if success else "ERR"
+                lines.append(
+                    f"- {status_label}: {command} | retries={retries} | total={total_ms}ms | queue={queue_wait_ms}ms"
+                )
+                if not success and entry.get("error"):
+                    lines.append(f"  error: {entry.get('error')}")
+
+        lines.append("\n#### Observation Events")
+        if not obs_events:
+            lines.append("- No observation events yet")
+        else:
+            for event in reversed(obs_events[-8:]):
+                iso_time = event.get("iso_time", "")
+                event_name = event.get("event", "")
+                meta = event.get("metadata", {})
+                target = meta.get("target_azel")
+                object_name = meta.get("object")
+                if target and len(target) == 2:
+                    lines.append(
+                        f"- {iso_time} {event_name}: az={float(target[0]):.3f}, el={float(target[1]):.3f}"
+                    )
+                elif object_name:
+                    lines.append(f"- {iso_time} {event_name}: object={object_name}")
+                else:
+                    lines.append(f"- {iso_time} {event_name}")
+
+        return "\n".join(lines)
 
     @app.callback(
-        Output("npoint-graph", "figure"),
-        [Input("npoint_info", "modified_timestamp")],
-        [State("npoint_info", "data")],
+        Output("btn-calibrate", "children"),
+        [Input("interval-component", "n_intervals")],
     )
-    def update_n_point(ts, npdata):
-        """Update the npoint track info
+    def update_encoder_calibrate_button_label(n):
+        status = status_thread.get_status()
+        if status is None:
+            return "Calibrate Encoders"
+        diagnostics = status.get("rotor_diagnostics", {}) or {}
+        cal_sts = diagnostics.get("CalSts")
+        if cal_sts:
+            return f"Cal Encoders ({cal_sts})"
+        return "Calibrate Encoders"
 
-        Parameters
-        ----------
-        ts : int
-            modified time stamp
-        npdata : dict
-            will hold N- point data.
-
-        Returns
-        -------
-        ofig : plotly.fig
-            Plotly figure
-        """
-
-        if ts is None:
+    @app.callback(
+        Output("obs-events-download", "data"),
+        [Input("btn-export-obs", "n_clicks")],
+        prevent_initial_call=True,
+    )
+    def export_observation_events_csv(n_clicks):
+        status = status_thread.get_status()
+        if status is None:
             raise PreventUpdate
-        if npdata is None:
-            return emptygraph("x", "y", "N-Point Scan")
+        events = status.get("observation_events", [])
+        if not events:
+            raise PreventUpdate
 
-        if npdata.get("scan_center", [1, 1])[0] == 0:
-            return emptygraph("x", "y", "N-Point Scan")
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "iso_time",
+                "event",
+                "time",
+                "sequence",
+                "object",
+                "target_az",
+                "target_el",
+                "point_index",
+                "point_total",
+                "end_reason",
+            ]
+        )
 
-        az_a = []
-        el_a = []
-        for irot in npdata["rotor_loc"]:
-            az_a.append(irot[0])
-            el_a.append(irot[1])
-        mdiff = npdata["maxdiff"]
-        sc = npdata["scan_center"]
-        plist = npdata["pwr"]
-        sd = npdata["sides"]
-        ofig = generate_npoint(az_a, el_a, mdiff[0], mdiff[1], plist, sc, sd)
-        return ofig
+        for entry in events:
+            meta = entry.get("metadata", {}) or {}
+            target = meta.get("target_azel") if isinstance(meta, dict) else None
+            target_az = ""
+            target_el = ""
+            if isinstance(target, (list, tuple)) and len(target) == 2:
+                target_az = target[0]
+                target_el = target[1]
+
+            writer.writerow(
+                [
+                    entry.get("iso_time", ""),
+                    entry.get("event", ""),
+                    entry.get("time", ""),
+                    meta.get("sequence", "") if isinstance(meta, dict) else "",
+                    meta.get("object", "") if isinstance(meta, dict) else "",
+                    target_az,
+                    target_el,
+                    meta.get("point_index", "") if isinstance(meta, dict) else "",
+                    meta.get("point_total", "") if isinstance(meta, dict) else "",
+                    meta.get("end_reason", "") if isinstance(meta, dict) else "",
+                ]
+            )
+
+        filename = f"observation_events_{int(time())}.csv"
+        return dcc.send_string(buffer.getvalue(), filename)
 
     @app.callback(
         Output("start-warning", "children"),
@@ -1029,7 +1173,7 @@ def register_callbacks(
         files = [
             {"label": file.name, "value": file.name}
             for file in Path(config["CONFIG_DIR"]).glob("*")
-            if file.is_file() and file.name.endswith(".yaml")
+            if file.is_file() and file.name.endswith(".yaml") and file.name != "schema.yaml"
         ]
         return files
 
@@ -1116,6 +1260,18 @@ def register_callbacks(
             axisstatus = 1
 
         if status is not None:
+            error_hist = status.get("pointing_error_history", [])
+            current_err = status.get("pointing_error")
+            if (not error_hist) and current_err is not None and len(current_err) == 2:
+                error_hist = [
+                    {
+                        "time": time(),
+                        "azerr_mdeg": float(current_err[0]),
+                        "elerr_mdeg": float(current_err[1]),
+                    }
+                ]
+            if error_hist:
+                return generate_pointing_error_graph(error_hist, range, axisstatus)
             # if (not clicksaz and not clicksel) or clicksaz > clicksel:
             # if clicksaz > clicksel:
             if axisstatus == 0:
@@ -1460,19 +1616,15 @@ def register_callbacks(
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
             if button_id == "start-btn-yes":
                 try:
-
-                    def run_srt_daemon(configuration_dir, configuration_dict):
-                        from srt.daemon import daemon as srt_d
-
-                        daemon = srt_d.SmallRadioTelescopeDaemon(
-                            configuration_dir, configuration_dict
-                        )
-                        daemon.srt_daemon_main()
-
                     from srt import config_loader
                     from multiprocessing import Process
 
-                    config_path = Path(config["CONFIG_DIR"], config_file_name)
+                    selected_config = config_file_name or "config.yaml"
+                    config_path = Path(config["CONFIG_DIR"], selected_config)
+                    if not config_path.is_file():
+                        raise FileNotFoundError(
+                            f"Config file not found: {config_path}"
+                        )
                     config_dict = config_loader.load_yaml(config_path)
                     daemon_process = Process(
                         target=run_srt_daemon,
@@ -1516,4 +1668,4 @@ def register_callbacks(
             elif button_id == "btn-quit":
                 command_thread.add_to_queue("quit")
             elif button_id == "btn-calibrate":
-                command_thread.add_to_queue("calibrate")
+                command_thread.add_to_queue("calibrate_encoders")

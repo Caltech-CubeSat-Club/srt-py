@@ -3,7 +3,7 @@
 Module for Tracking and Caching the Azimuth-Elevation Coords of Celestial Objects
 
 """
-from astropy.coordinates import SkyCoord, EarthLocation, get_sun, get_moon
+from astropy.coordinates import SkyCoord, EarthLocation, get_body, get_sun
 from astropy.coordinates import ICRS, Galactic, FK4, CIRS, AltAz
 from astropy.utils.iers.iers import conf
 from astropy.table import Table
@@ -13,6 +13,7 @@ import astropy.units as u
 import numpy as np
 from pathlib import Path
 from copy import deepcopy
+from typing import Any, cast
 
 
 root_folder = Path(__file__).parent.parent.parent.parent
@@ -73,7 +74,7 @@ class EphemerisTracker:
             sky_coord = SkyCoord(
                 coordinate_a, coordinate_b, frame=coordinate_system, unit=unit
             )
-            sky_coord_transformed = sky_coord.transform_to(CIRS)
+            sky_coord_transformed = cast(Any, sky_coord.transform_to(CIRS))
             sky_coords_ra[index] = sky_coord_transformed.ra.degree
             sky_coords_dec[index] = sky_coord_transformed.dec.degree
             self.sky_coord_names[name] = index
@@ -117,12 +118,16 @@ class EphemerisTracker:
             (az, el) Tuple
         """
         if name == "Sun":
-            alt_az = get_sun(time).transform_to(alt_az_frame)
+            alt_az = cast(Any, get_sun(time).transform_to(alt_az_frame))
         elif name == "Moon":
-            alt_az = get_moon(time, self.location).transform_to(alt_az_frame)
+            alt_az = cast(
+                Any, get_body("moon", time, self.location).transform_to(alt_az_frame)
+            )
         else:
-            alt_az = self.sky_coords[self.sky_coord_names[name]].transform_to(
-                alt_az_frame
+            target_coord = cast(Any, self.sky_coords[self.sky_coord_names[name]])
+            alt_az = cast(
+                Any,
+                target_coord.transform_to(alt_az_frame),
             )
         return alt_az.az.degree, alt_az.alt.degree
 
@@ -145,13 +150,19 @@ class EphemerisTracker:
             vlsr in km/s.
         """
         if name == "Sun":
-            tframe = get_sun(time).transform_to(frame)
+            tframe = cast(Any, get_sun(time).transform_to(frame))
             vlsr = tframe.radial_velocity_correction(obstime=time)
         elif name == "Moon":
-            tframe = get_moon(time).transform_to(frame)
+            tframe = cast(
+                Any, get_body("moon", time, self.location).transform_to(frame)
+            )
             vlsr = tframe.radial_velocity_correction(obstime=time)
         else:
-            tframe = self.sky_coord_names[name].transform_to(frame)
+            target_coord = cast(Any, self.sky_coords[self.sky_coord_names[name]])
+            tframe = cast(
+                Any,
+                target_coord.transform_to(frame),
+            )
             vlsr = tframe.radial_velocity_correction(obstime=time)
 
         return vlsr.to(u.km / u.s).value
@@ -228,7 +239,7 @@ class EphemerisTracker:
             return
         time = Time.now()
         frame = AltAz(obstime=time, location=self.location)
-        transformed = self.sky_coords.transform_to(frame)
+        transformed = cast(Any, self.sky_coords.transform_to(frame))
         for name in self.sky_coord_names:
             index = self.sky_coord_names[name]
             self.az_el_dict[name] = (
@@ -244,9 +255,9 @@ class EphemerisTracker:
 
         for time_passed in range(0, 61, 5):
 
-            timenew = time + time_passed
+            timenew = time + time_passed * u.second
             frame = AltAz(obstime=timenew, location=self.location)
-            transformed = self.sky_coords.transform_to(frame)
+            transformed = cast(Any, self.sky_coords.transform_to(frame))
 
             for name in self.sky_coord_names:
                 index = self.sky_coord_names[name]
@@ -297,7 +308,7 @@ class EphemerisTracker:
         if time_offset == 0:
             return self.get_all_azimuth_elevation()[name]
         else:
-            time = Time.now() + time_offset
+            time = Time.now() + time_offset * u.second
             return self.calculate_az_el(
                 name, time, AltAz(obstime=time, location=self.location)
             )
@@ -310,7 +321,7 @@ class EphemerisTracker:
         if time_offset == 0:
             return self.get_all_vlsr()[name]
         else:
-            time = Time.now() + time_offset
+            time = Time.now() + time_offset * u.second
             frame = AltAz(obstime=time, location=self.location)
             return self.calculate_vlsr(name, time, frame)
 
@@ -331,9 +342,9 @@ class EphemerisTracker:
 
         for time_passed in range(0, 61, 5):
 
-            time = Time.now() + time_passed
+            time = Time.now() + time_passed * u.second
             frame = AltAz(obstime=time, location=self.location)
-            transformed = self.sky_coords.transform_to(frame)
+            transformed = cast(Any, self.sky_coords.transform_to(frame))
 
             for name in self.sky_coord_names:
                 index = self.sky_coord_names[name]

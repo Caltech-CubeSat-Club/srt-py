@@ -67,6 +67,7 @@ def get_spectrum(port=5561):
     """
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
+    socket.setsockopt(zmq.RCVTIMEO, 1000)  # 1 second timeout
     socket.connect("tcp://localhost:%s" % port)
     socket.subscribe("")
     try:
@@ -74,6 +75,9 @@ def get_spectrum(port=5561):
         var = np.frombuffer(rec, dtype="float32")
     except:
         return None
+    finally:
+        socket.close()
+        context.term()
 
     return var
 

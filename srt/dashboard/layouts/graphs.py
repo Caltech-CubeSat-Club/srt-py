@@ -40,7 +40,7 @@ def generate_az_el_graph(
     horizon_points : list((float, float))
         Points to Build Outline of Horizon of Interfering Objects (i.e. Skyline in AzEl)
     beam_width : float
-        Beamwidth of the antenna
+        Beamwidth of the antenna in degrees
 
     Returns
     -------
@@ -67,31 +67,25 @@ def generate_az_el_graph(
         )
     )
 
-    # Marker for visability, basicaslly beamwidth  with azimuth stretched out for high elevation angles.
+    # Beam footprint marker: ellipse in Az/El with azimuth stretch by cos(elevation).
 
     az_l = current_location[0]
     el_l = current_location[1]
-    el_u = el_l + .5*beam_width
-    el_d = el_l - .5*beam_width
+    el_radius = 0.5 * beam_width
+    cos_el = np.cos(el_l * np.pi / 180.0)
+    az_radius = el_radius / max(abs(cos_el), 1e-3)
 
-    azu = .5*beam_width/np.cos(el_u * np.pi / 180.0)
-    azd = .5*beam_width/np.cos(el_d * np.pi / 180.0)
-    x_vec = [max(az_l-azd, 0), min(az_l-azu, 360),
-             max(az_l+azu, 0), min(az_l+azd, 360), max(az_l-azd, 0)]
-    y_vec = [max(el_d, 0), min(el_u, 90), min(
-        el_u, 90), min(el_d, 90), max(el_d, 0)]
-
-    fig.add_trace(
-        go.Scatter(
-            x=x_vec,
-            y=y_vec,
-            fill="toself",
-            fillcolor="rgba(147,112,219,0.1)",
-            text=["Visability"],
-            name='Visability',
-            mode="markers",
-            marker_color=["rgba(147,112,219, .8)" for _ in x_vec]
-        )
+    fig.add_shape(
+        type="circle",
+        xref="x",
+        yref="y",
+        x0=max(0, az_l - az_radius),
+        y0=max(0, el_l - el_radius),
+        x1=min(360, az_l + az_radius),
+        y1=min(90, el_l + el_radius),
+        fillcolor="rgba(147,112,219,0.1)",
+        line=dict(color="rgba(147,112,219,0.8)", width=1),
+        layer="below",
     )
 
     fig.add_trace(
@@ -294,18 +288,20 @@ def generate_zoom_graph(
             marker_color=["rgba(152, 0, 0, .8)" for _ in points_dict],
         )
     )
+    el_radius = 0.5 * beam_width
+    cos_el = np.cos(current_location[1] * np.pi / 180.0)
+    az_radius = el_radius / max(abs(cos_el), 1e-3)
     fig.add_shape(
-        type="rect",
+        type="circle",
         xref="x",
         yref="y",
-        x0=current_location[0]-beam_width,
-        y0=current_location[1]-beam_width,
-        x1=current_location[0]+beam_width,
-        y1=current_location[1]+beam_width,
+        x0=current_location[0] - az_radius,
+        y0=current_location[1] - el_radius,
+        x1=current_location[0] + az_radius,
+        y1=current_location[1] + el_radius,
         fillcolor="lightgrey",
+        line=dict(color="rgba(120,120,120,0.9)", width=1),
         layer="below",
-        label=dict(text="Beamwidth", textposition="top center",
-                   font=dict(color="White"))
     )
 
     fig.update_layout(
@@ -712,6 +708,61 @@ def emptygraph(xlabel, ylabel, title):
         layout={"title": title, "xaxis_title": xlabel, "yaxis_title": ylabel}
     )
 
+    return fig
+
+
+def generate_pointing_error_graph(error_history, timerange, axisstatus=0):
+    """Generates a time-series graph for az/el pointing errors in millidegrees."""
+    if not timerange:
+        timerange = 5
+
+    if not error_history:
+        error_history = [
+            {"time": 0.0, "azerr_mdeg": 0.0, "elerr_mdeg": 0.0},
+            {"time": float(timerange) * 60.0, "azerr_mdeg": 0.0, "elerr_mdeg": 0.0},
+        ]
+
+    newest_t = error_history[-1]["time"]
+    cutoff = newest_t - 60.0 * float(timerange)
+    filtered = [pt for pt in error_history if pt["time"] >= cutoff]
+    if not filtered:
+        filtered = error_history
+
+    t0 = filtered[0]["time"]
+    xvals = [pt["time"] - t0 for pt in filtered]
+    azvals = [pt.get("azerr_mdeg", np.nan) for pt in filtered]
+    elvals = [pt.get("elerr_mdeg", np.nan) for pt in filtered]
+
+    fig = go.Figure()
+    if axisstatus == 0:
+        fig.add_trace(
+            go.Scatter(
+                x=xvals,
+                y=azvals,
+                mode="lines",
+                name="Az Err (mdeg)",
+                line=dict(color="royalblue"),
+            )
+        )
+    else:
+        fig.add_trace(
+            go.Scatter(
+                x=xvals,
+                y=elvals,
+                mode="lines",
+                name="El Err (mdeg)",
+                line=dict(color="firebrick"),
+            )
+        )
+
+    fig.update_layout(
+        title="Pointing Error vs Time",
+        xaxis_title="Seconds",
+        yaxis_title="Error (mdeg)",
+        uirevision=True,
+        margin=dict(l=20, r=20, b=20, t=50, pad=4),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
     return fig
 
 

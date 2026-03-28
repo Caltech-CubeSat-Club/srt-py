@@ -1,0 +1,940 @@
+3:procedure BeginDrag;
+7:procedure Drag;
+11:procedure EndDrag;
+15:procedure DoubleClickLeft;
+19:procedure Setup;
+33:CmdAz := 0;
+34:CmdEl := 0;
+37:CmdVelAz := 0;
+38:CmdVelEl := 0;
+67:CmdTorqueAz := 0;
+68:CmdTorqueEl := 0;
+81:    CmdProc.setup;
+82:    CmdTorque := 0;
+146:    CmdProc.Setup;
+147:*21    ScheduleTask(TaskAddr(TaskUpdateDisplay),20);
+148:*.-   { BeginTask(TaskAddr(TaskSafetyMonitor));}
+150:function  CanClose:boolean;
+155:MsbFlashManager2
+156:procedure BeginDrag;
+160:procedure Drag;
+164:procedure EndDrag;
+168:procedure DoubleClickLeft;
+172:procedure Setup;
+187:*#"  ProductCodeString[0]:='Unknown';
+188:*"!  ProductCodeString[1]:='MSB-T8';
+189:*$#  ProductCodeString[2]:='MSB-V2T8';
+190:*$#  ProductCodeString[3]:='MSB-V4T8';
+191:*"!  ProductCodeString[4]:='MSB-T2';
+192:*"!  ProductCodeString[5]:='MSB-T4';
+193:*"!  ProductCodeString[6]:='MSB-T6';
+194:*$#  ProductCodeString[7]:='MSB-V2T2';
+195:*$#  ProductCodeString[8]:='MSB-V2T4';
+196:*$#  ProductCodeString[9]:='MSB-V2T6';
+197:*%$  ProductCodeString[10]:='MSB-V4T2';
+198:*%$  ProductCodeString[11]:='MSB-V4T4';
+199:*%$  ProductCodeString[12]:='MSB-V4T6';
+200:*%$  ProductCodeString[13]:='MSB-V6T2';
+201:*%$  ProductCodeString[14]:='MSB-V6T4';
+202:*&%  ProductCodeString[15]:='expansion';
+203:*&%  ProductCodeString[16]:='expansion';
+204:*#"  ProductCodeString[17]:='MSB-V2';
+205:*#"  ProductCodeString[18]:='MSB-V4';
+206:*#"  ProductCodeString[19]:='MSB-V6';
+207:*#"  ProductCodeString[20]:='MSB-T2';
+208:*#"  ProductCodeString[21]:='MSB-T4';
+209:*#"  ProductCodeString[22]:='MSB-T6';
+210:*%$  ProductCodeString[23]:='MSB-V2T2';
+211:*%$  ProductCodeString[24]:='MSB-V2T4';
+212:*%$  ProductCodeString[25]:='MSB-V2T6';
+213:*%$  ProductCodeString[26]:='MSB-V4T2';
+214:*%$  ProductCodeString[27]:='MSB-V4T4';
+215:*%$  ProductCodeString[28]:='MSB-V4T6';
+216:*%$  ProductCodeString[29]:='MSB-V6T2';
+217:*%$  ProductCodeString[30]:='MSB-V6T4';
+218:*&%  ProductCodeString[31]:='expansion';
+221:function  CanClose:boolean;
+225:*&%MSB Flash Memory Manager Version 2.03)'9
+227:procedure BeginDrag;
+231:procedure Drag;
+235:procedure EndDrag;
+239:procedure DoubleClickLeft;
+243:procedure Setup;
+247:function  CanClose:boolean;
+254:procedure BeginDrag;
+258:procedure Drag;
+262:procedure EndDrag;
+266:procedure DoubleClickLeft;
+270:procedure Setup;
+274:function  CanClose:boolean;
+285:procedure Click;
+290:procedure Click;
+308:eader:=Server.MemReadByte($B000,HeaderOf
+320:MemReadByte($B000,HeaderOffset+2) and $F
+325:procedure Click;
+341:*-,    status.writeln('Attempt: ',scanner);    
+346:*10      ScheduleTask(TaskAddr(UpdateDisplay),100);
+348:      UpdateFirmware;
+349:**)      AbortTask(TaskAddr(UpdateDisplay));
+352:      Status.writeln('done');
+362:*('    AbortTask(TaskAddr(UpdateDisplay));
+367:procedure Click;
+369:*CB  if AskYesNo.IsYes('No autostart without update. Continue?') then
+371:    ProgramByte($E000,0,$0);
+372:    ProgramByte($E000,1,$0);
+373:    ProgramByte($E000,2,$0);
+374:    ProgramByte($E000,3,$0);
+381:procedure Click;
+387:procedure BeginDrag;
+391:procedure Drag;
+395:procedure EndDrag;
+399:procedure DoubleClickLeft;
+403:procedure Setup;
+407:function  CanClose:boolean;
+418:procedure Click;
+423:procedure Click;
+456:procedure Click;
+464:*BA    Status.write('Updated Firmware Required for Autostart',crlf);
+465:*,+    Status.write('Use Firmware... button');
+470:*$#    if AutostartProgramPresent then
+472:*IH      if not AskYesNo.IsYes('Overwrite Current Autostart Program?') then
+481:*.-    ScheduleTask(TaskAddr(UpdateDisplay),20);
+484:*('    AbortTask(TaskAddr(UpdateDisplay));
+490:procedure Click;
+492:*BA  if AskYesNo.IsYes('Prevent controller from autostarting?') then
+494:    ProgramByte($8000,0,$0);
+495:    ProgramByte($8000,1,$0);
+496:    ProgramByte($8000,2,$0);
+497:    ProgramByte($8000,3,$0);
+503:Turn Off Autostart
+505:procedure BeginDrag;
+509:procedure Drag;
+513:procedure EndDrag;
+517:procedure Setup;
+523:function  CanClose:boolean;
+556:procedure Click;
+562:procedure BeginDrag;
+566:procedure Drag;
+570:procedure EndDrag;
+574:procedure DoubleClickLeft;
+578:procedure Setup;
+582:function  CanClose:boolean;
+589:procedure Click;
+595:procedure BeginDrag;
+599:procedure Drag;
+603:procedure EndDrag;
+607:procedure DoubleClickLeft;
+611:procedure Setup;
+615:function  CanClose:boolean;
+621:procedure Click;
+624:*87  SetPersistentBoolean(IndexEditor.ReadlnLongint,true);
+625:*CB  DebugList.writeln(PersistentBoolean(IndexEditor.ReadlnLongint));
+629:procedure DoubleClick;
+634:procedure Click;
+642:procedure Click;
+645:*98  SetPersistentBoolean(IndexEditor.ReadlnLongint,false);
+646:*CB  DebugList.writeln(PersistentBoolean(IndexEditor.ReadlnLongint));
+650:procedure Click;
+656:procedure Click;
+663:*CB    DebugList.writeln(Server.MemReadByte($B000,scanner+Sector));  
+667:procedure Click;
+674:*"!    SetPersistentBoolean(1,true);
+675:*%$    if not PersistentBoolean(1) then
+677:*#"    SetPersistentBoolean(1,false);
+678:*!     if PersistentBoolean(1) then
+685:procedure Click;
+693:**)      SetPersistentBoolean(scanner,false)
+695:**)      SetPersistentBoolean(scanner,true);
+702:*)(      if PersistentBoolean(scanner) then
+707:*-,      if not PersistentBoolean(scanner) then
+715:procedure Click;
+723:*)(      if PersistentBoolean(scanner) then
+728:*-,      if not PersistentBoolean(scanner) then
+736:procedure EnterKeyPushed;
+741:procedure Click;
+743:*CB  DebugList.writeln(PersistentBoolean(IndexEditor.ReadlnLongint));
+747:procedure Click;
+749:*CB  DebugList.writeln(PersistentInteger(IndexEditor.ReadlnLongint));
+753:procedure EnterKeyPushed;
+755:*NM  SetPersistentInteger(IndexEditor.ReadlnLongint,NumberEditor.ReadlnLongint);
+758:procedure Click;
+765:*-,    SetPersistentInteger(scanner,scanner*7);
+770:*65    if PersistentInteger(scanner) <> (scanner*7) then
+771:*lk      Diagnostic.Panel.Debuglist.writeln('Problem: ',scanner,' ',PersistentInteger(scanner),' ',scanner*7);
+777:procedure Click;
+779:*CB  DebugList.writeln(PersistentLongint(IndexEditor.ReadlnLongint));
+783:procedure EnterKeyPushed;
+785:*UT  SetPersistentLongint(IndexEditor.ReadlnLongint,LongintNumberEditor.ReadlnLongint);
+788:procedure Click;
+795:*10    SetPersistentLongint(scanner,scanner*10000);
+801:*:9    if PersistentLongint(scanner) <> (scanner*10000) then
+802:*lk      Diagnostic.Panel.Debuglist.writeln('Problem: ',scanner,' ',PersistentInteger(scanner),' ',scanner*7);
+808:procedure Click;
+815:*87    SetPersistentSingle(scanner,scanner*10000/3.16736);
+821:*ML    if abs(PersistentSingle(scanner) - (scanner*10000/3.16736)) > 0.001 then
+822:*lk      Diagnostic.Panel.Debuglist.writeln('Problem: ',scanner,' ',PersistentInteger(scanner),' ',scanner*7);
+828:procedure Click;
+830:*BA  DebugList.writeln(PersistentSingle(IndexEditor.ReadlnLongint));
+834:procedure EnterKeyPushed;
+838:*43  SetPersistentSingle(IndexEditor.ReadlnLongint,S);
+841:procedure Click;
+854:procedure EnterKeyPushed;
+858:*?>procedure ProgramByte(Seg:longint; Ofs:longint; Data:longint);
+866:  if AMDFlash then
+869:*'&    Server.MemWriteByte(Seg,Ofs,Data);
+872:*54      Readback:=Server.MemReadByte(Seg,Ofs) and $FF;
+877:*YX        Prompter.writeln('Unable to program Flash Memory byte: ',Seg,' ',Ofs,' ',Data);}
+878:*'&        Escape(ec_ProgramByteFailure);
+885:*'&        Escape(ec_ProgramByteFailure);
+889:  else if SSTFlash then
+891:    UnprotectSSTFlash;
+892:*&%    Server.MemWriteByte(Seg,Ofs,$10);
+893:*'&    Server.MemWriteByte(Seg,Ofs,Data);
+894:*.-    CurrentRead:=Server.MemReadByte(Seg,Ofs);
+902:*'&        Escape(ec_ProgramByteFailure);
+905:*21      CurrentRead:=Server.MemReadByte(Seg,Ofs);  
+907:*!     Server.MemReadByte(Seg,Ofs);
+908:*:9    if (Server.MemReadByte(Seg,Ofs) and $FF) <> Data then
+909:*%$      Escape(ec_ProgramByteFailure);
+912:*LK    Prompter.writeln('ProgramByte attempted on unidentified Flash device');
+928:Procedure Erase;
+942:*('    Value:=Server.MemReadByte($8000,0);
+945:*<;      Prompter.writeln('29F Flash Memory failed to erase');
+946:      Escape(ec_EraseFailure);
+949:  FlashReset;
+951:Procedure FlashReset;
+953:  if AMDFlash then
+956:*#"    Server.MemReadByte($8000,0);  
+958:  else if SSTFlash then
+959:*%$    Server.MemWriteByte($8000,0,$FF)
+961:*<;    Prompter.writeln('Flash chip has not been identified');
+963:Procedure UpdateFirmware;
+978:*-,  if ReadbackIDBit(7) then {E code required}
+994:    Escape(9005);
+998:  EraseSector(5);
+999:  EraseSector(6);
+1000:  FlashReset; 
+1011:*65      ProgramByte($D000,AddressCounter,DataByte);    
+1024:*65      ProgramByte($E000,AddressCounter,DataByte);    
+1029:  ProgramByte($E000,0,$55);
+1030:  ProgramByte($E000,1,$AA);
+1031:  ProgramByte($E000,2,$AA);
+1032:  ProgramByte($E000,3,$55);
+1033:*GF  ProgramByte($8000,0,0); {invalidate now-mislinked autostart program}
+1034:  ProgramByte($8000,1,0);
+1035:  ProgramByte($8000,2,0);
+1036:  ProgramByte($8000,3,0);
+1038:  FlashReset;
+1040:Function IsErased:boolean;
+1044:  FlashReset;
+1049:*,+    if FlashRead($8000,scanner) <> $FF then
+1051:*,+    if FlashRead($9000,scanner) <> $FF then
+1053:*,+    if FlashRead($A000,scanner) <> $FF then
+1055:*,+    if FlashRead($B000,scanner) <> $FF then
+1057:*,+    if FlashRead($C000,scanner) <> $FF then
+1059:*,+    if FlashRead($D000,scanner) <> $FF then
+1061:*,+    if FlashRead($E000,scanner) <> $FF then
+1063:*,+    if FlashRead($F000,scanner) <> $FF then
+1068:*98Function FlashRead(Seg:longint; Offset:longint):integer;
+1071:*54  FlashRead:=Server.MemReadByte(Seg,Offset) and $FF;
+1073:MinTimerompter.writeln('29F Flash Memory
+1076:Procedure InvalidateFlash;
+1078:  ProgramByte($8000,0,0);
+1087:   ProgramByte(
+1090:*'&  Server.MemWriteByte($8000,$555,$AA);
+1091:*'&  Server.MemWriteByte($8000,$2AA,$55);
+1092:*)(  Server.MemWriteByte($8000,$555,Value);
+1097:9000SendString(NumberString);OW
+1105: else if SSTFlash thenW
+1106:Procedure UpdateDisplay;
+1112:    Status.writeln('Erasing')
+1116:*('    Status.writeln('Storing Header...')
+1119:    Status.writeln('Code 1')
+1124:    Status.writeln('Code 2');
+1129:    Status.writeln('Data')
+1134:*$#    Status.writeln('Program Saved')
+1139:*+*    Status.writeln('Storing Firmware...');
+1144:*('    Status.writeln('Firmware Updated');
+1167:*('  Server.MemWriteByte($8000,$5555,$AA);
+1168:*('  Server.MemWriteByte($8000,$2AAA,$55);
+1170:*,+  Server.MemWriteByte(SegmentToErase,0,$30)
+1175:      Escape(4003);  
+1176:*87    Value:=Server.MemReadByte(SegmentToErase,0);       
+1180:Procedure SaveProgram;
+1182:  var AutostartAddress:longint;
+1184:*21  AutostartAddress:=TaskAddrAtName('Main.Setup');
+1185:  if AutostartAddress=0 then
+1188:    Escape(9002);
+1194:    EraseSector(0);
+1196:    EraseSector(1);
+1198:    EraseSector(2);
+1201:    FlashReset; 
+1202:    ProgramByte($8000,0,$5A);  
+1203:    ProgramByte($8000,1,$5A);
+1204:    ProgramByte($8000,2,$A5);  
+1205:    ProgramByte($8000,3,$A5);
+1207:*A@    ProgramByte($8000,4,5); {2 code segments and a data segment}
+1208:    FlashReset;
+1213:*HG      ProgramByte($8000,scanner,Server.MemReadByte($2000,scanner));    
+1219:*HG      ProgramByte($9000,scanner,Server.MemReadByte($3000,scanner));    
+1225:*DC      ProgramByte($A000,scanner,Server.MemReadByte($1000,scanner));
+1227:    {store autostart address}
+1228:*43    ProgramByte($8000,$8,AutostartAddress and $FF);
+1229:*A@    ProgramByte($8000,$9,(AutostartAddress and $FF00) div $100);
+1230:*ED    ProgramByte($8000,$A,(AutostartAddress and $FF0000) div $10000);
+1231:*IH    ProgramByte($8000,$B,(AutostartAddress and $FF000000) div $1000000);
+1237:*DC      InvalidateFlash  {invalidate header to insure autostart does}
+1239:*DC                       {flash memory                              }
+1244:  FlashReset;
+1245:  if SSTFlash then
+1246:    ProtectSSTFlash;
+1257:Procedure LoadFlashLongints;
+1264:  FlashReset;
+1267:*43    Byte0:=Server.MemReadByte($B000,(scanner-1)*4);
+1268:*65    Byte1:=Server.MemReadByte($B000,(scanner-1)*4+1);
+1269:*65    Byte2:=Server.MemReadByte($B000,(scanner-1)*4+2);
+1270:*65    Byte3:=Server.MemReadByte($B000,(scanner-1)*4+3);
+1272:    FlashLongint[scanner]:=
+1278:Procedure SaveFlashLongints;
+1285:  EraseSector(3); 
+1288:*?>    Byte3:=(HighWord(FlashLongint[scanner]) div $100) and $FF;
+1289:*43    Byte2:=HighWord(FlashLongint[scanner]) and $FF;
+1290:*?>    Byte1:=(LowWord(FlashLongint[scanner])  div $100) and $FF;
+1291:*32    Byte0:=LowWord(FlashLongint[scanner]) and $FF;
+1293:*,+    ProgramByte($B000,(scanner-1)*4,Byte0);
+1294:*.-    ProgramByte($B000,(scanner-1)*4+1,Byte1);
+1295:*.-    ProgramByte($B000,(scanner-1)*4+2,Byte2);
+1296:*.-    ProgramByte($B000,(scanner-1)*4+3,Byte3);
+1298:  FlashReset;
+1299:  if SSTFlash then
+1300:    ProtectSSTFlash;
+1302:+FlashLongint
+1306:Procedure UpdateStatus;
+1310:*65    Status.write('MSB Product Code not present',crlf)
+1312:*SR    Status.write('Controller identified as ',ProductCodeString[ProductCode],crlf);
+1315:*A@    Status.write('MSB currently operating in Backup Mode',crlf);
+1318:*IH      Status.write('Restarted controller will run in Active Mode',crlf);
+1319:*&%      if AutostartProgramPresent then
+1320:*GF        Status.write('Autostart program is present and will run',crlf)
+1322:*<;        Status.write('Autostart program not present',crlf);
+1325:*TS      Status.write('Updated Firmware required for Active Mode and Autostart',crlf);
+1329:*A@    Status.write('MSB currently operating in Active Mode',crlf);
+1332:*HG      Status.write('Restarted controller will run in Active Mode',crlf)
+1333:*&%      if AutostartProgramPresent then
+1334:*GF        Status.write('Autostart program is present and will run',crlf)
+1336:*<;        Status.write('Autostart program not present',crlf);
+1340:*IH      Status.write('Restarted controller will run in Backup Mode',crlf);
+1341:*TS      Status.write('Updated Firmware required for Active Mode and Autostart',crlf);
+1353:*-,  if server.MemReadByte($E000,0) <> $55 then
+1356:*76  if (server.MemReadByte($E000,1) and $FF) <> $AA then
+1359:*76  if (server.MemReadByte($E000,2) and $FF) <> $AA then
+1362:*-,  if server.MemReadByte($E000,3) <> $55 then
+1367:**)Function AutostartProgramPresent:boolean;
+1369:*"!  AutostartProgramPresent:=false;
+1370:  AutostartCode:=0;
+1373:  AutostartCode:=1;
+1376:  AutostartCode:=2;
+1379:  AutostartCode:=3;
+1380:*+*  if server.MemReadByte($8000,4) <> 5 then
+1382:  AutostartCode:=4;
+1385:  AutostartCode:=5;
+1388:  AutostartCode:=6;
+1391:  AutostartCode:=7;
+1394:  AutostartCode:=8;
+1395:*!   AutostartProgramPresent:=true;
+1397:AutostartCode;OW
+1401:Function ValidId: boolean;
+1407:  if (ReadbackIDBit(6)=0)
+1408:  and (ReadbackIdBit(5)=1) then
+1413:  else if (ReadbackIDBit(6)=1)
+1414:  and (ReadbackIDBit(5)=0) then
+1416:  else if (ReadbackIDBit(6)=1)
+1417:  and (ReadbackIDBit(5)=1) then
+1425:*CB      ReadbackIDBit(7),' ',ReadbackIDBit(6),' ',ReadbackIDBIt(5));
+1429:ProductCodeStringp
+1430:String Byte3:=(HighWord(FlashLongint[sca
+1435:   Byte2:=HighWord(FlashLon
+1436:AMDFlash]) and $FF;
+1438:SSTFlash$l
+1443:Procedure IdentifyDevice;
+1447:  AMDFlash:=false;
+1448:  SSTFlash:=false;
+1449:*<;  Server.MemWriteByte($8000,0,$FF); {speculative SST Reset}
+1450:*?>  Server.MemWriteByte($8000,0,$90); {speculative SST ID Query}
+1451:*98  ManufacturerCode:=Server.MemReadByte($8000,0) and $FF;
+1452:*32  DeviceCode:=Server.MemReadByte($8000,1) and $FF;
+1454:    SSTFlash:=true
+1456:    AMDFlash:=true;
+1457:  FlashReset;
+1461:*98{ Sector Number given as 0 to 7 range applies to Flash }
+1473:*ED    Prompter.writeln('Attempting to Erase Locked Sectors in Flash');
+1474:    Escape(3000);
+1481:*-,Procedure EraseSector(SectorNumber:longint);
+1486:  if AMDFlash then
+1488:  else if SSTFlash then
+1491:*<;    Prompter.writeln('EraseSector reports unknown device');
+1496:*98{ Sector Number given as 0 to 7 range applies to Flash }
+1507:  UnprotectSSTFlash;
+1508:*43  Server.MemWriteByte(EraseSegment,ByteOffset,$20);
+1509:*43  Server.MemWriteByte(EraseSegment,ByteOffset,$D0);
+1510:*<;  CurrentRead:=Server.MemReadByte(EraseSegment,ByteOffset);
+1514:*@?    CurrentRead:=Server.MemReadByte(EraseSegment,ByteOffset);  
+1518:      Escape(ec_EraseFailure);
+1521:Procedure UnprotectSSTFlash;
+1523:  if SSTFlashUnprotected then
+1525:*#"  Server.MemReadByte($8000,$1823);
+1526:*#"  Server.MemReadByte($8000,$1820);
+1527:*#"  Server.MemReadByte($8000,$1822);
+1528:*#"  Server.MemReadByte($8000,$0418);
+1529:*#"  Server.MemReadByte($8000,$041B);
+1530:*#"  Server.MemReadByte($8000,$0419);
+1531:*#"  Server.MemReadByte($8000,$041A);
+1532:  SSTFlashUnprotected:=true;
+1534:SSTFlashUnprotectedW
+1536:Procedure Initialize;
+1538:  SSTFlashUnprotected:=false;
+1546:Procedure ProtectSSTFlash;
+1548:*#"  Server.MemReadByte($8000,$1823);
+1549:*#"  Server.MemReadByte($8000,$1820);
+1550:*#"  Server.MemReadByte($8000,$1822);
+1551:*#"  Server.MemReadByte($8000,$0418);
+1552:*#"  Server.MemReadByte($8000,$041B);
+1553:*#"  Server.MemReadByte($8000,$0419);
+1554:*#"  Server.MemReadByte($8000,$040A);
+1555:  SSTFlashUnprotected:=false;
+1557:Procedure UploadFirmware;
+1579:*:9      DataByte:=Server.MemReadByte($D000,AddressCounter);
+1586:    Status.writeln(scanner);
+1594:*:9      DataByte:=Server.MemReadByte($E000,AddressCounter);
+1601:    Status.writeln(scanner);
+1634:*:9      DataByte:=Server.MemReadByte($E000,AddressCounter);
+1641:    Status.writeln(scanner);
+1645:*%$Procedure UpdateFirmwareWithoutFPGA;
+1664:    Escape(9005);
+1668:  EraseSector(6);
+1669:  FlashReset; 
+1680:*65      ProgramByte($E000,AddressCounter,DataByte);    
+1685:  ProgramByte($E000,0,$55);
+1686:  ProgramByte($E000,1,$AA);
+1687:  ProgramByte($E000,2,$AA);
+1688:  ProgramByte($E000,3,$55);
+1689:*GF  ProgramByte($8000,0,0); {invalidate now-mislinked autostart program}
+1690:  ProgramByte($8000,1,0);
+1691:  ProgramByte($8000,2,0);
+1692:  ProgramByte($8000,3,0);
+1694:  FlashReset;
+1696:*>=Procedure SetPersistentBoolean(Index:integer; Value:Boolean);
+1712:*,+    CurrentValue:=PersistentBoolean(Index);
+1727:*('      Escape(ec_PersistentSectorErase);
+1734:*.-    ProgramByte($B000,Offset+1+SectorBase,0);
+1735:*ba  ProgramByte($B000,Offset+SectorBase,$81); {high bit means data valid, low 7 bits means boolean}
+1737:*rq    ProgramByte($B000,LastHeaderOffset+SectorBase,Server.MemReadByte($B000,LastHeaderOffset+SectorBase) and $7F);
+1739:*"!Procedure LoadPersistentLongints;
+1741:  Escape(40000);
+1747:Function PersistentOffsetAvailableForDataSize(var Offset:integer; Index:integer; Size:integer; var LastHeader:integer):boolean;
+1755:*ED    HeaderByte:=Server.MemReadByte($B000,SectorBase+Offset) and $FF;
+1772:*32Function PersistentBoolean(Index:integer):boolean;
+1782:*21  Header:=Server.MemReadByte($B000,HeaderOffset);
+1784:*=<    Escape(ec_PersistentDatatypeError); {data type mismatch}
+1785:*A@  if (Server.MemReadByte($B000,HeaderOffset+1) and $FF) > 0 then
+1786:    PersistentBoolean:=true
+1788:    PersistentBoolean:=false;
+1799:*@?    Value:=Server.MemReadByte($B000,SectorBase+Offset) and $FF;
+1808:        Escape(6001);
+1813:  Escape(6001);
+1815:*32Function PersistentInteger(Index:integer):integer;
+1827:*21  Header:=Server.MemReadByte($B000,HeaderOffset);
+1829:*=<    Escape(ec_PersistentDatatypeError); {data type mismatch}
+1830:*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+1) and $FF;
+1831:*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+2) and $FF;
+1832:*/.  PersistentInteger:=HighByte*$100 or LowByte;
+1838:*>=Procedure SetPersistentInteger(Index:integer; Value:Integer);
+1852:*,+    CurrentValue:=PersistentInteger(Index);
+1867:*('      Escape(ec_PersistentSectorErase);
+1869:*87  ProgramByte($B000,Offset+1+SectorBase,Value and $FF);
+1870:*98  ProgramByte($B000,Offset+2+SectorBase,Value div $100);
+1871:*ba  ProgramByte($B000,Offset+SectorBase,$82); {high bit means data valid, low 7 bits means boolean}
+1873:*ut    ProgramByte($B000,LastHeaderOffset+SectorBase,Server.MemReadByte($B000,LastHeaderOffset+SectorBase) and $7F);   
+1875:*>=Procedure SetPersistentLongint(Index:integer; Value:Longint);
+1889:*,+    CurrentValue:=PersistentLongint(Index);
+1904:*('      Escape(ec_PersistentSectorErase);
+1906:*87  ProgramByte($B000,Offset+1+SectorBase,Value and $FF);
+1907:*98  ProgramByte($B000,Offset+2+SectorBase,Value div $100);
+1908:*;:  ProgramByte($B000,Offset+3+SectorBase,Value div $10000);
+1909:*=<  ProgramByte($B000,Offset+4+SectorBase,Value div $1000000);
+1910:*ba  ProgramByte($B000,Offset+SectorBase,$83); {high bit means data valid, low 7 bits means boolean}
+1912:*ut    ProgramByte($B000,LastHeaderOffset+SectorBase,Server.MemReadByte($B000,LastHeaderOffset+SectorBase) and $7F);   
+1914:*32Function PersistentLongint(Index:integer):Longint;
+1928:*21  Header:=Server.MemReadByte($B000,HeaderOffset);
+1930:*=<    Escape(ec_PersistentDatatypeError); {data type mismatch}
+1931:*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+1) and $FF;
+1932:*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+2) and $FF;
+1934:*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+3) and $FF;
+1935:*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+4) and $FF;
+1937:*GF  PersistentLongint:=MakeLongintFromHighAndLowWords(HighWord,LowWord);
+1939:*<;Procedure SetPersistentSingle(Index:integer; Value:Single);
+1954:*+*    CurrentValue:=PersistentSingle(Index);
+1969:*('      Escape(ec_PersistentSectorErase);
+1972:*98  ProgramByte($B000,Offset+1+SectorBase,LValue and $FF);
+1973:*:9  ProgramByte($B000,Offset+2+SectorBase,LValue div $100);
+1974:*<;  ProgramByte($B000,Offset+3+SectorBase,LValue div $10000);
+1975:*>=  ProgramByte($B000,Offset+4+SectorBase,LValue div $1000000);
+1976:*ba  ProgramByte($B000,Offset+SectorBase,$84); {high bit means data valid, low 7 bits means boolean}
+1978:*ut    ProgramByte($B000,LastHeaderOffset+SectorBase,Server.MemReadByte($B000,LastHeaderOffset+SectorBase) and $7F);   
+1998:*BA      LastHeader:=Server.MemReadByte($B000,HeaderOffset) and $FF;
+2001:*+*        if PersistentBoolean(scanner) then
+2007:*XW        File.writeln('2 ',PersistentInteger(scanner),' (',scanner,' contains Integer)')
+2009:*XW        File.writeln('3 ',PersistentLongint(scanner),' (',scanner,' contains Longint)')
+2011:*VU        File.writeln('4 ',PersistentSingle(scanner),' (',scanner,' contains Single)')
+2018:*10Function PersistentSingle(Index:integer):Single;
+2032:*21  Header:=Server.MemReadByte($B000,HeaderOffset);
+2034:*=<    Escape(ec_PersistentDatatypeError); {data type mismatch}
+2035:*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+1) and $FF;
+2036:*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+2) and $FF;
+2038:*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+3) and $FF;
+2039:*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+4) and $FF;
+2041:*ED  PersistentSingle:=MakeSingleFromHighAndLowWords(HighWord,LowWord);
+2063:*+*        if PersistentBoolean(scanner) then
+2069:*XW        File.writeln('2 ',PersistentInteger(scanner),' (',scanner,' contains Integer)')
+2071:*XW        File.writeln('3 ',PersistentLongint(scanner),' (',scanner,' contains Longint)')
+2073:*VU        File.writeln('4 ',PersistentSingle(scanner),' (',scanner,' contains Single)')
+2080:*32Function ReadbackIDBit(BitNumber:integer):integer;
+2084:    ReadbackIDBit:=1
+2086:    ReadbackIDBit:=0;
+2088:Function ProductCode:integer;
+2090:  ProductCode:=
+2091:    ReadbackIdBit(0)
+2092:    +(ReadbackIdBit(1)*2)
+2093:    +(ReadbackIDBit(2)*4)
+2094:    +(ReadbackIdBit(3)*8)
+2095:    +(ReadbackIdBit(4)*16);
+2137:cmdZeroEl2
+2138:procedure Click;
+2145:cmdZeroAz2
+2146:procedure Click;
+2163:txtCmdTorqueAz2
+2164:txtCmdTorqueAz
+2165:txtCmdTorqueEl2
+2166:txtCmdTorqueEl
+2168:CmdTorque
+2226:procedure EnterKeyPushed;
+2231:procedure EnterKeyPushed;
+2242:CmdVelAz
+2243:txtCmdVelAz2
+2244:txtCmdVelAz
+2245:txtCmdVelEl2
+2246:txtCmdVelEl
+2260:procedure Click;
+2262:  MSBFlashManager.PopUP;
+2448:CmdProc2
+2449:procedure BeginDrag;
+2453:procedure Drag;
+2457:procedure EndDrag;
+2461:procedure DoubleClickLeft;
+2465:procedure Setup;
+2468:*.-    BeginTask(TaskAddr(TaskMonitorCommPort));
+2470:function  CanClose:boolean;
+2476:procedure BeginDrag;
+2480:procedure Drag;
+2484:procedure EndDrag;
+2488:procedure Setup;
+2492:function  CanClose:boolean;
+2526:*('      Escape(SerialTransmitEscapeCode);
+2538:**)        Escape(SerialTransmitEscapeCode);
+2548:Function GetCharacter:integer;
+2560:*'&      Escape(SerialReceiveEscapeCode);
+2569:*'&      Escape(SerialReceiveEscapeCode);
+2589:**)Procedure SendString(var aString:string);
+2611:Procedure UartSetup;
+2629:Procedure PackageMarker;
+2733:*#"  Escape(ScanningErrorEscapeCode);
+2813:*=<      StringAtPut(InspectToken.Value,TokenScanner,NextChar);
+2818:*43    StringAtPut(InspectToken.Value,TokenScanner,0);
+2880:*>=      StringAtPut(InspectToken.Value,TokenScanner,UpperChar);
+2892:*87    StringAtPut(InspectToken.Value,TokenScanner,0);    
+2932:    Escape(5000);
+2955:procedure TaskMonitorCommPort;
+2982:  end; {TaskMonitorCommPort}
+2991:*&%{txtdb1.writeln(InspectToken.value);}
+2992:*ed    if InspectToken.value = 'AZEL' then begin CmdAZEL; SendAck('AZEL'); end ; {Commanded Az,El,time}
+2993:*]\    if InspectToken.value = 'AZL' then begin CmdAZL; SendAck('AZL'); end ; {Commanded Az,El}
+2994:*CB    if InspectToken.Value = 'GAE' then CmdGAE; {Request for Az,El}
+2995:*?>    if InspectToken.Value = 'GET' then CmdGET; {Download data}
+2996:*`_    if InspectToken.Value = 'ZPN' then begin CmdZPN; SendAck('ZPN'); end; {Zero buffer pointer}
+2997:    if InspectToken.Value = 'TON' then begin BeginTask(TaskAddr(TaskPositionLoop)); SendAck('TON'); UpdateAll := 1; end; {Start position loop}
+2998:*po    if InspectToken.Value = 'LPR' then begin cmdLPR; SendAck('LPR'); UpdateAll := 1; end; {Load new parameters}
+2999:    if InspectToken.Value = 'CLE' then begin BeginTask(TaskAddr(TaskCalEncoders)); SendAck('CLE'); end;  {Cal position encoders}
+3001:*ed    if InspectToken.Value = 'SPA' then begin StopAll; SendAck('SPA'); end; {Stop all tasks but comm}
+3002:*[Z    if InspectToken.Value = 'CLO' then begin CmdCLO; SendAck('CLO'); end;  {Clear offsets}
+3003:*a`    if InspectToken.Value = 'POF' then begin CmdPOF; SendAck('POF'); end;  {Set position offset}
+3004:*_^    if InspectToken.Value = 'VOF' then begin CmdVOF; SendAck('VOF'); end; {SetVelocity offset}
+3005:*@?    if InspectToken.Value = 'STS' then CmdSTS; {Status request}
+3006:*>=  if InspectToken.Value = 'STX' then CmdSTX; {Status request}
+3007:*HG    if InspectToken.Value = 'ERR' then CmdERR; {Position error request}
+3008:*_^    if InspectToken.Value = 'SEN' then begin CmdSEN; SendAck('SEN'); end; {Set encoder values}
+3009:*ZY    if InspectToken.Value = 'TMD' then begin CmdTMD; SendAck('TMD'); end; {Set test mode}
+3010:*ji   if InspectToken.Value = 'EBN' then begin IsoIo.SetOutputBit(2,off); SendAck('EBN'); end; {El brake ON}
+3011:*ji   if InspectToken.Value = 'EBF' then begin IsoIo.SetOutputBit(2,on); SendAck('EBF'); end; {El brake OFF}
+3012:*kj   if InspectToken.Value = 'ABN' then begin IsoIo.SetOutputBit(1,off); SendAck('ABN'); end;  {Az brake ON}
+3013:*ji   if InspectToken.Value = 'ABF' then begin IsoIo.SetOutputBit(1,on); SendAck('ABF'); end; {Az brake OFF}
+3015:*43   if InspectToken.Value = 'AZV' then {Set Az DACs}
+3018:*43        azvx = LongintInString(InspectToken.Value);
+3022:        SendAck('AZV');
+3025:*43    if InspectToken.Value = 'ELV' then {Set EL DAC}
+3028:*43        elvx = LongintInString(InspectToken.Value);
+3031:        SendAck('ELV');
+3033:*'&    if InspectToken.Value = 'VER' then
+3035:    comm.SendString(VerConst);
+3039:*43   if InspectToken.Value = 'AVS' then {Set Az DACs}
+3042:*43        azvx = LongintInString(InspectToken.Value);
+3045:*43        azvx = LongintInString(InspectToken.Value);
+3047:        SendAck('AZS');
+3049:*?>   if InspectToken.Value = 'ENC' then {REad az motor encoders}
+3051:    comm.SendString('ENC,');
+3053:*#"    comm.SendString(NumberString);
+3056:*#"    comm.SendString(NumberString);
+3060:*ON   if InspectToken.Value = 'NER' then {report number of errors in taskposloop}
+3062:*!         comm.SendString('NER,');
+3064:*'&        comm.SendString(NumberString);
+3069:Procedure CmdGAE; {Get Az, El }
+3074:    comm.SendString('AZEL,');
+3076:*#"    comm.SendString(NumberString);
+3079:*#"    comm.SendString(NumberString);
+3082:  end; {CmdGAE}
+3301:*$#Procedure CmdGET; {Get buffer data}
+3308:*#"    comm.SendString(NumberString);
+3312:*#"    comm.SendString(NumberString);
+3317:  end; {CmdGET}
+3318:*('Procedure cmdZPN; {Zero Buffer Pointer}
+3321:*=<    LogDataCountRate := LongintInString(InspectToken.Value);
+3323:*43    LogValA := LongintInString(InspectToken.Value);
+3325:*43    LogValB := LongintInString(InspectToken.Value);
+3327:   end; {CmdZPN}
+3329:*FECmdLPR accepts a command in the form LPR,p1,p2,p3,p4,p5,p6,p7,p8 <cr>
+3333:*54    AzPosPGain:= DoubleInString(InspectToken.Value);
+3335:*54    AzPosIGain:= DoubleInString(InspectToken.Value);
+3337:*54    AzVelPGain:= DoubleInString(InspectToken.Value);
+3339:*54    AzVelIGain:= DoubleInString(InspectToken.Value);
+3341:*32    AzFFGain:= DoubleInString(InspectToken.Value);
+3343:*54    ElPosPGain:= DoubleInString(InspectToken.Value);
+3345:*54    ElPosIGain:= DoubleInString(InspectToken.Value);
+3347:*54    ElVelPGain:= DoubleInString(InspectToken.Value);
+3349:*54    ElVelIGain:= DoubleInString(InspectToken.Value);
+3351:*32    ElFFGain:= DoubleInString(InspectToken.Value);
+3353:*21    pAzTmax:= DoubleInString(InspectToken.Value);
+3355:*21    pElTmax:= DoubleInString(InspectToken.Value);
+3357:*21    pAzTmin:= DoubleInString(InspectToken.Value);
+3359:*21    pElTmin:= DoubleInString(InspectToken.Value);
+3361:*32    pAzTbias:= DoubleInString(InspectToken.Value);
+3363:*10    pAzMrd:= DoubleInString(InspectToken.Value);
+3365:*10    pElMrd:= DoubleInString(InspectToken.Value);
+3367:*10    pAzMcr:= DoubleInString(InspectToken.Value);
+3369:*10    pElMcr:= DoubleInString(InspectToken.Value);
+3371:*10    pAzEpo:= DoubleInString(InspectToken.Value);
+3373:*10    pElEpo:= DoubleInString(InspectToken.Value);
+3374:  end; {CmdLPR}
+3375:*)(Procedure CmdVOF; {Set velocity offset }
+3379:*43    VelOffAz := DoubleInString(InspectToken.Value);
+3381:*43    VelOffEl := DoubleInString(InspectToken.Value);
+3382:  end; {CmdVOF}
+3383:*"!Procedure CmdCLO; {Clear offsets}
+3391:  end; {CmdCLO}
+3392:*,+Procedure CmdPOF; {Position Offset az, el }
+3395:*43    PosOffAz := DoubleInString(InspectToken.Value);
+3397:*43    PosOffEl := DoubleInString(InspectToken.Value);
+3398:  end; {CmdPOF}
+3399:Procedure CmdSTS; {Get Status }
+3401:    comm.SendString('STS,');
+3403:*#"    comm.SendString(NumberString);
+3406:*#"    comm.SendString(NumberString);
+3407:*76if RunningTask = 0 then comm.SendString('0'); {halted}
+3408:*98if RunningTask = 1 then comm.SendString('1'); {tracking}
+3410:  comm.SendString('F')
+3412:  comm.SendString('T');
+3414:  comm.SendString('F')
+3416:  comm.SendString('T');
+3418:  comm.SendString('F')
+3420:  comm.SendString('T');
+3422:  comm.SendString('F')
+3424:  comm.SendString('T');
+3426:  comm.SendString('F')
+3428:  comm.SendString('T');
+3430:  comm.SendString('F')
+3432:  comm.SendString('T');
+3434:  comm.SendString('F')
+3436:  comm.SendString('T');
+3438:  comm.SendString('F')
+3440:  comm.SendString('T');
+3442:  comm.SendString('F')
+3444:  comm.SendString('T');
+3446:  comm.SendString('F')
+3448:  comm.SendString('T');
+3450:  comm.SendString('F')
+3452:  comm.SendString('T');
+3454:  comm.SendString('F')
+3456:  comm.SendString('T');
+3457:*CBif CalComplete = 0 then comm.SendString('0'); {not calibrated = 0}
+3458:*DCif CalComplete = 1 then comm.SendString('1'); {cal in progress = 1}
+3459:*CBif CalComplete = 2 then comm.SendString('2'); {cal complete = 2}  
+3461:  comm.SendString('T')
+3463:  comm.SendString('F');
+3466:  end; {CmdSTS}
+3467:*#"Procedure CmdErr; {pointing error}
+3469:      comm.SendString('ERR,');
+3471:*#"    comm.SendString(NumberString);
+3474:*#"    comm.SendString(NumberString);
+3477:    {comm.SendString(crlf);}
+3478:  end; {CmdErr}
+3479:*! Procedure cmdSEN; {Set encoders}
+3484:*.-    xaz = DoubleInString(InspectToken.value);
+3485:*GF    {'VAxis.SetActualPosition( LongintInString(InspectToken.Value) );}
+3488:*.-    xel = DoubleInString(InspectToken.value);
+3490:*ED   { 'WAxis.SetActualPosition(LongintInString(InspectToken.Value));}
+3491:  end; {CmdSEN}
+3492:*'&Procedure CmdTMD; {Set test mode flag}
+3495:*43    TestMode:= LongintInString(InspectToken.Value);
+3496:  end; {CmdTMD}
+3497:*,+Procedure SendAck(var m:string); {ACK msg }
+3499:    comm.SendString(m);
+3503:**)Procedure cmdLPR; {Load loop parameters }
+3505:*FECmdLPR accepts a command in the form LPR,p1,p2,p3,p4,p5,p6,p7,p8 <cr>
+3509:*/.   pAzKo:= DoubleInString(InspectToken.Value);
+3511:*/.   pElKo:= DoubleInString(InspectToken.Value);
+3513:*/.   pAzKv:= DoubleInString(InspectToken.Value);
+3515:*/.   pElKv:= DoubleInString(InspectToken.Value);
+3517:*.-   pAze:= DoubleInString(InspectToken.Value);
+3519:*.-   pEle:= DoubleInString(InspectToken.Value);
+3521:*10   pAzAmax:= DoubleInString(InspectToken.Value);
+3523:*10   pElAmax:= DoubleInString(InspectToken.Value);
+3525:*10   pAzVmax:= DoubleInString(InspectToken.Value);
+3527:*10   pElVmax:= DoubleInString(InspectToken.Value);
+3529:*10   pAzImax:= DoubleInString(InspectToken.Value);
+3531:*10   pElImax:= DoubleInString(InspectToken.Value);
+3533:*0/   pAzKpp:= DoubleInString(InspectToken.Value);
+3535:*0/   pElKpp:= DoubleInString(InspectToken.Value);
+3537:*0/   pAzKpi:= DoubleInString(InspectToken.Value);
+3539:*0/   pElKpi:= DoubleInString(InspectToken.Value);
+3541:*0/   pAzKvp:= DoubleInString(InspectToken.Value);
+3543:*0/   pElKvp:= DoubleInString(InspectToken.Value);
+3545:*0/   pAzKvi:= DoubleInString(InspectToken.Value);
+3547:*0/   pElKvi:= DoubleInString(InspectToken.Value);
+3549:*0/   pAzKff:= DoubleInString(InspectToken.Value);
+3551:*0/   pElKff:= DoubleInString(InspectToken.Value);
+3553:*10   pAzTmax:= DoubleInString(InspectToken.Value);
+3555:*10   pElTmax:= DoubleInString(InspectToken.Value);
+3557:*10   pAzTmin:= DoubleInString(InspectToken.Value);
+3559:*10   pElTmin:= DoubleInString(InspectToken.Value);
+3561:*10   pAzTsgn:= DoubleInString(InspectToken.Value);
+3563:*10   pElTsgn:= DoubleInString(InspectToken.Value);
+3565:*21   pAzTbias:= DoubleInString(InspectToken.Value);
+3567:*0/   pAzEcr:= DoubleInString(InspectToken.Value);
+3569:*0/   pElEcr:= DoubleInString(InspectToken.Value);
+3571:*10   pAzMEcr:= DoubleInString(InspectToken.Value);
+3573:*10   pElMEcr:= DoubleInString(InspectToken.Value);
+3575:*0/   pAzEpo:= DoubleInString(InspectToken.Value);
+3577:*0/   pElEpo:= DoubleInString(InspectToken.Value);
+3579:*/.   pAzAr:= DoubleInString(InspectToken.Value);
+3581:*/.   pElAr:= DoubleInString(InspectToken.Value);
+3695:Procedure Proc1;
+3699:Procedure CmdSTX;
+3705:*#"    comm.SendString(NumberString);
+3708:*#"    comm.SendString(NumberString);
+3711:*#"    comm.SendString(NumberString);
+3714:*#"    comm.SendString(NumberString);
+3716:*76if RunningTask = 0 then comm.SendString('0'); {halted}
+3717:*98if RunningTask = 1 then comm.SendString('1'); {tracking}
+3719:  comm.SendString('F')
+3721:  comm.SendString('T');
+3723:  comm.SendString('F')
+3725:  comm.SendString('T');
+3727:  comm.SendString('F')
+3729:  comm.SendString('T');
+3731:  comm.SendString('F')
+3733:  comm.SendString('T');
+3735:  comm.SendString('F')
+3737:  comm.SendString('T');
+3739:  comm.SendString('F')
+3741:  comm.SendString('T');
+3743:  comm.SendString('F')
+3745:  comm.SendString('T');
+3747:  comm.SendString('F')
+3749:  comm.SendString('T');
+3751:  comm.SendString('F')
+3753:  comm.SendString('T');
+3755:  comm.SendString('F')
+3757:  comm.SendString('T');
+3759:  comm.SendString('F')
+3761:  comm.SendString('T');
+3763:  comm.SendString('F')
+3765:  comm.SendString('T');
+3766:*CBif CalComplete = 0 then comm.SendString('0'); {not calibrated = 0}
+3767:*DCif CalComplete = 1 then comm.SendString('1'); {cal in progress = 1}
+3768:*CBif CalComplete = 2 then comm.SendString('2'); {cal complete = 2}  
+3770:  comm.SendString('T')
+3772:  comm.SendString('F');
+3776:*%$Procedure CmdAZEL; {Send Az,El,time}
+3778:*A@CmdAZEL accepts a command in the form "AZEL,Az,El,TV" where AZEL
+3787:    Tok1 := InspectToken.Value;
+3789:    Tok2 := InspectToken.Value;
+3790:*.-    Az := DoubleInString(InspectToken.Value);
+3792:    Tok3 := InspectToken.Value
+3793:*.-    El := DoubleInString(InspectToken.Value);
+3795:    Tok4 := InspectToken.Value
+3796:*/.    TC := LongIntInString(InspectToken.Value);
+3808:  end; {CmdAZEL}
+3809:Procedure CmdAZL; {Send Az,El}
+3811:*<;CmdAZL accepts a command in the form "AZEL,Az,El" where AZL
+3819:    Tok1 := InspectToken.Value;
+3821:    Tok2 := InspectToken.Value;
+3822:*.-    Az := DoubleInString(InspectToken.Value);
+3824:    Tok3 := InspectToken.Value
+3825:*.-    El := DoubleInString(InspectToken.Value);
+3832:  end; {CmdAZL}  
+3837: CmdTorque := 0;tring}mits ********}W
+3847:CmdAzelEL > (CmdVelElold + 0.005 * pElAm
+3855:CmdEl
+3860:CmdTorque
+3861: CppAz := CmdAz;$
+3866: if CmdVelAz >  pA
+3867:Vmax*pAzAr then CmdVelAz :=  pAzVmax*pAz
+3868:Procedure TaskUpdateDisplay;
+3875:txtAzNow.writeln(CmdAz);
+3876:txtElNow.writeln(CmdEl);
+3896:txtCmdVelAz.writeln(CmdVelAz);
+3897:txtCmdVelEl.writeln(CmdVelEl);
+3904:*%$txtCmdTorqueAz.writeln(CmdTorqueAz);
+3905:*%$txtCmdTorqueEl.writeln(CmdTorqueEl);
+3909:  txtPID.writeln('Tasks Off');
+3911:*"!  txtPID.writeln('TaskPosition');
+3913:*"!  txtPID.writeln('TaskPosLoop2');
+3915:*%$  txtPID.writeln('TaskCalEncoders');
+3989:rocedure CmdPOF; {Position 
+3991:AzIndexPosID.writeln('TaskPosition');WOW
+3996:CmdTorqueXOW
+3999:CmdTorqueY 5 then|
+4003:CmdTorqueZOW
+4007:teln('TaskPosLoop2');WOW
+4015:CmdTorqueEl.Value);W
+4018:CmdTorqueAzW
+4020: end; {CmdPOF}W
+4024:Tok2edure CmdSTS; {Get Status }W
+4057:RunningTaskW
+4060:Procedure TaskPositionLoop;
+4082:var CmdVelAzold:single; static;
+4083:var CmdVelElold:single; static;
+4123:  CmdVelAzold := 0;
+4124:  CmdVelElold := 0;
+4136:*-,    CmdAz := CmdAz + IntVelOffAz + PosOffAz;
+4137:*-,    CmdEl := CmdEl + IntVelOffEl + PosOffEl;
+4141:        Azrold := CmdAz;
+4142:        Azrfold := CmdAz;
+4144:        Elrold := CmdEl;
+4145:        Elrfold := CmdEl;
+4150:    Azr := CmdAz;
+4151:    Elr := CmdEl;
+4152:    ErrAzA := CmdAz - Paz;
+4153:    ErrElA := CmdEl - Pel;
+4185:  CppAz := CmdAz;
+4186:  CppEl := CmdEl;
+4187:  {CppAz := CmdAz;
+4188:  CppEl := CmdEl;}
+4205:*ba    CmdVelAz := pAzKpp * AzPosErr + pAzKpi * AzPosIntErr + pAzKff*Azu; {azimuth in antenna deg/s}
+4206:*dc    CmdVelEl := pElKpp * ElPosErr + pElKpi * ElPosIntErr + pElKff*Elu; {elevation in antenna deg/s}
+4208:*0/if TestMode = 1 then CmdVelAz := 0.4*utest+0.0;
+4209:*0/if TestMode = 2 then CmdVelEl := 0.2*utest+0.0;
+4211:*76if TestMode = 3 then CmdVelAz := CmdVelAz + 0.5*utest;
+4212:*76if TestMode = 4 then CmdVelEl := CmdVelEl + 0.5*utest;
+4213:    xCmdVelAz := CmdVelAz;
+4214:    xCmdVelEl := CmdVelEl;
+4215:*65    CmdVelAz := CmdVelAz * pAzAr;    {in motor deg/s}
+4216:*65    CmdVelEl := CmdVelEl * pElAr;    {in motor deg/s}
+4217:    {CmdVelAz := 1500;
+4218:    CmdVelEl := 0;}
+4220:*ml  if CmdVelAz > (CmdVelAzold + 0.005 * pAzAmax*pAzAr) then  CmdVelAz := CmdVelAzold + 0.005 * pAzAmax*pAzAr;
+4221:*ml  if CmdVelAz < (CmdVelAzold - 0.005 * pAzAmax*pAzAr) then  CmdVelAz := CmdVelAzold - 0.005 * pAzAmax*pAzAr;
+4222:*ml  if CmdVelEL > (CmdVelElold + 0.005 * pElAmax*pElAr) then  CmdVelEl := CmdVelElold + 0.005 * pElAmax*pElAr;
+4223:*ml  if CmdVelEL < (CmdVelElold - 0.005 * pElAmax*pElAr) then  CmdVelEl := CmdVelElold - 0.005 * pElAmax*pElAr;
+4224:*@?  if CmdVelAz >  pAzVmax*pAzAr then CmdVelAz :=  pAzVmax*pAzAr;
+4225:*@?  if CmdVelAz < -pAzVmax*pAzAr then CmdVelAz := -pAzVmax*pAzAr;
+4226:*@?  if CmdVelEl >  pElVmax*pElAr then CmdVelEl :=  pElVmax*pElAr;
+4227:*@?  if CmdVelEl < -pElVmax*pElAr then CmdVelEl := -pElVmax*pElAr;
+4228:  CmdVelAzold = CmdVelAz;
+4229:  CmdVelElold = CmdVelEl;
+4231:    AzVelErr := CmdVelAz - Vaz;
+4232:    ElVelErr := CmdVelEl - Vel;
+4235:*=<    CmdTorqueAz := pAzKvp * AzVelErr + pAzKvi * AzVelIntErr;
+4236:*=<    CmdTorqueEl := pElKvp * ElVelErr + pElKvi * ElVelIntErr;
+4238:*"!   { CmdTorqueAz := -CmdTorqueAz;
+4239:*&%     CmdTorqueEl := -CmdTorqueEl;}   
+4258:Procedure GetData;
+4306:Procedure Interpolate;
+4318:        CmdAz = AzNow;
+4319:        CmdEl = ElNow;
+4323:*]\        CmdAz := AzNow + ((AzNext - AzNow)/(TimeNext - TimeNow))* (SampleCounter - TimeNow);
+4324:*]\        CmdEl := ElNow + ((ElNext - ElNow)/(TimeNext - TimeNow))* (SampleCounter - TimeNow);
+4327:Procedure SetTorque;
+4329:*:9SetTorque accepts CmdTorqueAz and CmdTorqueEl from PiVel.
+4330:*YXThese commands are limited to +-2000.CmdTorqueX ,Y, Z are rounded versions of The above.
+4336:*:9    if CmdTorqueEl > pElTmax then CmdTorqueEl := pElTmax;
+4337:*:9    if CmdTorqueEl < pElTmin then CmdTorqueEl := pElTmin;
+4338:*:9    if CmdTorqueAz > pAzTmax then CmdTorqueAz := pAzTmax;
+4339:*:9    if CmdTorqueAz < pAzTmin then CmdTorqueAz := pAzTmin;
+4340:*&%    CmdTorqueX := round(CmdTorqueEl);
+4341:*@?    CmdTorqueY := round(CmdTorqueAz + pAzTbias - deltaVaz*0.3);
+4342:*@?    CmdTorqueZ := round(CmdTorqueAz - pAzTbias + deltaVaz*0.3);
+4343:**)    Xaxis.SetCommandedTorque(CmdTorqueX);
+4344:**)    YAxis.SetCommandedTorque(CmdTorqueY);
+4345:**)    ZAxis.SetCommandedTorque(CmdTorqueZ);
+4352:Pz  Tok1 := InspectToken.Value;
+4368:Pel Tok2 := InspectToken.Value;W
+4377:CmdVelAz
+4382:CmdVelEl
+4400:FLASHRESETOW
+4412:ERASESECTOR
+4440:Procedure LogData;
+4448:*GF        if LogValA = 3 then DataBufferA[WriteBufferPntr] := xCmdVelAz;
+4452:*GF        if LogValB = 3 then DataBufferB[WriteBufferPntr] := xCmdVelEl;
+4464:Procedure TaskCalEncoders;
+4474:    CmdVelEl := 0;
+4475:    CmdVelAz := 0;
+4491:*10        FVAz := 0.995 * FVAz + 0.005 * CmdVelAz;
+4492:*10        FVEl := 0.995 * FVEl + 0.005 * CmdVelEl;
+4497:*IH        CmdTorqueAz := AzVelPGain * AzVelErr + AzVelIGain * AzVelIntErr;
+4498:*IH        CmdTorqueEl := ElVelPGain * ElVelErr + ElVelIGain * ElVelIntErr;
+4499:*/.        CmdTorqueAz := AzVelPGain * AzVelErr ;
+4500:*0/        CmdTorqueEl := ElVelPGain * ElVelErr ;}
+4501:*+*        CmdTorqueAz := pAzKvp * AzVelErr ;
+4502:*+*        CmdTorqueEl := pElKvp * ElVelErr ;
+4512:*ba  CmdVelEl := - pElAr; {2900 deg/sec, or 483 rpm, for the motor is 1 deg/sec for the axis (sim) }
+4513:*UT  if CmdVelEl > 10000 then CmdVelEl := 10000; {limit vel to 3000 deg/sec or 500 rpm}
+4532:    CmdVelEl := 0;
+4543:*a`  CmdVelEl :=  pElAr; {2900 deg/sec, or 483 rpm, for the motor is 1 deg/sec for the axis (sim) }
+4544:*UT  if CmdVelEl > 10000 then CmdVelEl := 10000; {limit vel to 3000 deg/sec or 500 rpm}
+4563:    CmdVelEl := 0;
+4574:  CmdVelAz := pAzAr; 
+4575:*SR  if CmdVelAz > 3000 then CmdVelEl := 3000; {limit vel to 3000 deg/sec or 500 rpm}
+4594:    CmdVelAz := 0;
+4605:  CmdVelAz := -pAzAr; 
+4606:*SR  if CmdVelAz > 3000 then CmdVelEl := 3000; {limit vel to 3000 deg/sec or 500 rpm}
+4625:    CmdVelAz := 0;
+4665:Procedure StopAll;
+4667:*CB    if RunningTask = 1 then AbortTask(TaskAddr(TaskPositionLoop));
+4668:*@?     if RunningTask = 2 then AbortTask(TaskAddr(TaskPosLoop2));
+4669:*BA    if RunningTask = 5 then AbortTask(TaskAddr(TaskCalEncoders));
+4670:*'&AbortTask(TaskAddr(TaskPositionLoop));
+4671:*&%AbortTask(TaskAddr(TaskCalEncoders));
+4702:   CmdVelAz := 0;OW
+4716:Function exp(v:single):single;
+4720:CPPflagr.MemReadByte($8000,$041B);/@
+4724: Server.MemReadByte($8000,$041
+4730:ut 2ver.MemReadByte($80
+4765:xCmdVElAzX
+4767:xCmdVelEl
+4770:Procedure ReleaseBrakes;
+4775:Procedure SetBrakes;
+4804:   Status.writel
+4926:Function Documentation:integer;
+4962:Procedure TaskSafetyMonitor;
+4964:*gfIf the WDTimer counter reaches 10, i.e. 1 second, then something has happened in the taskposition loop
+4965:*a`and it is shut down and the DACs set to 0. WDTimer is continually reset to 0 in taskpositionloop
+4966:*gfIf LastCommandTime reaches 300, i.e. 30 seconds, then we assume the APC has failed and the taskposloop
