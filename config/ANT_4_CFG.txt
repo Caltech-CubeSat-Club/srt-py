@@ -1,0 +1,95 @@
+Name = Caltech
+Ip = 127.0.0.1
+Cmdport = 1003
+Longitude = 118d 7m 27.8s
+Latitude = 34d 8m 23.6s
+Altitude = 400
+
+PW = caltech
+
+PntModel = No_Correction_Pm58.txt
+
+AzKo = 0.4
+ElKo = 0.4
+
+AzKv = 2.0
+ElKv = 2.0
+
+AzKe = 0.01
+ElKe = 0.01
+
+AzAmax = 1.5
+ElAmax = 1.0
+
+AzVmax = 2.5
+ElVmax = 1.0
+
+AzImax = 1.0
+ElImax = 5.0
+
+AzKpp = 2.0
+ElKpp = 1.2
+
+AzKpi = 1.0
+ElKpi = 1.0
+
+AzKvp = 0.8
+ElKvp = 1.5
+
+AzKvi = 0.0
+ElKvi = 0.0
+
+AzKff = 1.0
+ElKff = 1.0
+
+AzTmax = 800
+ElTmax = 1200
+
+AzTmin = -800
+ElTmin = -1300
+
+AzTsgn = 1.0
+ElTsgn = 1.0
+
+AzTbias = 150
+
+//3600 line encoder, 10 X interpolator, quadrature encoded (X4) = 144000 cnts/rev
+//ratio az enc counts per az rotation
+AzEcr = 144000 
+
+//3600 line encoder, 10 X interpolator, quadrature encoded (X4) = 144000 cnts/rev
+//ratio el enc counts per el rotation
+ElEcr = 144000 
+
+//5000 line encoder, quadrature encoded (X4) = 20000 cnts/rev
+//az and el motor deg per motor encoder count
+AzMEcr = 20000 
+ElMEcr = 20000 
+
+
+AzEpo = -301.087
+ElEpo = 118.5 
+
+AzAr = 1522.5
+ElAr = 19749
+
+AzDAC1 = 400
+AzDAC1a = -400
+ElDAC1 = 400
+ElDAC1a = -400
+
+XlcpNdTemp = 1.0
+XrcpNdTemp = 1.0
+KlcpNdTemp = 1.0
+KrcpNdTemp = 1.0
+
+Ch1P0 = 0.0
+Ch1P1 = 1.0
+Ch1P2 = 0.0
+Ch1P3 = 0.0
+Ch2P0 = 0.0
+Ch2P1 = 1.0
+Ch2P2 = 0.0
+Ch2P3 = 0.0
+
+*END*

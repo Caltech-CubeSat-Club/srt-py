@@ -1,36 +1,36 @@
 SOFTWARE: Small Radio Telescope
 STATION:
-  latitude: 42.5
-  longitude: -71.5
-  name: Haystack
+  latitude: 34.140
+  longitude: -118.124
+  name: Caltech
 EMERGENCY_CONTACT:
-  name: John Doe
-  email: test@example.com
-  phone_number: 555-555-5555
+  name: Michael Gutierrez
+  email: magutier@caltech.edu
+  phone_number: 941-330-4460
 AZLIMITS:
-  lower_bound: 38.0
-  upper_bound: 355.0
+  lower_bound: -89.0
+  upper_bound: 449.0
 ELLIMITS:
-  lower_bound: 0.0
-  upper_bound: 89.0
+  lower_bound: 15.0
+  upper_bound: 81.0
 STOW_LOCATION:
-  azimuth: 38.0
-  elevation: 0.0
+  azimuth: 179
+  elevation: 81
 CAL_LOCATION:
-  azimuth: 120.0
-  elevation: 7.0
+  azimuth: 270.0
+  elevation: 16.0
 HORIZON_POINTS:
   - azimuth: 0
-    elevation: 0
+    elevation: 15
   - azimuth: 120
-    elevation: 5
+    elevation: 15
   - azimuth: 240
-    elevation: 5
+    elevation: 15
   - azimuth: 360
-    elevation: 0
-MOTOR_TYPE: NONE
-MOTOR_PORT: /dev/ttyUSB0
-MOTOR_BAUDRATE: 600
+    elevation: 15
+MOTOR_TYPE: CALTECH6M
+MOTOR_PORT: COM1
+MOTOR_BAUDRATE: 115200
 RADIO_CF: 1420000000
 RADIO_SF: 2400000
 RADIO_FREQ_CORR: -50000
@@ -41,9 +41,9 @@ NUM_BEAMSWITCHES: 25
 BEAMWIDTH: 7.0
 TSYS: 171
 TCAL: 290
-SAVE_DIRECTORY: ~/Desktop/SRT-Saves
+SAVE_DIRECTORY: ~/SRT-Saves
 RUN_HEADLESS: No
 DASHBOARD_PORT: 8080
 DASHBOARD_HOST: 0.0.0.0
 DASHBOARD_DOWNLOADS: Yes
-DASHBOARD_REFRESH_MS: 3000
+DASHBOARD_REFRESH_MS: 500
