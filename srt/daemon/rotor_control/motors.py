@@ -977,6 +977,35 @@ class Caltech6m(Motor):
             return response.startswith(ack_prefix)
         return True
 
+    def _read_matching_response(self, command_text, expected_prefix=None, max_reads=4, max_wait_s=0.25):
+        """Read a few serial lines and return the first response that validates.
+
+        Hardware can occasionally return a delayed response from a previous command,
+        causing an apparent off-by-one reply stream. This helper tolerates that by
+        scanning a bounded number of lines for a response that matches this command.
+        """
+        deadline = monotonic() + max(0.01, float(max_wait_s))
+        reads = 0
+        last_response = ''
+
+        while reads < max(1, int(max_reads)) and monotonic() <= deadline:
+            response = self._read_response_line()
+            reads += 1
+            if not response:
+                continue
+
+            last_response = response
+            if self._verify_response(command_text, response, expected_prefix=expected_prefix):
+                return response, True
+
+            logging.warning(
+                'out-of-sync response while waiting for %s: %r',
+                command_text,
+                response,
+            )
+
+        return last_response, False
+
     def _record_command_history(self, command_text, expected_prefix, response, retries, error, start_mono, end_mono, enqueued_mono):
         queue_wait_ms = max(0.0, (start_mono - enqueued_mono) * 1000.0)
         duration_ms = max(0.0, (end_mono - start_mono) * 1000.0)
@@ -1020,17 +1049,39 @@ class Caltech6m(Motor):
                 self.serial.write(cmd)
                 logging.info('Sent: %s', cmd)
                 sleep(send_delay)
-                response = self._read_response_line()
+                response, matched = self._read_matching_response(
+                    command_text,
+                    expected_prefix=expected_prefix,
+                    max_reads=5,
+                    max_wait_s=max(0.05, recv_delay + 0.05),
+                )
                 logging.info('Recv: %s', response)
-                sleep(recv_delay)
-                if not response:
+                if not matched and not response:
                     self.serial.write(b'\r')
                     sleep(send_delay)
-                    response = self._read_response_line()
+                    response, matched = self._read_matching_response(
+                        command_text,
+                        expected_prefix=expected_prefix,
+                        max_reads=4,
+                        max_wait_s=max(0.05, recv_delay + 0.05),
+                    )
                     logging.info('Probe Recv: %s', response)
+                sleep(recv_delay)
+
+                if not matched:
+                    # One more bounded read pass before resending command.
+                    extra_response, extra_matched = self._read_matching_response(
+                        command_text,
+                        expected_prefix=expected_prefix,
+                        max_reads=5,
+                        max_wait_s=max(0.08, float(self.serial.timeout or 0.5)),
+                    )
+                    if extra_response:
+                        response = extra_response
+                    matched = extra_matched
 
             last_response = response
-            if self._verify_response(command_text, response, expected_prefix=expected_prefix):
+            if matched:
                 return response, attempt, ''
 
             logging.warning(
