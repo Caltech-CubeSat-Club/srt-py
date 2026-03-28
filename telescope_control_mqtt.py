@@ -7,13 +7,15 @@ from astroplan import Observer, FixedTarget
 from parse import parse
 from time import sleep
 import logging
-#from astroquery.simbad import Simbad
+from astroquery.simbad import Simbad
+import paho.mqtt.client as paho
+from paho import mqtt
 
 class Caltech6m:
     
     Pasadena = EarthLocation.from_geodetic('-118d7.4650m', '34d8.3860m', '204.7m')
     obs = Observer(location=Pasadena, timezone='US/Pacific')
-    def __init__(self, port='COM1', baudrate=115200, az_limits=(-89,449), el_limits=(15,81), verbose=False):
+    def __init__(self, port='COM1', baudrate=115200, az_limits=(-89,449), el_limits=(15,81), verbose=False, mqtt_broker='localhost', mqtt_port=1883, mqtt_username=None, mqtt_password=None):
         logging.basicConfig(level=logging.INFO if verbose else logging.WARNING, format='%(asctime)s %(levelname)s: %(message)s')
         logging.warning('initializing telescope interface')
         self.serial = serial.Serial(
@@ -29,7 +31,46 @@ class Caltech6m:
         if not self.calibrated:
             if input('telescope is not calibrated, would you like to calibrate now? [y]/n') != 'n':
                 self.calibrate()
+        self.mqtt_broker = mqtt_broker
+        self.mqtt_port = mqtt_port
+        self.mqtt_client = paho.Client(client_id="telescope", userdata=None, protocol=paho.MQTTv5)
+        self.mqtt_client.on_connect = self.on_connect
+        # Enable TLS for secure connection
+        self.mqtt_client.tls_set(tls_version=mqtt.client.ssl.PROTOCOL_TLS)
+
+        # Set username and password
+        self.mqtt_client.username_pw_set(mqtt_username, mqtt_password)
+
+        # Set additional callbacks for better visibility
+        self.mqtt_client.on_message = self.on_message
+        self.mqtt_client.on_publish = lambda client, userdata, mid, properties=None: logging.info(f"Message published with mid: {mid}")
+        self.mqtt_client.on_subscribe = lambda client, userdata, mid, granted_qos, properties=None: logging.info(f"Subscribed with mid: {mid}, QoS: {granted_qos}")
+
+        # Connect to the broker
+        logging.warning("Attempting to connect to MQTT broker with TLS...")
+        self.mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60, clean_start=True)
+        logging.warning("Connection initiated. Starting loop...")
+        self.mqtt_client.loop_start()
     
+    def on_connect(self, client, userdata, flags, rc, properties):
+        logging.warning(f"Connected to MQTT broker with result code {rc}")
+        if rc == 0:
+            logging.warning("Connection successful. Subscribing to topics...")
+            client.subscribe("telescope/AZEL")
+        else:
+            logging.error(f"Connection failed with result code {rc}")
+
+    def on_message(self, client, userdata, msg):
+        logging.warn(f"Received MQTT message on topic {msg.topic}: {msg.payload.decode()}")
+        if msg.topic == "telescope/AZEL":
+            try:
+                az, el = map(float, msg.payload.decode().split(','))
+                response = self.point(az, el)
+                client.publish("telescope/response", response if response else "Error: Unable to point telescope")
+            except ValueError:
+                logging.error("Invalid AZEL command format. Expected 'az,el'")
+                client.publish("telescope/response", "Error: Invalid AZEL command format")
+
     def startup(self):
         # clear out any junk in the serial buffer
         for i in range(8):
@@ -265,6 +306,8 @@ class Caltech6m:
         self.spa()
         self.brakes_on()
         self.serial.close()
+        self.mqtt_client.loop_stop()
+        self.mqtt_client.disconnect()
 
     def point_at_CasA(self):
         t = Time.now()
@@ -289,21 +332,24 @@ class Caltech6m:
         
         
 if __name__ == '__main__':
-    c=Caltech6m(verbose=True)
-    while True:
-        cmd = input('>>> ')
-        if cmd == 'exit':
-            break
-        if not cmd:
-            continue
-        if not cmd.startswith('c.'):
-            cmd = 'c.'+cmd
-        if not cmd.endswith(')') and len(cmd.split(' ')) == 1:
-            cmd += '()'
-        if len(cmd.split(' ')) > 1:
-            cmd = f'{cmd.split(" ")[0]}({",".join(cmd.split(" ")[1:])})'
-        try:
-            print(cmd)
-            exec(cmd)
-        except Exception as e:
-            print(e)
+    c = Caltech6m(verbose=True, mqtt_broker='0fed07f982184f4db2a5cbd8f181ccae.s1.eu.hivemq.cloud', mqtt_port=8883, mqtt_username='scp_mtf_dei_pda', mqtt_password='Delta-42')
+    try:
+        while True:
+            cmd = input('>>> ')
+            if cmd == 'exit':
+                break
+            if not cmd:
+                continue
+            if not cmd.startswith('c.'):
+                cmd = 'c.'+cmd
+            if not cmd.endswith(')') and len(cmd.split(' ')) == 1:
+                cmd += '()'
+            if len(cmd.split(' ')) > 1:
+                cmd = f'{cmd.split(" ")[0]}({",".join(cmd.split(" ")[1:])})'
+            try:
+                print(cmd)
+                exec(cmd)
+            except Exception as e:
+                print(e)
+    finally:
+        c.cleanup()

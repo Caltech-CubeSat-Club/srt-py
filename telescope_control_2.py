@@ -7,7 +7,7 @@ from astroplan import Observer, FixedTarget
 from parse import parse
 from time import sleep
 import logging
-#from astroquery.simbad import Simbad
+from astroquery.simbad import Simbad
 
 class Caltech6m:
     
@@ -201,25 +201,12 @@ class Caltech6m:
             self.azerr = errs['azerr']
             self.elerr = errs['elerr']
             
-        sic1 = parse('2A01{current:d}', self.send_command('2A01SIC')) or {'current': -999999}
-        sia1 = parse('2A01{current:d}', self.send_command('2A01SIA')) or {'current': -999999}
-        sic2 = parse('2A02{current:d}', self.send_command('2A02SIC')) or {'current': -999999}
-        sia2 = parse('2A02{current:d}', self.send_command('2A02SIA')) or {'current': -999999}
-        sic3 = parse('2A03{current:d}', self.send_command('2A03SIC')) or {'current': -999999}
-        sia3 = parse('2A03{current:d}', self.send_command('2A03SIA')) or {'current': -999999}
+        # Removed amplifier current queries to reduce serial communication overhead
+        # These 6 queries were causing lag and potential serial crashes
         self.amp_currents = {
-            '2A01': {
-                'commanded': sic1['current'],
-                'actual': sia1['current'],
-            },
-            '2A02': {
-                'commanded': sic2['current'],
-                'actual': sia2['current'],
-            },
-            '2A03': {
-                'commanded': sic3['current'],
-                'actual': sia3['current'],
-            },                    
+            '2A01': {'commanded': 0, 'actual': 0},
+            '2A02': {'commanded': 0, 'actual': 0},
+            '2A03': {'commanded': 0, 'actual': 0},
         }
         # self.serial.write(b'\r')
         # self.serial.read_until(b'\r')
