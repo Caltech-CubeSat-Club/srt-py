@@ -711,8 +711,13 @@ def emptygraph(xlabel, ylabel, title):
     return fig
 
 
-def generate_pointing_error_graph(error_history, timerange, axisstatus=0):
-    """Generates a time-series graph for az/el pointing errors in millidegrees."""
+def generate_pointing_error_graph(error_history, timerange, axisstatus=None):
+    """Generates a time-series graph for az/el pointing errors in millidegrees.
+    
+    Always displays both Az and El on the same plot.
+    Y-axis is clamped to ±1000 mdeg.
+    axisstatus parameter is ignored (kept for backward compatibility).
+    """
     if not timerange:
         timerange = 5
 
@@ -734,26 +739,27 @@ def generate_pointing_error_graph(error_history, timerange, axisstatus=0):
     elvals = [pt.get("elerr_mdeg", np.nan) for pt in filtered]
 
     fig = go.Figure()
-    if axisstatus == 0:
-        fig.add_trace(
-            go.Scatter(
-                x=xvals,
-                y=azvals,
-                mode="lines",
-                name="Az Err (mdeg)",
-                line=dict(color="royalblue"),
-            )
+    
+    # Always show both Az and El
+    fig.add_trace(
+        go.Scatter(
+            x=xvals,
+            y=azvals,
+            mode="lines",
+            name="Az Err (mdeg)",
+            line=dict(color="royalblue", width=2),
         )
-    else:
-        fig.add_trace(
-            go.Scatter(
-                x=xvals,
-                y=elvals,
-                mode="lines",
-                name="El Err (mdeg)",
-                line=dict(color="firebrick"),
-            )
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=xvals,
+            y=elvals,
+            mode="lines",
+            name="El Err (mdeg)",
+            line=dict(color="firebrick", width=2),
         )
+    )
 
     fig.update_layout(
         title="Pointing Error vs Time",
@@ -763,6 +769,10 @@ def generate_pointing_error_graph(error_history, timerange, axisstatus=0):
         margin=dict(l=20, r=20, b=20, t=50, pad=4),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
+    
+    # Clamp y-axis to ±1000 mdeg
+    fig.update_yaxes(range=[-1000, 1000])
+    
     return fig
 
 

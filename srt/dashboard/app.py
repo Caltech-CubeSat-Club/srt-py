@@ -216,7 +216,7 @@ def generate_app(config_dir, config_dict):
     # Generate Sidebar Objects
     side_title = software
     image_filename = curfold.joinpath(
-        "images", "MIT_HO_logo_landscape.png"
+        "images", "6m_logo.jpg"
     )  # replace with your own image
     # Check if file is there and if not put in a single pixel image.
     if image_filename.exists():
@@ -245,40 +245,100 @@ def generate_app(config_dir, config_dict):
         ),
         "Image": html.Div(
             [
-                html.A(
-                    [
-                        html.Img(
-                            src="data:image/png;base64,{}".format(
-                                encoded_image.decode()
-                            ),
-                            style={"height": "100%", "width": "100%"},
-                        )
-                    ],
-                    href="https://www.haystack.mit.edu/",
-                )
+                html.Img(
+                    src="data:image/png;base64,{}".format(
+                        encoded_image.decode()
+                    ),
+                    style={"height": "100%", "width": "100%"},
+                ),
             ]
         ),
     }
     sidebar = generate_sidebar(side_title, side_content)
 
     # Build Dashboard Framework
+    auth_required = bool(config_dict.get("DASHBOARD_REQUIRE_AUTH", False))
+    auth_username = str(config_dict.get("DASHBOARD_USERNAME", "admin"))
+    auth_password = str(config_dict.get("DASHBOARD_PASSWORD", "admin"))
+    
     content = html.Div(id="page-content")
+    
+    # Login modal for authentication
+    login_modal = dbc.Modal(
+        [
+            dbc.ModalHeader("Dashboard Login", close_button=False),
+            dbc.ModalBody(
+                [
+                    html.Div(
+                        id="login-error-alert",
+                        children=[],
+                        style={"marginBottom": "15px"}
+                    ),
+                    dbc.InputGroup(
+                        [
+                            dbc.InputGroupText("Username"),
+                            dbc.Input(
+                                id="login-username",
+                                placeholder="Username",
+                                type="text",
+                                autoComplete="username",
+                            ),
+                        ],
+                        className="mb-3",
+                    ),
+                    dbc.InputGroup(
+                        [
+                            dbc.InputGroupText("Password"),
+                            dbc.Input(
+                                id="login-password",
+                                placeholder="Password",
+                                type="password",
+                                autoComplete="current-password",
+                            ),
+                        ],
+                        className="mb-3",
+                    ),
+                ]
+            ),
+            dbc.ModalFooter(
+                dbc.Button(
+                    "Login",
+                    id="login-submit-btn",
+                    className="ms-auto",
+                    color="primary",
+                    n_clicks=0,
+                )
+            ),
+        ],
+        id="login-modal",
+        backdrop="static",
+        keyboard=False,
+        is_open=auth_required,
+        centered=True,
+    )
+    
     layout = html.Div(
         [
             dcc.Location(id="url"),
-            sidebar,
-            content,
-            dcc.Interval(id="interval-component",
-                         interval=refresh_time, n_intervals=0),
-            html.Div(id="output-clientside"),
-        ],
-        id="mainContainer",
-        style={
-            "height": "100vh",
-            "min_height": "100vh",
-            "width": "100%",
-            "display": "inline-block",
-        },
+            dcc.Store(id="auth-session", storage_type="session"),
+            login_modal,
+            html.Div(
+                [
+                    sidebar,
+                    content,
+                    dcc.Interval(id="interval-component",
+                                 interval=refresh_time, n_intervals=0),
+                    html.Div(id="output-clientside"),
+                ],
+                id="mainContainer",
+                style={
+                    "height": "100vh",
+                    "min_height": "100vh",
+                    "width": "100%",
+                    "display": "inline-block" if not auth_required else "none",
+                },
+            ),
+        ]
     )
 
     app.layout = layout  # Set App Layout to Dashboard Framework
@@ -290,6 +350,57 @@ def generate_app(config_dir, config_dict):
             #    figure_page.generate_layout()
         ]
     )  # Necessary for Allowing Other Files to Create Callbacks
+
+    # Authentication callbacks
+    if auth_required:
+        @app.callback(
+            [
+                Output("auth-session", "data"),
+                Output("login-modal", "is_open"),
+                Output("login-error-alert", "children"),
+            ],
+            [
+                Input("login-submit-btn", "n_clicks"),
+                Input("auth-session", "data"),
+            ],
+            [
+                State("login-username", "value"),
+                State("login-password", "value"),
+            ],
+            prevent_initial_call=False,
+        )
+        def handle_login(n_clicks, session_data, username, password):
+            # If already authenticated, keep modal closed
+            if session_data and session_data.get("authenticated"):
+                return session_data, False, []
+            
+            # If no submit yet, show modal
+            if not n_clicks or n_clicks == 0:
+                return {}, True, []
+            
+            # Check credentials
+            if username == auth_username and password == auth_password:
+                return {"authenticated": True}, False, []
+            else:
+                error_alert = dbc.Alert(
+                    "Invalid username or password",
+                    color="danger",
+                    dismissable=False,
+                )
+                return {}, True, [error_alert]
+        
+        @app.callback(
+            Output("mainContainer", "style"),
+            [Input("auth-session", "data")],
+        )
+        def toggle_main_container_visibility(session_data):
+            style = {
+                "height": "100vh",
+                "min_height": "100vh",
+                "width": "100%",
+                "display": "inline-block" if (session_data and session_data.get("authenticated")) else "none",
+            }
+            return style
 
     # Create Resizing JS Script Callback
     app.clientside_callback(

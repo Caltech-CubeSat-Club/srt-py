@@ -1,6 +1,6 @@
 """status_fetcher.py
 
-Thread Which Handles Receiving Status Data
+Thread Which Handles Receiving Status Data with ZMQ
 
 """
 
@@ -8,6 +8,7 @@ import zmq
 from threading import Thread
 from time import sleep
 import json
+import logging
 
 
 class StatusThread(Thread):
@@ -15,7 +16,7 @@ class StatusThread(Thread):
     Thread Which Handles Receiving Status Data
     """
 
-    def __init__(self, group=None, target=None, name=None, port=5550):  # 5555
+    def __init__(self, group=None, target=None, name=None, port=5555):
         """Initializer for StatusThread
 
         Parameters
@@ -42,12 +43,20 @@ class StatusThread(Thread):
         """
         context = zmq.Context()
         socket = context.socket(zmq.SUB)
+
         socket.connect("tcp://localhost:%s" % self.port)
         socket.subscribe("")
+
+        logging.warning("StatusThread connected to port %s", self.port)
+        
         while True:
-            rec = socket.recv()
-            dump = json.loads(rec)
-            self.status = dump
+            try:
+                rec = socket.recv()
+                dump = json.loads(rec)
+                self.status = dump
+            except zmq.error.ZMQError as e:
+                logging.error("StatusThread recv error: %s", str(e))
+                sleep(0.1)
 
     def get_status(self):
         """Return Most Recent Status Dictionary

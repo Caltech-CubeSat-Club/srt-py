@@ -15,6 +15,7 @@ from operator import add
 
 import zmq
 import json
+import logging
 import numpy as np
 
 from .rotor_control.rotors import Rotor
@@ -940,7 +941,7 @@ class SmallRadioTelescopeDaemon:
                 self.log_message(str(e))
 
     def update_status(self):
-        """Periodically Publishes Daemon Status for Dashboard (or any other subscriber)
+        """Periodically Publishes Daemon Status for Dashboard.
 
         Is Operated as an Infinite Looping Thread Function
 
@@ -949,50 +950,75 @@ class SmallRadioTelescopeDaemon:
         None
         """
         context = zmq.Context()
+        
         status_port = 5555
         status_socket = context.socket(zmq.PUB)
-        status_socket.bind("tcp://*:%s" % status_port)
+        status_socket.bind("tcp://127.0.0.1:%s" % status_port)
+        logging.warning("Status socket bound on localhost:%s", status_port)
+
+        def _json_default(obj):
+            """Best-effort conversion for status payload serialization."""
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, (np.floating, np.integer, np.bool_)):
+                return obj.item()
+            if isinstance(obj, bytes):
+                return obj.decode("utf-8", errors="replace")
+            return str(obj)
+        
         while True:
-            status = {
-                "beam_width": self.beamwidth,
-                "location": self.station,
-                "motor_azel": self.rotor_location,
-                "motor_cmd_azel": self.rotor_cmd_location,
-                "vlsr": self.current_vlsr,
-                "object_locs": self.ephemeris_locations,
-                "object_time_locs": self.ephemeris_time_locs,
-                "az_limits": self.az_limits,
-                "el_limits": self.el_limits,
-                "stow_loc": self.stow_location,
-                "cal_loc": self.cal_location,
-                "horizon_points": self.horizon_points,
-                "center_frequency": self.radio_center_frequency,
-                "frequency_correction": self.radio_frequency_correction,
-                "bandwidth": self.radio_sample_frequency,
-                "motor_offsets": self.rotor_offsets,
-                "queued_item": self.current_queue_item,
-                "queue_size": self.command_queue.qsize(),
-                "emergency_contact": self.contact,
-                "error_logs": self.command_error_logs,
-                "temp_cal": self.temp_cal,
-                "temp_sys": self.temp_sys,
-                "cal_power": self.cal_power,
-                "n_point_data": self.n_point_data,
-                "beam_switch_data": self.beam_switch_data,
-                "pointing_error": self.pointing_error,
-                "pointing_error_history": list(self.pointing_error_history),
-                "rotor_diagnostics": self.rotor_diagnostics,
-                "rotor_fsm_status": self.rotor_fsm_status,
-                "serial_communications": self.rotor.get_recent_serial_communications(
-                    limit=12
-                ),
-                "command_history": self.rotor.get_recent_command_history(
-                    limit=12
-                ),
-                "observation_events": list(self.observation_events)[-80:],
-                "time": time(),
-            }
-            status_socket.send_json(status)
+            try:
+                status = {
+                    "beam_width": self.beamwidth,
+                    "location": self.station,
+                    "motor_azel": self.rotor_location,
+                    "motor_cmd_azel": self.rotor_cmd_location,
+                    "vlsr": self.current_vlsr,
+                    "object_locs": self.ephemeris_locations,
+                    "object_time_locs": self.ephemeris_time_locs,
+                    "az_limits": self.az_limits,
+                    "el_limits": self.el_limits,
+                    "stow_loc": self.stow_location,
+                    "cal_loc": self.cal_location,
+                    "horizon_points": self.horizon_points,
+                    "center_frequency": self.radio_center_frequency,
+                    "frequency_correction": self.radio_frequency_correction,
+                    "bandwidth": self.radio_sample_frequency,
+                    "motor_offsets": self.rotor_offsets,
+                    "queued_item": self.current_queue_item,
+                    "queue_size": self.command_queue.qsize(),
+                    "emergency_contact": self.contact,
+                    "error_logs": self.command_error_logs,
+                    "temp_cal": self.temp_cal,
+                    "temp_sys": self.temp_sys,
+                    "cal_power": self.cal_power,
+                    "n_point_data": self.n_point_data,
+                    "beam_switch_data": self.beam_switch_data,
+                    "pointing_error": self.pointing_error,
+                    "pointing_error_history": list(self.pointing_error_history),
+                    "rotor_diagnostics": self.rotor_diagnostics,
+                    "rotor_fsm_status": self.rotor_fsm_status,
+                    "observation_events": list(self.observation_events)[-80:],
+                    "time": time(),
+                }
+                try:
+                    status["serial_communications"] = (
+                        self.rotor.get_recent_serial_communications(limit=12)
+                    )
+                except Exception:
+                    status["serial_communications"] = []
+
+                try:
+                    status["command_history"] = self.rotor.get_recent_command_history(
+                        limit=12
+                    )
+                except Exception:
+                    status["command_history"] = []
+
+                serialized = json.dumps(status, default=_json_default)
+                status_socket.send_string(serialized)
+            except Exception as e:
+                logging.exception("Status publish error: %s", str(e))
             sleep(0.5)
 
     def update_radio_settings(self):
@@ -1012,7 +1038,7 @@ class SmallRadioTelescopeDaemon:
             sleep(0.1)
 
     def update_command_queue(self):
-        """Waits for New Commands Coming in Over ZMQ PUSH/PULL
+        """Waits for New Commands Coming in Over ZMQ PUSH/PULL with PLAIN auth
 
         Is Operated as an Infinite Looping Thread Function
 
@@ -1021,12 +1047,18 @@ class SmallRadioTelescopeDaemon:
         None
         """
         context = zmq.Context()
+        
         command_port = 5556
         command_socket = context.socket(zmq.PULL)
-        command_socket.bind("tcp://*:%s" % command_port)
+        command_socket.bind("tcp://127.0.0.1:%s" % command_port)
+        logging.warning("Command socket bound on localhost:%s", command_port)
+        
         while True:
-            cmd = command_socket.recv_string()
-            self.command_queue.put(cmd)
+            try:
+                cmd = command_socket.recv_string()
+                self.command_queue.put(cmd)
+            except zmq.error.ZMQError as e:
+                logging.error("Command socket error: %s", str(e))
 
     def srt_daemon_main(self):
         """Starts and Processes Commands for the SRT
@@ -1109,6 +1141,16 @@ class SmallRadioTelescopeDaemon:
                 command_parts = command.split(" ")
                 command_parts = [x for x in command_parts if x]
                 command_name = command_parts[0].lower()
+
+                # Handle Stop All (SPA) command - Emergency stop for motors
+                if command_name == "spa":
+                    self.log_message("SPA command received - Stopping all rotor motors")
+                    try:
+                        self.rotor.motor.stop()
+                        self.log_message("Rotor motors stopped successfully")
+                    except Exception as e:
+                        self.log_message(f"Error stopping rotor: {str(e)}")
+                    continue  # Continue processing commands, don't shut down
 
                 # If Command Starts With a Valid Object Name
                 if command_parts[0] in self.ephemeris_locations:

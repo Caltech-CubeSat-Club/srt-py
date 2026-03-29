@@ -7,6 +7,7 @@ Thread Which Handles Sending Commands to the Daemon
 import zmq
 from threading import Thread
 from queue import Queue
+import logging
 
 
 class CommandThread(Thread):
@@ -41,7 +42,10 @@ class CommandThread(Thread):
         """
         context = zmq.Context()
         socket = context.socket(zmq.PUSH)
+
         socket.connect("tcp://localhost:%s" % self.port)
+        logging.warning("CommandThread connected to port %s", self.port)
+        
         while self.is_alive():
             command = self.queue.get()
             socket.send_string(command)
@@ -69,6 +73,34 @@ class CommandThread(Thread):
             If the Queue is Empty
         """
         return self.queue.empty()
+
+    def emergency_stop(self):
+        """Sends an emergency stop (SPA) command with high priority, bypassing the queue.
+        
+        Creates a direct PUSH socket connection to send the SPA (stop all) command immediately,
+        ensuring it is not delayed by queued commands.
+
+        Returns
+        -------
+        bool
+            True if SPA sent successfully, False otherwise
+        """
+        try:
+            from time import sleep
+            context = zmq.Context()
+            estop_socket = context.socket(zmq.PUSH)
+            estop_socket.setsockopt(zmq.LINGER, 0)  # No waiting on close
+            estop_socket.setsockopt(zmq.SNDHWM, 1)  # Small send buffer
+
+            estop_socket.connect("tcp://localhost:%s" % self.port)
+            sleep(0.05)  # Brief pause to ensure connection established
+            estop_socket.send_string("spa")
+            estop_socket.close()
+            context.term()
+            return True
+        except zmq.error.ZMQError as e:
+            return False
+
 
 
 def test_cmd_send():  # TODO: Look into PyTest Fixtures - Having Multiple Threads in PyTest Causes Copious Warnings
