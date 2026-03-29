@@ -30,6 +30,11 @@ DASHBOARD_PORT: int()
 DASHBOARD_HOST: ip()
 DASHBOARD_DOWNLOADS: bool()
 DASHBOARD_REFRESH_MS: int()
+WEBCAM_ENABLE: bool(required=False)
+WEBCAM_DEVICE_INDEX: int(required=False)
+WEBCAM_TARGET_FPS: num(required=False)
+WEBCAM_JPEG_QUALITY: int(required=False)
+WEBCAM_MAX_WIDTH: int(required=False)
 ---
 location:
     latitude: num()

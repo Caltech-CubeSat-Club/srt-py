@@ -185,6 +185,42 @@ def generate_srt_second_row():
     )
 
 
+def generate_webcam_row():
+    """Generates webcam live-view row."""
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.H5("Live Webcam"),
+                            html.Img(
+                                id="live-webcam-feed",
+                                src="/video_feed",
+                                style={
+                                    "width": "100%",
+                                    "height": "auto",
+                                    "maxHeight": "480px",
+                                    "objectFit": "contain",
+                                    "backgroundColor": "black",
+                                    "borderRadius": "4px",
+                                },
+                            ),
+                            html.Small(
+                                "MJPEG stream served by dashboard backend",
+                                style={"color": "gray"},
+                            ),
+                        ],
+                        className="pretty_container twelve columns",
+                    )
+                ],
+                className="flex-display",
+                style={"justify-content": "left", "margin": "5px"},
+            )
+        ]
+    )
+
+
 def generate_second_row():
     """Generates Second Row (AzEl and AzEl Zoom) Display
 
@@ -789,9 +825,11 @@ def generate_layout(software, config_dict=None):
     """
     # Check if we should hide radio plots
     radio_enabled = True
+    webcam_enabled = False
     if config_dict:
         control_profile = config_dict.get("CONTROL_PROFILE", "FULL_SRT").upper()
         radio_enabled = control_profile != "POINTING_ONLY"
+        webcam_enabled = bool(config_dict.get("WEBCAM_ENABLE", False))
     
     drop_down_buttons_vsrt = {
         "Coordinates": [
@@ -855,6 +893,7 @@ def generate_layout(software, config_dict=None):
     base_vsrt.extend([
         generate_second_row(),
         generate_third_row(),
+        *( [generate_webcam_row()] if webcam_enabled else [] ),
         generate_popups(software),
         html.Div(id="signal", style={"display": "none"}),
         dcc.Download(id="obs-events-download"),
@@ -871,6 +910,7 @@ def generate_layout(software, config_dict=None):
         generate_srt_azel(),
         generate_srt_second_row(),
         generate_third_row(),
+        *( [generate_webcam_row()] if webcam_enabled else [] ),
         generate_popups(software),
         html.Div(id="signal", style={"display": "none"}),
         dcc.Download(id="obs-events-download"),

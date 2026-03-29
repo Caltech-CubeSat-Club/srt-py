@@ -26,6 +26,8 @@ from time import time
 from pathlib import Path
 import base64
 import math
+import platform
+from threading import Event, Lock, Thread
 from typing import Any, cast
 
 from .layouts import monitor_page, system_page  # , figure_page
@@ -33,6 +35,11 @@ from .layouts.sidebar import generate_sidebar
 from .messaging.status_fetcher import StatusThread
 from .messaging.command_dispatcher import CommandThread
 from .messaging.spectrum_fetcher import SpectrumThread
+
+try:
+    import cv2
+except Exception:
+    cv2 = None
 
 
 def generate_app(config_dir, config_dict):
@@ -62,6 +69,124 @@ def generate_app(config_dir, config_dict):
     )
     server = cast(Any, app.server)
     app.title = software
+
+    webcam_enabled = bool(config_dict.get("WEBCAM_ENABLE", False))
+    webcam_device = int(config_dict.get("WEBCAM_DEVICE_INDEX", 0))
+    webcam_fps = max(1.0, float(config_dict.get("WEBCAM_TARGET_FPS", 10.0)))
+    webcam_jpeg_quality = int(config_dict.get("WEBCAM_JPEG_QUALITY", 70))
+    webcam_jpeg_quality = max(10, min(95, webcam_jpeg_quality))
+    webcam_width = int(config_dict.get("WEBCAM_MAX_WIDTH", 960))
+    webcam_width = max(160, webcam_width)
+
+    webcam_state = {
+        "latest_frame": None,
+        "error": "",
+    }
+    webcam_lock = Lock()
+    webcam_stop_event = Event()
+    webcam_thread = None
+
+    def _open_camera(device_index):
+        if cv2 is None:
+            return None
+        if platform.system().lower().startswith("win"):
+            capture = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
+            if capture is not None and capture.isOpened():
+                return capture
+        capture = cv2.VideoCapture(device_index)
+        if capture is not None and capture.isOpened():
+            return capture
+        return None
+
+    def _webcam_worker():
+        if cv2 is None:
+            with webcam_lock:
+                webcam_state["error"] = "OpenCV not installed (pip install opencv-python)."
+            return
+
+        capture = _open_camera(webcam_device)
+        if capture is None:
+            with webcam_lock:
+                webcam_state["error"] = f"Unable to open webcam device index {webcam_device}."
+            return
+
+        capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        frame_interval = 1.0 / webcam_fps
+        last_emit = 0.0
+
+        try:
+            while not webcam_stop_event.is_set():
+                ok, frame = capture.read()
+                if not ok or frame is None:
+                    with webcam_lock:
+                        webcam_state["error"] = "Webcam frame read failed."
+                    continue
+
+                now_ts = time()
+                if now_ts - last_emit < frame_interval:
+                    continue
+                last_emit = now_ts
+
+                h, w = frame.shape[:2]
+                if w > webcam_width and webcam_width > 0:
+                    new_h = int((webcam_width / float(w)) * float(h))
+                    frame = cv2.resize(frame, (webcam_width, max(1, new_h)))
+
+                ok, encoded = cv2.imencode(
+                    ".jpg",
+                    frame,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), webcam_jpeg_quality],
+                )
+                if not ok:
+                    with webcam_lock:
+                        webcam_state["error"] = "Failed to JPEG-encode webcam frame."
+                    continue
+
+                with webcam_lock:
+                    webcam_state["latest_frame"] = encoded.tobytes()
+                    webcam_state["error"] = ""
+        finally:
+            capture.release()
+
+    if webcam_enabled:
+        webcam_thread = Thread(target=_webcam_worker, name="dashboard-webcam", daemon=True)
+        webcam_thread.start()
+
+        @server.route("/video_feed")
+        def video_feed():
+            def generate_stream():
+                while True:
+                    with webcam_lock:
+                        frame = webcam_state.get("latest_frame")
+                        err = webcam_state.get("error", "")
+
+                    if frame is None:
+                        message = err or "Waiting for webcam frames..."
+                        yield (
+                            b"--frame\r\n"
+                            b"Content-Type: text/plain\r\n\r\n"
+                            + message.encode("utf-8", errors="replace")
+                            + b"\r\n"
+                        )
+                    else:
+                        yield (
+                            b"--frame\r\n"
+                            b"Content-Type: image/jpeg\r\n\r\n"
+                            + frame
+                            + b"\r\n"
+                        )
+
+            return flask.Response(
+                generate_stream(),
+                mimetype="multipart/x-mixed-replace; boundary=frame",
+            )
+
+        @server.route("/video_status")
+        def video_status():
+            with webcam_lock:
+                err = webcam_state.get("error", "")
+                has_frame = webcam_state.get("latest_frame") is not None
+            return {"enabled": True, "has_frame": has_frame, "error": err}
 
     # Start Listening for Radio and Status Data
     status_thread = StatusThread(port=5555)
