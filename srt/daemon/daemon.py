@@ -93,6 +93,10 @@ class SmallRadioTelescopeDaemon:
             deadband_deg = config_dict.get("TRACKING_COMMAND_DEADBAND_DEG", 0.15)
             deadband_mdeg = float(deadband_deg) * 1000.0
         self.tracking_command_deadband_deg = float(deadband_mdeg) / 1000.0
+        self.end_observation_on_oob = bool(
+            config_dict.get("END_OBSERVATION_ON_OOB", True)
+        )
+        self.stow_on_oob = bool(config_dict.get("STOW_ON_OOB", False))
         self.pointing_error_threshold_mdeg = config_dict.get(
             "POINTING_ERROR_THRESHOLD_MDEG", 150.0
         )
@@ -144,8 +148,15 @@ class SmallRadioTelescopeDaemon:
                 "safe_mode": self.caltech6m_safe_mode,
             } if str(self.motor_type).upper() == "CALTECH6M" else None,
         )
-        self.rotor_location = self.stow_location
-        self.rotor_destination = self.stow_location
+        # Start from current motor position so daemon startup does not
+        # immediately command a move to stow.
+        try:
+            current_azel = self.rotor.get_azimuth_elevation()
+        except Exception:
+            current_azel = self.stow_location
+
+        self.rotor_location = current_azel
+        self.rotor_destination = current_azel
         self.rotor_offsets = (0.0, 0.0)
         self.rotor_cmd_location = tuple(
             map(add, self.rotor_destination, self.rotor_offsets)
@@ -886,6 +897,16 @@ class SmallRadioTelescopeDaemon:
                     self.log_message(
                         f"Object {self.ephemeris_cmd_location} moved out of motor bounds"
                     )
+                    if self.end_observation_on_oob:
+                        self._end_active_observation("object_out_of_bounds")
+
+                    if self.stow_on_oob:
+                        self.log_message("Object out of bounds: commanding stow")
+                        self.rotor_offsets = (0.0, 0.0)
+                        self.rotor_destination = self.stow_location
+                        self.rotor_cmd_location = self.stow_location
+                        self._radio_put("soutrack", "at_stow")
+
                     self.ephemeris_cmd_location = None
             sleep(1)
 

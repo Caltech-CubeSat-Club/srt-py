@@ -41,6 +41,8 @@ WEBCAM_DEVICE_INDEX: int(required=False)
 WEBCAM_TARGET_FPS: num(required=False)
 WEBCAM_JPEG_QUALITY: int(required=False)
 WEBCAM_MAX_WIDTH: int(required=False)
+END_OBSERVATION_ON_OOB: bool(required=False)
+STOW_ON_OOB: bool(required=False)
 ---
 location:
     latitude: num()

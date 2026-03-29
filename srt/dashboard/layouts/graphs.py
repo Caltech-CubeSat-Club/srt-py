@@ -19,7 +19,8 @@ def generate_az_el_graph(
     stow_position,
     cal_position,
     horizon_points,
-    beam_width
+    beam_width,
+    future_points_dict=None,
 ):
     """Generates Figure for Displaying AzEl Locations
 
@@ -53,19 +54,78 @@ def generate_az_el_graph(
     el_lower_display_lim = 0
     el_upper_display_lim = 90
 
-    # Markers for celestial objects
+    # Markers for celestial objects - with proper click support
     fig.add_trace(
         go.Scatter(
             x=[points_dict[name][0] for name in points_dict],
             y=[points_dict[name][1] for name in points_dict],
             text=[name for name in points_dict],
-            # hovertext=[name for name in points_dict],
             name="Celestial Objects",
             mode="markers+text",
             textposition="top center",
-            marker_color=["rgba(152, 0, 0, .8)" for _ in points_dict],
+            marker=dict(
+                color="rgba(152, 0, 0, .8)",
+                size=8,
+            ),
+            hovertemplate="<b>%{text}</b><extra></extra>",
+            hoverlabel=dict(namelength=-1),
         )
     )
+
+    # Optional future trajectories - shown with subtle opacity, more visible on hover
+    if isinstance(future_points_dict, dict) and future_points_dict:
+        # Parse offset keys safely (JSON deserialization converts int keys to strings)
+        offsets = []
+        for k in future_points_dict.keys():
+            try:
+                offset_int = int(k) if isinstance(k, str) else k
+                # Skip offset=0 to avoid blocking current object position
+                if offset_int > 0:
+                    offsets.append(offset_int)
+            except (ValueError, TypeError):
+                continue
+        offsets = sorted(offsets)
+
+        for name in points_dict:
+            xs = []
+            ys = []
+            times = []
+            customdata = []
+            for offset in offsets:
+                # Look up using string key (from JSON) or int key
+                offset_key = str(offset) if str(offset) in future_points_dict else offset
+                pos = future_points_dict.get(offset_key, {}).get(name)
+                if not (isinstance(pos, (list, tuple)) and len(pos) == 2):
+                    continue
+                # Explicitly skip offset==0 regardless of key type (redundant, but extra safe)
+                if int(offset) == 0:
+                    continue
+                az_val, el_val = float(pos[0]), float(pos[1])
+                xs.append(az_val)
+                ys.append(el_val)
+                # Add trajectory info to hovertext
+                hours = float(offset) / 3600.0
+                times.append(f"{hours:.1f}h")
+                customdata.append({"name": name, "offset": offset})
+
+            # Only plot if there are at least 2 valid (non-0h) points
+            if len(xs) >= 2:
+                fig.add_trace(
+                    go.Scatter(
+                        x=xs,
+                        y=ys,
+                        mode="lines+markers",
+                        line={"dash": "dot", "width": 1, "color": "rgba(100, 0, 0, 0.5)"},
+                        marker={"size": 3, "color": "rgba(100, 0, 0, 0.5)"},
+                        opacity=0.4,  # Slightly darker and more visible
+                        text=[name]*len(xs),
+                        customdata=customdata,
+                        hovertext=[f"{name} +{t}" for t in times],
+                        hoverinfo="text",
+                        showlegend=False,
+                        name=f"{name} (future)",
+                    )
+                )
 
     # Beam footprint marker: ellipse in Az/El with azimuth stretch by cos(elevation).
 
@@ -228,7 +288,7 @@ def generate_az_el_graph(
                     y=1.02, xanchor="right", x=1),
     )
     fig.update_xaxes(range=[az_lower_display_lim, az_upper_display_lim])
-    fig.update_yaxes(range=[el_lower_display_lim, el_upper_display_lim])
+    fig.update_yaxes(range=[-30, el_upper_display_lim])  # Allow zooming to negative elevations
 
     return fig
 
@@ -381,24 +441,21 @@ def generate_az_time_graph(
 
     # Markers for celestial objects
 
-    for name in points_time_dict['0']:
+    # Only plot for time keys > 0 (skip '0' or 0)
+    time_keys = [k for k in points_time_dict.keys() if str(k) != '0' and float(k) != 0.0]
+    if not time_keys:
+        return fig
+    for name in points_time_dict.get('0', {}):
         fig.add_trace(
             go.Scatter(
-                x=[float(time) for time in points_time_dict],
-
-                y=[points_time_dict[time][name][0]
-                    for time in points_time_dict],
-
+                x=[float(time) for time in time_keys],
+                y=[points_time_dict[time][name][0] for time in time_keys],
                 text=str(name),
-
-                hovertext=['(Azimuth: %s, Elevation: %s)' % (round(points_time_dict[time][name][0], 2), round(points_time_dict[time][name][1], 2))
-                           for time in points_time_dict],
-
+                hovertext=['(Azimuth: %s, Elevation: %s)' % (round(points_time_dict[time][name][0], 2), round(points_time_dict[time][name][1], 2)) for time in time_keys],
                 name=str(name),
                 mode="markers+text",
                 showlegend=False,
                 textposition="top right",
-                # marker_color=["rgba(152, 0, 0, .8)" for _ in points_time_dict],
             )
         )
 
@@ -494,24 +551,21 @@ def generate_el_time_graph(
 
     # Markers for celestial objects
 
-    for name in points_time_dict['0']:
+    # Only plot for time keys > 0 (skip '0' or 0)
+    time_keys = [k for k in points_time_dict.keys() if str(k) != '0' and float(k) != 0.0]
+    if not time_keys:
+        return fig
+    for name in points_time_dict.get('0', {}):
         fig.add_trace(
             go.Scatter(
-                x=[float(time) for time in points_time_dict],
-
-                y=[points_time_dict[time][name][1]
-                    for time in points_time_dict],
-
+                x=[float(time) for time in time_keys],
+                y=[points_time_dict[time][name][1] for time in time_keys],
                 text=str(name),
-
-                hovertext=['(Azimuth: %s, Elevation: %s)' % (round(points_time_dict[time][name][0], 2), round(points_time_dict[time][name][1], 2))
-                           for time in points_time_dict],
-
+                hovertext=['(Azimuth: %s, Elevation: %s)' % (round(points_time_dict[time][name][0], 2), round(points_time_dict[time][name][1], 2)) for time in time_keys],
                 name=str(name),
                 mode="markers+text",
                 showlegend=False,
                 textposition="top right",
-                # marker_color=["rgba(152, 0, 0, .8)" for _ in points_time_dict],
             )
         )
 

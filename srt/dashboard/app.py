@@ -5,16 +5,17 @@ Dash Small Radio Telescope Web App Dashboard
 """
 
 import dash
+import importlib
 
 try:
     from dash import dcc
-except:
-    import dash_core_components as dcc
+except Exception:
+    dcc = importlib.import_module("dash_core_components")
 
 try:
     from dash import html
-except:
-    import dash_html_components as html
+except Exception:
+    html = importlib.import_module("dash_html_components")
 
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State, ClientsideFunction
@@ -37,7 +38,7 @@ from .messaging.command_dispatcher import CommandThread
 from .messaging.spectrum_fetcher import SpectrumThread
 
 try:
-    import cv2
+    import cv2  # type: ignore[reportMissingImports]
 except Exception:
     cv2 = None
 
@@ -419,7 +420,7 @@ def generate_app(config_dir, config_dict):
         software
     )
     # Create Callbacks for System Page Objects
-    system_page.register_callbacks(app, config_dict, status_thread)
+    system_page.register_callbacks(app, config_dict, status_thread, command_thread)
 
     # # Create Callbacks for figure page callbacks
     # figure_page.register_callbacks(app,config_dict, status_thread)

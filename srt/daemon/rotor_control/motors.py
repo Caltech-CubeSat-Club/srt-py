@@ -16,11 +16,14 @@ from math import cos, acos, pi, sqrt, floor
 from astropy.coordinates import SkyCoord, get_sun, EarthLocation, AltAz
 from astropy.coordinates.name_resolve import NameResolveError
 from astropy.time import Time
-import astropy.units as u
+import astropy.units as _u
 from astroplan import Observer, FixedTarget
 from parse import parse
 import logging
 from typing import Any, Dict
+
+
+deg: Any = getattr(_u, "deg")
 
 
 class Motor(ABC):
@@ -1343,7 +1346,7 @@ class Caltech6m(Motor):
         except NameResolveError:
             logging.error('could not resolve object name')
             return
-        if not self.obs.target_is_up(t, obj, horizon=15*u.deg):
+        if not self.obs.target_is_up(t, obj, horizon=15 * deg):
             logging.error('requested object is below horizon')
             return
         altaz = self.obs.altaz(t, obj)
