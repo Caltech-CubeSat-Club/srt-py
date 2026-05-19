@@ -40,7 +40,9 @@ if __name__ == "__main__":
                 record.levelname = "DEBUG"
             return True
 
-    logging.getLogger("waitress.queue").addFilter(_WaitressQueueDebugFilter())
+    root_logger = logging.getLogger()
+    root_logger.addFilter(_WaitressQueueDebugFilter())
+    logging.getLogger("waitress.queue").setLevel(logging.DEBUG)
 
     # Create the parser
     my_parser = argparse.ArgumentParser(description="Runs the SRT Control Application")

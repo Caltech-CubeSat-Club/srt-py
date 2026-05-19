@@ -74,6 +74,10 @@ class Moore6mWorker:
 
     def stop(self):
         self._running.clear()
+        try:
+            self.stop_runner()
+        except Exception:
+            pass
         # cleanup moore6m
         try:
             self.moore6m.cleanup()
@@ -211,8 +215,8 @@ class Moore6mWorker:
         try:
             self.runner_proc = subprocess.Popen(
                 [sys.executable, self.runner_path],
-                stdout=None,
-                stderr=None,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
                 start_new_session=True,
             )
             return True
