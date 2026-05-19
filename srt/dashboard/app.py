@@ -215,7 +215,7 @@ def generate_app(config_dir, config_dict):
     pio.templates.default = "seaborn"  # Style Choice for Graphs
     curfold = Path(__file__).parent.absolute()
     # Generate Sidebar Objects
-    side_title = software
+    side_title = "Moore 6m Telescope"
     image_filename = curfold.joinpath(
         "images", "6m_logo.jpg"
     )  # replace with your own image
@@ -516,9 +516,9 @@ def generate_app(config_dir, config_dict):
             el_offset = status["motor_offsets"][1]
             time_dif = time() - status["time"]
             if time_dif > 5:
-                status_string = "SRT Daemon Not Available"
+                status_string = "Serial Link Not Available"
             else:
-                status_string = "SRT Active"
+                status_string = "Serial Link Active"
 
         lines = [
             f"#### {status_string}",
