@@ -108,3 +108,8 @@ venv.bak/
 
 # Rever
 rever/
+
+# DS store files anywhere
+.DS_Store
+
+config/config.yaml
