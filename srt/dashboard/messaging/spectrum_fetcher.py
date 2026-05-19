@@ -5,7 +5,7 @@ Thread Which Handles Receiving Spectrum Data from Siglent Spectrum Analyzer via 
 """
 
 import numpy as np
-from threading import Thread
+from threading import Event, Thread
 from time import sleep
 import time
 import pyvisa
@@ -65,6 +65,8 @@ class SpectrumThread(Thread):
         self.vbw_hz = vbw_hz
         self.ref_level_dbm = ref_level_dbm
         self.inst = None
+        self.frequency_axis = None
+        self._stop_event = Event()
 
     def _find_instrument_by_serial(self, serial_text):
         """Find spectrum analyzer by serial number"""
@@ -114,6 +116,14 @@ class SpectrumThread(Thread):
 
         return spectrum
 
+    def _build_frequency_axis(self, point_count):
+        """Build a frequency axis aligned with the configured sweep range."""
+        return np.linspace(self.start_hz, self.stop_hz, point_count)
+
+    def stop(self):
+        """Request the acquisition loop to stop."""
+        self._stop_event.set()
+
     def run(self):
         """Acquires Spectrum Traces from Analyzer, Converts to Numpy, and Stores
 
@@ -136,17 +146,20 @@ class SpectrumThread(Thread):
 
             self._configure_analyzer()
 
-            while True:
+            while not self._stop_event.is_set():
                 try:
                     spectrum = self._acquire_trace()
 
                     if len(self.history) >= self.history_length:
                         self.history.pop()
 
+                    self.frequency_axis = self._build_frequency_axis(len(spectrum))
                     self.history.insert(0, (time.time(), spectrum))
                     self.spectrum = spectrum
 
                 except Exception as e:
+                    if self._stop_event.is_set():
+                        break
                     print(f"Error acquiring trace: {e}")
                     sleep(1)
 
@@ -166,6 +179,10 @@ class SpectrumThread(Thread):
         """
         return self.spectrum
 
+    def get_frequency_axis(self):
+        """Return the most recently generated frequency axis in Hz."""
+        return self.frequency_axis
+
     def get_history(self):
         """Return Entire History List
 
@@ -182,11 +199,18 @@ if __name__ == "__main__":
 
     thread = SpectrumThread()
     thread.start()
-    sleep(2)
-    print(thread.get_spectrum())
-    data = thread.get_spectrum()
-    if data is not None:
-        plt.plot(range(len(data)), data)
-        plt.xlabel("Frequency Bin")
-        plt.ylabel("Power (dBm)")
-        plt.show()
+    try:
+        sleep(2)
+
+        data = thread.get_spectrum()
+        frequency_axis = thread.get_frequency_axis()
+
+        print(data)
+        if data is not None and frequency_axis is not None:
+            plt.plot(frequency_axis / 1e6, data)
+            plt.xlabel("Frequency (MHz)")
+            plt.ylabel("Power (dBm)")
+            plt.show()
+    finally:
+        thread.stop()
+        thread.join(timeout=5)
