@@ -4,7 +4,7 @@ Module for Managing Different Motor Objects
 
 """
 
-from .motors import Caltech6m, H180Motor, NoMotor, PushRodMotor, Rot2Motor
+from .motors import Moore6mClient, NoMotor
 
 
 def angle_within_range(angle, limits):
@@ -40,10 +40,8 @@ class Rotor:
         motor_type_upper = str(motor_type).upper()
         motor_types = {
             "NONE": NoMotor,
-            "ALFASPID": Rot2Motor,
-            "H180MOUNT": H180Motor,
-            "PUSHROD": PushRodMotor,
-            "CALTECH6M": Caltech6m,
+            "CALTECH6M": Moore6mClient,
+            "MOORE6M": Moore6mClient,
         }
         try:
             motor_class = motor_types[motor_type_upper]

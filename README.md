@@ -62,6 +62,24 @@ python bin/srt_runner.py --config_dir=PATH_TO_CONFIG_DIR
 
 For all commands in following sections which assume installation, modifying those commands analogously will also allow you to run them from source directly, which make custom modifications and debugging much easier.
 
+### Moore 6m Serial Worker
+
+For the Moore/Caltech 6m mount, serial I/O is handled by a standalone worker process. Start the worker before starting the daemon:
+
+```
+python bin/rotor_worker.py --port=/dev/ttyUSB0 --baud=115200
+```
+
+To start in safe mode (motion/control commands blocked), pass:
+
+```
+python bin/rotor_worker.py --port=/dev/ttyUSB0 --baud=115200 --safe-mode
+```
+
+The worker exposes a ZMQ command socket (default port 5566) and a separate estop socket (default port 5567). The daemon connects to these endpoints when `MOTOR_TYPE` is set to `CALTECH6M`.
+
+The worker also provides a Tkinter GUI with basic status, an emergency stop button, a refresh/startup button, and controls for starting/stopping the `srt_runner.py` web app.
+
 Note: This requires manually making sure you have all the dependencies listed in Required Libraries
 
 ### OS-Specific Setup

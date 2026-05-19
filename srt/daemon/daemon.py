@@ -71,7 +71,6 @@ class SmallRadioTelescopeDaemon:
         self.motor_type = config_dict["MOTOR_TYPE"]
         self.motor_port = config_dict["MOTOR_PORT"]
         self.motor_baudrate = config_dict["MOTOR_BAUDRATE"]
-        self.caltech6m_safe_mode = bool(config_dict.get("CALTECH6M_SAFE_MODE", False))
         self.control_profile = str(
             config_dict.get("CONTROL_PROFILE", "FULL_SRT")
         ).upper()
@@ -144,9 +143,6 @@ class SmallRadioTelescopeDaemon:
             self.motor_baudrate,
             self.az_limits,
             self.el_limits,
-            motor_kwargs={
-                "safe_mode": self.caltech6m_safe_mode,
-            } if str(self.motor_type).upper() == "CALTECH6M" else None,
         )
         # Start from current motor position so daemon startup does not
         # immediately command a move to stow.
