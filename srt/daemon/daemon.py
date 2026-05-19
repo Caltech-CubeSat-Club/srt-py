@@ -970,7 +970,7 @@ class SmallRadioTelescopeDaemon:
         
         status_port = 5555
         status_socket = context.socket(zmq.PUB)
-        status_socket.bind("tcp://127.0.0.1:%s" % status_port)
+        status_socket.bind("tcp://*:%s" % status_port)
         logging.warning("Status socket bound on localhost:%s", status_port)
 
         def _json_default(obj):
@@ -1067,7 +1067,7 @@ class SmallRadioTelescopeDaemon:
         
         command_port = 5556
         command_socket = context.socket(zmq.PULL)
-        command_socket.bind("tcp://127.0.0.1:%s" % command_port)
+        command_socket.bind("tcp://*:%s" % command_port)
         logging.warning("Command socket bound on localhost:%s", command_port)
         
         while True:

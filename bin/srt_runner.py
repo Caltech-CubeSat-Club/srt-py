@@ -51,7 +51,7 @@ if __name__ == "__main__":
         metavar="config_dir",
         type=str,
         help="The Path to the SRT Config Directory",
-        default="../config",
+        default="config",
     )
     my_parser.add_argument(
         "--config_file_name",

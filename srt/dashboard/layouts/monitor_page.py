@@ -960,7 +960,7 @@ def generate_layout(software, config_dict=None):
 
 
 def register_callbacks(
-    app, config, status_thread, command_thread, raw_spectrum_thread, cal_spectrum_thread, software
+    app, config, status_thread, command_thread, raw_spectrum_thread, cal_spectrum_thread, software="Moore 6m"
 ):
     """Registers the Callbacks for the Monitor Page
 
