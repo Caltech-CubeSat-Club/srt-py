@@ -246,6 +246,13 @@ def make_gui(worker: Moore6mWorker, poll_ms=500):
     root = tk.Tk()
     root.title('Moore 6m Dish Controller')
 
+    def on_close():
+        worker.stop()
+        root.quit()
+        root.destroy()
+
+    root.protocol('WM_DELETE_WINDOW', on_close)
+
     frm = ttk.Frame(root, padding=8)
     frm.grid()
 
