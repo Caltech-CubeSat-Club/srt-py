@@ -321,7 +321,7 @@ def make_gui(worker: Moore6mWorker, poll_ms=500):
 
 def main():
     parser = argparse.ArgumentParser(description='Rotor serial worker with ZMQ & GUI')
-    parser.add_argument('--port', default='/dev/ttyUSB0', help='serial port')
+    parser.add_argument('--port', default='COM1', help='serial port')
     parser.add_argument('--baud', default=115200, type=int, help='baudrate')
     parser.add_argument('--cmd-port', default=DEFAULT_CMD_PORT, type=int, help='ZMQ command port')
     parser.add_argument('--estop-port', default=DEFAULT_ESTOP_PORT, type=int, help='ZMQ estop port')
