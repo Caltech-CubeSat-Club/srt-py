@@ -213,12 +213,21 @@ class Moore6mWorker:
             logging.error('no runner path configured')
             return False
         try:
-            self.runner_proc = subprocess.Popen(
-                [sys.executable, self.runner_path],
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-                start_new_session=True,
-            )
+            cmd = [sys.executable, self.runner_path]
+            if os.name == 'nt':
+                self.runner_proc = subprocess.Popen(
+                    cmd,
+                    stdout=None,
+                    stderr=None,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                )
+            else:
+                self.runner_proc = subprocess.Popen(
+                    cmd,
+                    stdout=None,
+                    stderr=None,
+                    start_new_session=True,
+                )
             return True
         except Exception:
             logging.exception('failed to start runner')
@@ -229,17 +238,31 @@ class Moore6mWorker:
             return True
         try:
             if self.runner_proc.poll() is None:
-                try:
-                    os.killpg(self.runner_proc.pid, signal.SIGTERM)
-                except Exception:
-                    self.runner_proc.terminate()
-                try:
-                    self.runner_proc.wait(timeout=3)
-                except Exception:
+                if os.name == 'nt':
                     try:
-                        os.killpg(self.runner_proc.pid, signal.SIGKILL)
+                        self.runner_proc.send_signal(signal.CTRL_BREAK_EVENT)
                     except Exception:
-                        self.runner_proc.kill()
+                        self.runner_proc.terminate()
+                    try:
+                        self.runner_proc.wait(timeout=3)
+                    except Exception:
+                        subprocess.run(
+                            ["taskkill", "/PID", str(self.runner_proc.pid), "/T", "/F"],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
+                else:
+                    try:
+                        os.killpg(self.runner_proc.pid, signal.SIGTERM)
+                    except Exception:
+                        self.runner_proc.terminate()
+                    try:
+                        self.runner_proc.wait(timeout=3)
+                    except Exception:
+                        try:
+                            os.killpg(self.runner_proc.pid, signal.SIGKILL)
+                        except Exception:
+                            self.runner_proc.kill()
             self.runner_proc = None
             return True
         except Exception:

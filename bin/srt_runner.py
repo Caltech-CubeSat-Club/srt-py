@@ -14,6 +14,19 @@ from waitress import serve
 from srt import config_loader
 
 
+def _configure_waitress_queue_logging():
+    logger = logging.getLogger("waitress.queue")
+    logger.setLevel(logging.DEBUG)
+
+    class _QueueDebugFilter(logging.Filter):
+        def filter(self, record):
+            record.levelno = logging.DEBUG
+            record.levelname = "DEBUG"
+            return True
+
+    logger.addFilter(_QueueDebugFilter())
+
+
 def run_srt_daemon(configuration_dir, configuration_dict):
     from srt.daemon import daemon as srt_d
 
@@ -24,6 +37,8 @@ def run_srt_daemon(configuration_dir, configuration_dict):
 def run_srt_dashboard(configuration_dir, configuration_dict):
     from srt.dashboard import app as srt_app
 
+    _configure_waitress_queue_logging()
+
     app_server, _ = srt_app.generate_app(configuration_dir, configuration_dict)
     serve(
         app_server,
@@ -33,16 +48,7 @@ def run_srt_dashboard(configuration_dir, configuration_dict):
 
 
 if __name__ == "__main__":
-    class _WaitressQueueDebugFilter(logging.Filter):
-        def filter(self, record):
-            if record.name.startswith("waitress.queue"):
-                record.levelno = logging.DEBUG
-                record.levelname = "DEBUG"
-            return True
-
-    root_logger = logging.getLogger()
-    root_logger.addFilter(_WaitressQueueDebugFilter())
-    logging.getLogger("waitress.queue").setLevel(logging.DEBUG)
+    _configure_waitress_queue_logging()
 
     # Create the parser
     my_parser = argparse.ArgumentParser(description="Runs the SRT Control Application")
