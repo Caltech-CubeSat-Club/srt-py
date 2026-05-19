@@ -6,6 +6,7 @@ Starts the SRT Daemon and/or Dashboard
 """
 
 import argparse
+import logging
 from pathlib import Path
 from multiprocessing import Process
 
@@ -32,6 +33,15 @@ def run_srt_dashboard(configuration_dir, configuration_dict):
 
 
 if __name__ == "__main__":
+    class _WaitressQueueDebugFilter(logging.Filter):
+        def filter(self, record):
+            if record.name.startswith("waitress.queue"):
+                record.levelno = logging.DEBUG
+                record.levelname = "DEBUG"
+            return True
+
+    logging.getLogger("waitress.queue").addFilter(_WaitressQueueDebugFilter())
+
     # Create the parser
     my_parser = argparse.ArgumentParser(description="Runs the SRT Control Application")
 

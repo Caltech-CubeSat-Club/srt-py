@@ -626,7 +626,7 @@ class Moore6mSerial(Motor):
                         self.mode = {0: "Stop", 1: "Calibrate", 5: "Track"}.get(v, f"Unknown({v})")
                     if k == "CalSts":
                         self.CalSts = {0: "Not Calibrated", 1: "Calibrating Now", 2: "Calibration OK"}.get(v, f"Unknown({v})")
-                logging.info("{}: {}".format(k, v))
+                logging.debug("{}: {}".format(k, v))
 
         if self.mode == "Track":
             self._transition_state(Moore6mSerial.State.TRACKING, "controller mode indicates tracking")
