@@ -259,7 +259,7 @@ class Moore6mSerial(Motor):
             with self._serial_lock:
                 self._record_serial_comm("sent", command_text)
                 self.serial.write(cmd)
-                logging.info("Sent: %s", cmd)
+                logging.debug("Sent: %s", cmd)
                 sleep(send_delay)
                 response, matched = self._read_matching_response(
                     command_text,
@@ -267,7 +267,7 @@ class Moore6mSerial(Motor):
                     max_reads=5,
                     max_wait_s=max(0.05, recv_delay + 0.05),
                 )
-                logging.info("Recv: %s", response)
+                logging.debug("Recv: %s", response)
                 if not matched and not response:
                     self.serial.write(b"\r")
                     sleep(send_delay)
@@ -277,7 +277,7 @@ class Moore6mSerial(Motor):
                         max_reads=4,
                         max_wait_s=max(0.05, recv_delay + 0.05),
                     )
-                    logging.info("Probe Recv: %s", response)
+                    logging.debug("Probe Recv: %s", response)
                 sleep(recv_delay)
 
                 if not matched:
@@ -734,9 +734,10 @@ class Moore6mSerial(Motor):
         }
 
     def cleanup(self):
-        self._transition_state(Moore6mSerial.State.SHUTDOWN, "cleanup invoked")
-        self.spa()
-        self.brakes_on()
+        if self.state != Moore6mSerial.State.SHUTDOWN:
+            self.spa()
+            self.brakes_on()
+            self._transition_state(Moore6mSerial.State.SHUTDOWN, "cleanup invoked")
         self._shutdown_command_worker()
         if self.serial is not None and self.serial.is_open:
             self.serial.close()

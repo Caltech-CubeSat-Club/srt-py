@@ -74,22 +74,28 @@ class Moore6mWorker:
 
     def stop(self):
         self._running.clear()
-        try:
-            self.cmd_socket.close()
-            self.estop_socket.close()
-            self._ctx.term()
-        except Exception:
-            pass
         # cleanup moore6m
         try:
             self.moore6m.cleanup()
         except Exception:
             pass
+        try:
+            self.cmd_socket.setsockopt(zmq.LINGER, 0)
+            self.estop_socket.setsockopt(zmq.LINGER, 0)
+            self.cmd_socket.close()
+            self.estop_socket.close()
+            self._ctx.term()
+        except Exception:
+            pass
+        for t in list(self._threads):
+            t.join(timeout=1.0)
 
     def _cmd_loop(self):
         while self._running.is_set():
             try:
                 msg = self.cmd_socket.recv_string(flags=0)
+            except zmq.error.ZMQError:
+                break
             except Exception:
                 break
             resp = self._handle_command(msg)
@@ -102,10 +108,15 @@ class Moore6mWorker:
         poller = zmq.Poller()
         poller.register(self.estop_socket, zmq.POLLIN)
         while self._running.is_set():
-            socks = dict(poller.poll(200))
+            try:
+                socks = dict(poller.poll(200))
+            except zmq.error.ZMQError:
+                break
             if self.estop_socket in socks:
                 try:
                     msg = self.estop_socket.recv_string(flags=0)
+                except zmq.error.ZMQError:
+                    break
                 except Exception:
                     continue
                 logging.warning('estop message received: %s', msg)
@@ -200,8 +211,8 @@ class Moore6mWorker:
         try:
             self.runner_proc = subprocess.Popen(
                 [sys.executable, self.runner_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=None,
+                stderr=None,
                 start_new_session=True,
             )
             return True
