@@ -6,6 +6,7 @@ Starts the SRT Daemon and/or Dashboard
 """
 
 import argparse
+import atexit
 import logging
 from pathlib import Path
 from multiprocessing import Process
@@ -16,15 +17,7 @@ from srt import config_loader
 
 def _configure_waitress_queue_logging():
     logger = logging.getLogger("waitress.queue")
-    logger.setLevel(logging.DEBUG)
-
-    class _QueueDebugFilter(logging.Filter):
-        def filter(self, record):
-            record.levelno = logging.DEBUG
-            record.levelname = "DEBUG"
-            return True
-
-    logger.addFilter(_QueueDebugFilter())
+    logger.disabled = True
 
 
 def run_srt_daemon(configuration_dir, configuration_dict):
@@ -49,6 +42,11 @@ def run_srt_dashboard(configuration_dir, configuration_dict):
 
 if __name__ == "__main__":
     _configure_waitress_queue_logging()
+
+    def _announce_shutdown():
+        print("SRT runner shutting down")
+
+    atexit.register(_announce_shutdown)
 
     # Create the parser
     my_parser = argparse.ArgumentParser(description="Runs the SRT Control Application")

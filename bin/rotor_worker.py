@@ -208,11 +208,13 @@ class Moore6mWorker:
     # srt_runner process control
     def start_runner(self):
         if self.runner_proc and self.runner_proc.poll() is None:
+            logging.warning('runner already running')
             return True
         if not self.runner_path:
             logging.error('no runner path configured')
             return False
         try:
+            logging.warning('starting runner process')
             cmd = [sys.executable, self.runner_path]
             if os.name == 'nt':
                 self.runner_proc = subprocess.Popen(
@@ -235,9 +237,11 @@ class Moore6mWorker:
 
     def stop_runner(self):
         if not self.runner_proc:
+            logging.warning('runner not running')
             return True
         try:
             if self.runner_proc.poll() is None:
+                logging.warning('stopping runner process')
                 if os.name == 'nt':
                     try:
                         self.runner_proc.send_signal(signal.CTRL_BREAK_EVENT)
@@ -270,6 +274,7 @@ class Moore6mWorker:
             return False
 
     def restart_runner(self):
+        logging.warning('restarting runner process')
         ok = self.stop_runner()
         if not ok:
             return False
