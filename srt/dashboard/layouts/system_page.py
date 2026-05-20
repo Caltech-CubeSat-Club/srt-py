@@ -30,8 +30,6 @@ commands = '''
 
 3. 'quit' stows and stops the daemon.
 
-4. File type for 'record' is set by extension (.fits, .rad, or none for raw).
-
 5. Object names are from sky_coords.csv (e.g. Sun, Moon).
 
 6. Parameters are separated by spaces. Most commands are case-insensitive.
@@ -263,20 +261,16 @@ def register_callbacks(app, config, status_thread, command_thread):
 
         # Helper function to parse timestamps from various formats
         def parse_timestamp(iso_time_str):
-            """Parse ISO timestamp string, treating missing timezone as UTC."""
             if not iso_time_str:
                 return 0.0
             try:
-                # If string ends with Z, it's UTC
-                if iso_time_str.endswith('Z'):
-                    ts = datetime.fromisoformat(iso_time_str.replace("Z", "+00:00")).timestamp()
-                # If it has +00:00 or other timezone, parse as-is
-                elif '+' in iso_time_str or iso_time_str.count('-') > 2:
-                    ts = datetime.fromisoformat(iso_time_str).timestamp()
-                # If no timezone indicator, assume UTC and append it
-                else:
-                    ts = datetime.fromisoformat(iso_time_str + "+00:00").timestamp()
-                return ts
+                s = str(iso_time_str).strip()
+                if s.endswith('Z'):
+                    s = s.replace('Z', '+00:00')
+                elif '+' not in s and s.count('-') <= 2:
+                    # covers both "2026-05-20T01:36:22.148" and "2026-05-19 18:48:01"
+                    s = s + '+00:00'
+                return datetime.fromisoformat(s).timestamp()
             except (ValueError, AttributeError):
                 return 0.0
 
@@ -287,14 +281,13 @@ def register_callbacks(app, config, status_thread, command_thread):
                 try:
                     ts = float(log_time)
                 except (ValueError, TypeError):
-                    ts = 0.0
-                entries.append(
-                    (
-                        ts,
-                        "daemon",
-                        f"{datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')} | {log_txt}",
-                    )
-                )
+                    # log_time is a formatted string like "2026-05-19 18:48:01"
+                    ts = parse_timestamp(log_time)
+                entries.append((
+                    ts,
+                    "daemon",
+                    f"{log_time} | {log_txt}",
+                ))
 
         if "serial" in channels:
             for entry in status.get("serial_communications", []):
