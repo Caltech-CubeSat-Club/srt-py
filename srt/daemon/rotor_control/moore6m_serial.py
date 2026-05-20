@@ -525,10 +525,9 @@ class Moore6mSerial(Motor):
             )
             return
         self.brakes_off()
-        self.send_command("TON", expected_prefix="TON")
-        self._transition_state(
-            Moore6mSerial.State.SLEWING, f"point command to az={az:.3f}, el={el:.3f}"
-        )
+        if self.mode != "Track":
+            self.send_command("TON", expected_prefix="TON")
+        self._transition_state(Moore6mSerial.State.SLEWING, f"point command to az={az:.3f}, el={el:.3f}")
         resp = self.send_command(f"AZL,{az},{el}", expected_prefix="AZL")
         self.get_info()
         return resp
@@ -569,44 +568,16 @@ class Moore6mSerial(Motor):
     def stow(self):
         self.brakes_off()
         if not self.calibrated:
-            logging.warning("telescope is not calibrated, only moving elevation")
-            return self.send_command("ELV,1200", expected_prefix="ELV")
+            logging.error("cannot stow telescope, it is not calibrated")
+            return
         return self.point(179, 81)
 
     def maint(self):
         self.brakes_off()
         if not self.calibrated:
-            logging.warning("telescope is not calibrated, only moving elevation")
-            return self.send_command("ELV,-1200", expected_prefix="ELV")
-        return self.point(270, 15)
-
-    def cw(self, time_s=-1, speed=500):
-        self.brakes_off()
-        self.send_command(f"AZV,{abs(speed)}", expected_prefix="AZV")
-        if time_s > 0:
-            sleep(time_s)
-            self.send_command("AZV,0", expected_prefix="AZV")
-
-    def ccw(self, time_s=-1, speed=500):
-        self.brakes_off()
-        self.send_command(f"AZV,{-abs(speed)}", expected_prefix="AZV")
-        if time_s > 0:
-            sleep(time_s)
-            self.send_command("AZV,0", expected_prefix="AZV")
-
-    def up(self, time_s=-1, speed=1100):
-        self.brakes_off()
-        self.send_command(f"ELV,{abs(speed)}", expected_prefix="ELV")
-        if time_s > 0:
-            sleep(time_s)
-            self.send_command("ELV,0", expected_prefix="ELV")
-
-    def down(self, time_s=-1, speed=1100):
-        self.brakes_off()
-        self.send_command(f"ELV,{-abs(speed)}", expected_prefix="ELV")
-        if time_s > 0:
-            sleep(time_s)
-            self.send_command("ELV,0", expected_prefix="ELV")
+            logging.error("cannot move telescope to maintenance position, it is not calibrated")
+            return
+        return self.point(90, 15)
 
     def get_info(self):
         sts = self.send_command("STS", expected_prefix="STS", fail_on_error=False)
@@ -623,16 +594,24 @@ class Moore6mSerial(Motor):
                         setattr(self, k, (v == "T"))
                 if isinstance(v, int):
                     if k == "mode":
-                        self.mode = {0: "Stop", 1: "Calibrate", 5: "Track"}.get(v, f"Unknown({v})")
+                        self.mode = {0: "Stop", 1: "Track"}.get(v, f"Unknown({v})")
                     if k == "CalSts":
                         self.CalSts = {0: "Not Calibrated", 1: "Calibrating Now", 2: "Calibration OK"}.get(v, f"Unknown({v})")
                 logging.debug("{}: {}".format(k, v))
 
-        if self.mode == "Track":
-            self._transition_state(Moore6mSerial.State.TRACKING, "controller mode indicates tracking")
-        elif self.mode == "Calibrate" or self.CalSts == "Calibrating Now":
-            self._transition_state(Moore6mSerial.State.CALIBRATING, "controller mode indicates calibration")
-        elif self.state not in (Moore6mSerial.State.SHUTDOWN, Moore6mSerial.State.FAULT):
+        if self.CalSts == "Calibrating Now":
+            self._transition_state(Moore6mSerial.State.CALIBRATING, "CalSts indicates calibration in progress")
+        elif self.mode == "Track":
+            if self.state == Moore6mSerial.State.SLEWING:
+                pass  # let point() or a settling check resolve SLEWING -> TRACKING
+            else:
+                self._transition_state(Moore6mSerial.State.TRACKING, "RunningTask=1 indicates position loop active")
+        elif self.state not in (
+            Moore6mSerial.State.SHUTDOWN,
+            Moore6mSerial.State.FAULT,
+            Moore6mSerial.State.SLEWING,
+            Moore6mSerial.State.CALIBRATING,
+        ):
             self._transition_state(Moore6mSerial.State.READY, "status refresh")
 
         azel = self.send_command("GAE", expected_prefix="AZEL", fail_on_error=False)
@@ -713,11 +692,16 @@ class Moore6mSerial(Motor):
             self.get_info()
         logging.warning("calibration complete")
         self.send_command("TMD,0", expected_prefix="TMD")
+        self.brakes_off()
         self.send_command("TON", expected_prefix="TON")
         self._transition_state(Moore6mSerial.State.READY, "calibration complete")
 
     def spa(self):
         self.send_command("SPA", expected_prefix="SPA", fail_on_error=False)
+        # Pessimistically invalidate calibration if it was in progress —
+        # TaskCalEncoders was aborted before writing encoder offsets.
+        if self.CalSts == "Calibrating Now":
+            self.CalSts = "Not Calibrated"
         if self.state not in (Moore6mSerial.State.FAULT, Moore6mSerial.State.SHUTDOWN):
             self._transition_state(Moore6mSerial.State.READY, "stop-all command")
 

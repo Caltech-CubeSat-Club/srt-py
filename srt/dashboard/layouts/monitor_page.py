@@ -64,6 +64,253 @@ def get_all_objects(config_file="config/sky_coords.csv",):
         all_objects.append(name)
     return all_objects
 
+# ---------------------------------------------------------------------------
+# Antenna state panel helpers
+# ---------------------------------------------------------------------------
+ 
+# Map FSM state strings to Bootstrap contextual colors.
+_STATE_COLOR = {
+    "disconnected": "secondary",
+    "connecting": "secondary",
+    "startup_sync": "warning",
+    "ready": "primary",
+    "slewing": "info",
+    "tracking": "success",
+    "calibrating": "warning",
+    "fault": "danger",
+    "recovering": "warning",
+    "shutdown": "dark",
+}
+ 
+_CALSTS_COLOR = {
+    "Not Calibrated": "danger",
+    "Calibrating Now": "warning",
+    "Calibration OK": "success",
+}
+ 
+_BRAKE_COLOR = {True: "danger", False: "success"}   # True = brake ON (motion blocked)
+_ESTOP_COLOR = {True: "danger", False: "success"}
+ 
+ 
+def _indicator_pill(label, active, color_true="danger", color_false="success",
+                    true_text=None, false_text=None):
+    """Renders a small labelled pill badge.
+ 
+    active=True  → color_true (e.g. red for a fault, green for 'brake off')
+    active=False → color_false
+    true_text / false_text override the displayed text when active/inactive.
+    """
+    color = color_true if active else color_false
+    text = (true_text if active else false_text) or label
+    return dbc.Badge(
+        text,
+        color=color,
+        className="me-1 mb-1",
+        style={"fontSize": "0.72rem", "letterSpacing": "0.04em"},
+    )
+ 
+ 
+def generate_antenna_state_panel():
+    """Placeholder layout; content is filled by the update callback."""
+    return dbc.Card(
+        [
+            dbc.CardHeader(
+                html.H5("Antenna State", className="mb-0"),
+                style={},
+            ),
+            dbc.CardBody(
+                html.Div(id="antenna-state-body"),
+                style={},
+            ),
+        ],
+        className="mb-2",
+        style={},
+    )
+ 
+ 
+def _build_antenna_state_body(motor_status):
+    """Build the antenna state panel content from a motor_status dict.
+ 
+    motor_status keys (all optional — defaults to 'unknown' / neutral):
+        fsm_state, last_transition, last_error, safe_mode, retry_count,
+        mode, CalSts,
+        AzBrkOn, ElBrkOn, EmStopOn,
+        ElUpPreLim, ElDnPreLim, ElUpFinLim, ElDnFinLim,
+        AzCwPreLim, AzCcwPreLim, AzCwFinLim, AzCcwFinLim,
+        AzLT180, SimMode,
+        az, el, azerr, elerr,
+        amp_currents  (dict: {"2A01": {"commanded": int, "actual": int}, ...})
+    """
+    if motor_status is None:
+        return html.P("Motor status unavailable.", style={"color": "#555"})
+ 
+    fsm_state = motor_status.get("fsm_state", "unknown")
+    state_color = _STATE_COLOR.get(fsm_state, "secondary")
+ 
+    cal_sts = motor_status.get("CalSts", "Unknown")
+    cal_color = _CALSTS_COLOR.get(cal_sts, "secondary")
+ 
+    # RunningTask: 0=Stop, 1=Track (5 is never actually set in firmware)
+    mode = motor_status.get("mode", "Unknown")
+    mode_color = "success" if mode == "Track" else ("secondary" if mode == "Stop" else "warning")
+ 
+    az_brk = motor_status.get("AzBrkOn", None)
+    el_brk = motor_status.get("ElBrkOn", None)
+    estop = motor_status.get("EmStopOn", None)
+    sim = motor_status.get("SimMode", None)
+ 
+    az = motor_status.get("az", float("nan"))
+    el = motor_status.get("el", float("nan"))
+    azerr = motor_status.get("azerr", float("nan"))
+    elerr = motor_status.get("elerr", float("nan"))
+    last_err = motor_status.get("last_error", "")
+    last_trans = motor_status.get("last_transition", "")
+    safe_mode = motor_status.get("safe_mode", False)
+    retry_count = motor_status.get("retry_count", 0)
+ 
+    # Limit switch states — show only active ones prominently, dim inactive
+    limit_switches = {
+        "El↑ Pre": motor_status.get("ElUpPreLim", False),
+        "El↓ Pre": motor_status.get("ElDnPreLim", False),
+        "El↑ Fin": motor_status.get("ElUpFinLim", False),
+        "El↓ Fin": motor_status.get("ElDnFinLim", False),
+        "Az CW Pre": motor_status.get("AzCwPreLim", False),
+        "Az CCW Pre": motor_status.get("AzCcwPreLim", False),
+        "Az CW Fin": motor_status.get("AzCwFinLim", False),
+        "Az CCW Fin": motor_status.get("AzCcwFinLim", False),
+    }
+    any_limit = any(limit_switches.values())
+ 
+    amp_currents = motor_status.get("amp_currents", {})
+ 
+    # --- Build layout ---
+ 
+    top_badges = html.Div(
+        [
+            dbc.Badge(fsm_state.upper(), color=state_color,
+                      className="me-2 mb-1", style={"fontSize": "0.85rem"}),
+            dbc.Badge(cal_sts, color=cal_color,
+                      className="me-2 mb-1", style={"fontSize": "0.85rem"}),
+            dbc.Badge(f"Loop: {mode}", color=mode_color,
+                      className="me-2 mb-1", style={"fontSize": "0.85rem"}),
+            *([ dbc.Badge("SAFE MODE", color="warning", className="me-2 mb-1",
+                           style={"fontSize": "0.85rem"}) ] if safe_mode else []),
+            *([ dbc.Badge("SIM", color="info", className="me-2 mb-1",
+                           style={"fontSize": "0.85rem"}) ] if sim else []),
+        ],
+        className="mb-2",
+    )
+ 
+    position_row = dbc.Row(
+        [
+            dbc.Col([
+                html.Small("Az", style={"color": "#555"}),
+                html.Div(f"{az:.3f}°", style={"fontSize": "1.1rem", "fontFamily": "monospace"}),
+                html.Small(f"err: {azerr:+.4f}°", style={"color": "#666", "fontFamily": "monospace"}),
+            ], width=3),
+            dbc.Col([
+                html.Small("El", style={"color": "#555"}),
+                html.Div(f"{el:.3f}°", style={"fontSize": "1.1rem", "fontFamily": "monospace"}),
+                html.Small(f"err: {elerr:+.4f}°", style={"color": "#666", "fontFamily": "monospace"}),
+            ], width=3),
+            dbc.Col([
+                html.Small("Az Brake", style={"color": "#555"}),
+                html.Div(_indicator_pill(
+                    "Az Brake",
+                    az_brk if az_brk is not None else False,
+                    color_true="danger", color_false="success",
+                    true_text="ON (locked)", false_text="OFF (free)",
+                )) if az_brk is not None else html.Div("?", style={"color": "#999"}),
+            ], width=3),
+            dbc.Col([
+                html.Small("El Brake", style={"color": "#555"}),
+                html.Div(_indicator_pill(
+                    "El Brake",
+                    el_brk if el_brk is not None else False,
+                    color_true="danger", color_false="success",
+                    true_text="ON (locked)", false_text="OFF (free)",
+                )) if el_brk is not None else html.Div("?", style={"color": "#999"}),
+            ], width=3),
+        ],
+        className="mb-2",
+    )
+ 
+    estop_row = html.Div(
+        [
+            _indicator_pill("E-Stop", estop if estop is not None else False,
+                            color_true="danger", color_false="success",
+                            true_text="⚠ E-STOP ACTIVE", false_text="E-Stop: clear"),
+            _indicator_pill("Retries", retry_count > 0, color_true="warning",
+                            color_false="success",
+                            true_text=f"Retries: {retry_count}", false_text="Comms OK"),
+        ],
+        className="mb-2",
+    )
+ 
+    # Limit switch section — collapsed grid, highlighted red when any active
+    limit_pills = html.Div(
+        [_indicator_pill(
+            name, active,
+            color_true="danger", color_false="secondary",
+            true_text=f"⚠ {name}", false_text=name,
+        ) for name, active in limit_switches.items()],
+        className="mb-1",
+    )
+    limit_section = html.Div(
+        [
+            html.Small(
+                "Limit Switches" + (" — ⚠ ACTIVE" if any_limit else " — clear"),
+                style={"color": "#e05050" if any_limit else "#555", "display": "block", "marginBottom": "3px"},
+            ),
+            limit_pills,
+        ],
+        className="mb-2",
+    )
+ 
+    # Amp current summary (3 amps, commanded vs actual)
+    amp_rows = []
+    for amp_id in ("2A01", "2A02", "2A03"):
+        info = amp_currents.get(amp_id, {})
+        cmd = info.get("commanded", None)
+        act = info.get("actual", None)
+        if cmd is None or cmd == -999999:
+            cmd_str = "—"
+        else:
+            cmd_str = str(cmd)
+        if act is None or act == -999999:
+            act_str = "—"
+        else:
+            act_str = str(act)
+        amp_rows.append(
+            dbc.Row([
+                dbc.Col(html.Small(amp_id, style={"color": "#555"}), width=2),
+                dbc.Col(html.Small(f"cmd: {cmd_str}", style={"fontFamily": "monospace"}), width=5),
+                dbc.Col(html.Small(f"act: {act_str}", style={"fontFamily": "monospace"}), width=5),
+            ], className="mb-0")
+        )
+    amp_section = html.Div(
+        [html.Small("Amplifier Currents", style={"color": "#555", "display": "block", "marginBottom": "3px"})]
+        + amp_rows,
+        className="mb-2",
+    )
+ 
+    error_section = html.Div()
+    if last_err:
+        error_section = dbc.Alert(
+            [html.Strong("Last error: "), last_err],
+            color="danger",
+            className="mb-2 py-1 px-2",
+            style={"fontSize": "0.8rem"},
+        )
+ 
+    meta = html.Small(
+        f"Last transition: {last_trans}",
+        style={"color": "#888", "display": "block"},
+    )
+ 
+    return html.Div([top_badges, position_row, estop_row, limit_section, amp_section, error_section, meta])
+ 
+
 
 def generate_first_row():
     """Generates First Row (Power and Spectrum) Display
@@ -166,12 +413,9 @@ def generate_srt_second_row():
             html.Div(
                 [
                     html.Div(
-                        [
-                            html.H5("6m Mount Status"),
-                            html.Div(id="mount-status-panel"),
-                        ],
+                        generate_antenna_state_panel(),
                         className="pretty_container six columns",
-                        style={"maxHeight": "420px", "overflowY": "auto"},
+                        style={"alignSelf": "stretch"},
                     ),
                     html.Div(
                         [dcc.Graph(id="zoom-graph")],
@@ -1148,6 +1392,17 @@ def register_callbacks(
         if cal_sts:
             return f"Cal Encoders ({cal_sts})"
         return "Calibrate Encoders"
+
+    @app.callback(
+        Output("antenna-state-body", "children"),
+        [Input("interval-component", "n_intervals")],
+    )
+    def update_antenna_state(n):
+        status = status_thread.get_status()
+        if status is None:
+            return _build_antenna_state_body(None)
+        motor_status = status.get("motor_status", status)
+        return _build_antenna_state_body(motor_status)
 
     if not vsrt:
         @app.callback(
