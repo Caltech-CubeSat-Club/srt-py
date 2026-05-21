@@ -158,7 +158,6 @@ class Moore6mController:
         self._daemon = None
         self._daemon_thread: Optional[threading.Thread] = None
         self._dashboard_thread: Optional[threading.Thread] = None
-        self._dashboard_server = None
 
     # ------------------------------------------------------------------
     # Logging helpers
@@ -207,23 +206,26 @@ class Moore6mController:
         self._threads.append(estop_thread)
 
     def stop(self):
-        """Clean shutdown: stop daemon, release serial, close ZMQ."""
+        if not self._running.is_set():
+            return                          # prevent double-call
         self._log("Controller shutting down")
         self._running.clear()
 
-        # Stop daemon gracefully
         self.stop_daemon()
 
-        # Stop dashboard server gracefully
-        self.stop_dashboard()
-
-        # Release serial port
         try:
-            self.moore6m.cleanup()
+            # Signal the command worker to stop and close the serial port first.
+            # Closing the port unblocks any in-progress serial.read_until() immediately,
+            # which lets the worker thread exit rather than timing out.
+            if hasattr(self.moore6m, "_command_worker_stop"):
+                self.moore6m._command_worker_stop.set()
+            if hasattr(self.moore6m, "serial") and self.moore6m.serial and self.moore6m.serial.is_open:
+                self.moore6m.serial.close()
+            # Now cleanup() won't block on serial I/O
+            self.moore6m._transition_state(Moore6mSerial.State.SHUTDOWN, "cleanup invoked")
         except Exception:
-            logging.exception("Error during Moore6mSerial cleanup")
+            logging.exception("Error during serial shutdown")
 
-        # Close ZMQ with zero linger so sockets release ports immediately
         for sock in (self._cmd_socket, self._estop_socket):
             try:
                 sock.setsockopt(zmq.LINGER, 0)
@@ -234,9 +236,6 @@ class Moore6mController:
             self._zmq_ctx.term()
         except Exception:
             pass
-
-        for t in list(self._threads):
-            t.join(timeout=1.0)
 
     # ------------------------------------------------------------------
     # Daemon thread
@@ -292,7 +291,7 @@ class Moore6mController:
             self._log("Dashboard already running")
             return True
         try:
-            from waitress import create_server
+            from waitress import serve
             from srt.dashboard import app as srt_app
 
             def _configure_waitress_queue_logging():
@@ -304,13 +303,9 @@ class Moore6mController:
             host = self.config_dict.get("DASHBOARD_HOST", "127.0.0.1")
             port = self.config_dict.get("DASHBOARD_PORT", 8080)
 
-            self._dashboard_server = create_server(
-                app_server,
-                host=host,
-                port=port,
-            )
             self._dashboard_thread = threading.Thread(
-                target=self._dashboard_server.run,
+                target=serve,
+                kwargs={"app": app_server, "host": host, "port": port},
                 name="srt-dashboard",
                 daemon=True,
             )
@@ -324,20 +319,6 @@ class Moore6mController:
 
     def dashboard_is_running(self) -> bool:
         return bool(self._dashboard_thread and self._dashboard_thread.is_alive())
-
-    def stop_dashboard(self):
-        """Request the dashboard server to stop."""
-        if self._dashboard_server is not None:
-            try:
-                self._dashboard_server.close()
-                if hasattr(self._dashboard_server, "task_dispatcher"):
-                    self._dashboard_server.task_dispatcher.shutdown()
-                self._log("Dashboard stop signalled")
-            except Exception:
-                logging.exception("Failed to stop dashboard")
-        self._dashboard_server = None
-        if self._dashboard_thread is not None:
-            self._dashboard_thread.join(timeout=2.0)
 
     # ------------------------------------------------------------------
     # ZMQ command loop  (REQ/REP — queued commands from Moore6mClient)
