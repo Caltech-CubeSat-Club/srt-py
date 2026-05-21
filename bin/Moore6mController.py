@@ -158,6 +158,7 @@ class Moore6mController:
         self._daemon = None
         self._daemon_thread: Optional[threading.Thread] = None
         self._dashboard_thread: Optional[threading.Thread] = None
+        self._dashboard_server = None
 
     # ------------------------------------------------------------------
     # Logging helpers
@@ -212,6 +213,9 @@ class Moore6mController:
 
         # Stop daemon gracefully
         self.stop_daemon()
+
+        # Stop dashboard server gracefully
+        self.stop_dashboard()
 
         # Release serial port
         try:
@@ -288,7 +292,7 @@ class Moore6mController:
             self._log("Dashboard already running")
             return True
         try:
-            from waitress import serve
+            from waitress import create_server
             from srt.dashboard import app as srt_app
 
             def _configure_waitress_queue_logging():
@@ -300,9 +304,13 @@ class Moore6mController:
             host = self.config_dict.get("DASHBOARD_HOST", "127.0.0.1")
             port = self.config_dict.get("DASHBOARD_PORT", 8080)
 
+            self._dashboard_server = create_server(
+                app_server,
+                host=host,
+                port=port,
+            )
             self._dashboard_thread = threading.Thread(
-                target=serve,
-                kwargs={"app": app_server, "host": host, "port": port},
+                target=self._dashboard_server.run,
                 name="srt-dashboard",
                 daemon=True,
             )
@@ -316,6 +324,16 @@ class Moore6mController:
 
     def dashboard_is_running(self) -> bool:
         return bool(self._dashboard_thread and self._dashboard_thread.is_alive())
+
+    def stop_dashboard(self):
+        """Request the dashboard server to stop."""
+        if self._dashboard_server is not None:
+            try:
+                self._dashboard_server.close()
+                self._log("Dashboard stop signalled")
+            except Exception:
+                logging.exception("Failed to stop dashboard")
+        self._dashboard_server = None
 
     # ------------------------------------------------------------------
     # ZMQ command loop  (REQ/REP — queued commands from Moore6mClient)

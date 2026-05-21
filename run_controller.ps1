@@ -9,7 +9,6 @@
 #   3. Invokes the env's python.exe directly (no conda run wrapper) so PowerShell
 #      owns the process — when Tkinter closes, this window closes too.
 
-$pythonPath = "C:\Users\Caltech6mUser\radioconda\envs\srt-dev\python.exe"
 $scriptPath = "C:\Users\Caltech6mUser\srt-py\bin\Moore6mController.py"
 $configDir  = "C:\Users\Caltech6mUser\srt-py\config"
 $serialPort = "COM1"
@@ -30,10 +29,10 @@ if (-not $mutex.WaitOne(0)) {
 $env:PYTHONUNBUFFERED = "1"
 
 try {
-    & $pythonPath $scriptPath `
+    conda run -n srt-dev python $scriptPath `
         --port        $serialPort `
         --config_dir  $configDir `
-        --autostart
+        --autostart 2>&1
 } finally {
     $mutex.ReleaseMutex()
 }
