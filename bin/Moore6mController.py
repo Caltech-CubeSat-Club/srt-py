@@ -330,10 +330,14 @@ class Moore6mController:
         if self._dashboard_server is not None:
             try:
                 self._dashboard_server.close()
+                if hasattr(self._dashboard_server, "task_dispatcher"):
+                    self._dashboard_server.task_dispatcher.shutdown()
                 self._log("Dashboard stop signalled")
             except Exception:
                 logging.exception("Failed to stop dashboard")
         self._dashboard_server = None
+        if self._dashboard_thread is not None:
+            self._dashboard_thread.join(timeout=2.0)
 
     # ------------------------------------------------------------------
     # ZMQ command loop  (REQ/REP — queued commands from Moore6mClient)
