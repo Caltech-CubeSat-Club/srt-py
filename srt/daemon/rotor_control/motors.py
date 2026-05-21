@@ -198,6 +198,19 @@ class Moore6mClient(Motor):
         self.ElBrkOn = None
         self.EmStopOn = None
         self.amp_currents = None
+        self.ElUpPreLim  = None
+        self.ElDnPreLim  = None
+        self.ElUpFinLim  = None
+        self.ElDnFinLim  = None
+        self.AzCwPreLim  = None
+        self.AzCcwPreLim = None
+        self.AzCwFinLim  = None
+        self.AzCcwFinLim = None
+        self.AzLT180     = None
+        self.SimMode     = None
+        self.safe_mode   = False
+        self.last_transition = None
+        self.retry_count = 0
 
     def _send_cmd(self, text):
         with self._cmd_lock:
@@ -232,6 +245,21 @@ class Moore6mClient(Motor):
         self.azerr = diagnostics.get("azerr", self.azerr)
         self.elerr = diagnostics.get("elerr", self.elerr)
         self.amp_currents = diagnostics.get("amp_currents", self.amp_currents)
+        self.ElUpPreLim   = diagnostics.get("ElUpPreLim",   self.ElUpPreLim)
+        self.ElDnPreLim   = diagnostics.get("ElDnPreLim",   self.ElDnPreLim)
+        self.ElUpFinLim   = diagnostics.get("ElUpFinLim",   self.ElUpFinLim)
+        self.ElDnFinLim   = diagnostics.get("ElDnFinLim",   self.ElDnFinLim)
+        self.AzCwPreLim   = diagnostics.get("AzCwPreLim",   self.AzCwPreLim)
+        self.AzCcwPreLim  = diagnostics.get("AzCcwPreLim",  self.AzCcwPreLim)
+        self.AzCwFinLim   = diagnostics.get("AzCwFinLim",   self.AzCwFinLim)
+        self.AzCcwFinLim  = diagnostics.get("AzCcwFinLim",  self.AzCcwFinLim)
+        self.AzLT180      = diagnostics.get("AzLT180",      self.AzLT180)
+        self.SimMode      = diagnostics.get("SimMode",      self.SimMode)
+        self.safe_mode    = diagnostics.get("safe_mode",    self.safe_mode)
+        # FSM metadata forwarded from the fsm sub-dict
+        self.last_transition = self._fsm_status.get("last_transition", self.last_transition)
+        self.last_error      = self._fsm_status.get("last_error",      self.last_error)
+        self.retry_count     = self._fsm_status.get("retry_count",     self.retry_count)
 
     def status(self):
         resp = self._send_cmd("STATUS")

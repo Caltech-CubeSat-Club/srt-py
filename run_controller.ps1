@@ -29,7 +29,7 @@ if (-not $mutex.WaitOne(0)) {
 $env:PYTHONUNBUFFERED = "1"
 
 try {
-    conda run -n srt-dev python $scriptPath `
+    conda run --no-capture-output -n srt-dev python $scriptPath `
         --port        $serialPort `
         --config_dir  $configDir `
         --autostart 2>&1

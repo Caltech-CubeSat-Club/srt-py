@@ -578,10 +578,6 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
     def _toggle_safe_mode():
         controller.moore6m.safe_mode = bool(safe_mode_var.get())
         controller._log(f"Safe mode {'enabled' if controller.moore6m.safe_mode else 'disabled'}")
-    ttk.Checkbutton(
-        motor_frm, text="Safe Mode (block motion commands)",
-        variable=safe_mode_var, command=_toggle_safe_mode
-    ).grid(row=0, column=0, columnspan=2, sticky="w", padx=4, pady=2)
 
     def _do_estop():
         if not estop_engaged.get():

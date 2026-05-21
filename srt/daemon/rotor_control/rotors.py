@@ -115,22 +115,16 @@ class Rotor:
         return None
 
     def get_diagnostics(self):
-        """Returns motor backend diagnostics when available."""
         keys = [
-            "mode",
-            "CalSts",
-            "AzBrkOn",
-            "ElBrkOn",
-            "EmStopOn",
-            "azerr",
-            "elerr",
-            "amp_currents",
+            "mode", "CalSts",
+            "AzBrkOn", "ElBrkOn", "EmStopOn",
+            "azerr", "elerr", "amp_currents",
+            "ElUpPreLim", "ElDnPreLim", "ElUpFinLim", "ElDnFinLim",
+            "AzCwPreLim", "AzCcwPreLim", "AzCwFinLim", "AzCcwFinLim",
+            "AzLT180", "SimMode", "safe_mode",
         ]
         diagnostics = {}
         for key in keys:
             if hasattr(self.motor, key):
                 diagnostics[key] = getattr(self.motor, key)
-        fsm = self.get_fsm_status()
-        if fsm:
-            diagnostics["fsm_status"] = fsm
         return diagnostics
