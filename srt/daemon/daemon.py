@@ -7,7 +7,7 @@ Main Control and Orchestration Class for the Small Radio Telescope
 from time import sleep, time
 from datetime import timedelta, datetime
 from threading import Thread
-from queue import Queue
+from queue import Queue, Empty
 from collections import deque
 from xmlrpc.client import ServerProxy
 from pathlib import Path
@@ -862,7 +862,7 @@ class SmallRadioTelescopeDaemon:
         None
         """
         last_updated_time = None
-        while True:
+        while self.keep_running:
             if last_updated_time is None or time() - last_updated_time > 10:
                 last_updated_time = time()
                 self.ephemeris_tracker.update_all_az_el()
@@ -915,7 +915,7 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
-        while True:
+        while self.keep_running:
             try:
                 current_rotor_cmd_location = self.rotor_cmd_location
                 if not azel_within_range(
@@ -983,7 +983,7 @@ class SmallRadioTelescopeDaemon:
                 return obj.decode("utf-8", errors="replace")
             return str(obj)
         
-        while True:
+        while self.keep_running:
             try:
                 status = {
                     "beam_width": self.beamwidth,
@@ -1037,6 +1037,11 @@ class SmallRadioTelescopeDaemon:
             except Exception as e:
                 logging.exception("Status publish error: %s", str(e))
             sleep(0.5)
+        try:
+            status_socket.close()
+            context.term()
+        except Exception:
+            pass
 
     def update_radio_settings(self):
         """Coordinates Sending XMLRPC Commands to the GNU Radio Script
@@ -1048,8 +1053,11 @@ class SmallRadioTelescopeDaemon:
         None
         """
         rpc_server = ServerProxy("http://localhost:5557/")
-        while True:
-            method, value = self.radio_queue.get()
+        while self.keep_running:
+            try:
+                method, value = self.radio_queue.get(timeout=0.5)
+            except Empty:
+                continue
             call = getattr(rpc_server, f"set_{method}")
             call(value)
             sleep(0.1)
@@ -1070,12 +1078,20 @@ class SmallRadioTelescopeDaemon:
         command_socket.bind("tcp://*:%s" % command_port)
         logging.warning("Command socket bound on localhost:%s", command_port)
         
-        while True:
+        command_socket.RCVTIMEO = 500
+        while self.keep_running:
             try:
                 cmd = command_socket.recv_string()
                 self.command_queue.put(cmd)
             except zmq.error.ZMQError as e:
+                if isinstance(e, zmq.error.Again):
+                    continue
                 logging.error("Command socket error: %s", str(e))
+        try:
+            command_socket.close()
+            context.term()
+        except Exception:
+            pass
 
     def srt_daemon_main(self):
         """Starts and Processes Commands for the SRT
