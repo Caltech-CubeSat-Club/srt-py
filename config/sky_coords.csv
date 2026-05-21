@@ -2,6 +2,7 @@ coordinate_system,coordinate_a,coordinate_b,name
 fk4,05 31 30,21 58 00,Crab
 fk4,05 32 48,-5 27 00,Orion
 fk4,23 21 12,58 44 00,Cass
+icrs,23 23 26,58 48 41,CassA
 fk4,17 42 54,-28 50 00,SgrA
 fk4,18 17 30,-16 18 00,M17
 fk4,20 27 00,41 00 00,CygEMN
