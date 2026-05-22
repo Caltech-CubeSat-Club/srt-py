@@ -1108,7 +1108,7 @@ def generate_layout(config_dict=None):
 
 
 def register_callbacks(
-    app, config, status_thread, command_thread, raw_spectrum_thread, cal_spectrum_thread
+    app, config, status_thread, command_thread #, raw_spectrum_thread, cal_spectrum_thread
 ):
     """Registers the Callbacks for the Monitor Page
 
@@ -1135,49 +1135,49 @@ def register_callbacks(
     control_profile = str(config.get("CONTROL_PROFILE", "FULL_SRT")).upper()
     radio_enabled = control_profile != "POINTING_ONLY"
 
-    if radio_enabled:
-        @app.callback(
-            Output("cal-spectrum-histogram", "figure"),
-            [Input("interval-component", "n_intervals")],
-        )
-        def update_cal_spectrum_histogram(n):
-            spectrum = cal_spectrum_thread.get_spectrum()
-            status = status_thread.get_status()
-            if status is None or spectrum is None:
-                return ""
-            bandwidth = float(status["bandwidth"])
-            cf = float(status["center_frequency"])
-            return generate_spectrum_graph(bandwidth, cf, spectrum, is_spec_cal=True)
+    # if radio_enabled:
+    #     @app.callback(
+    #         Output("cal-spectrum-histogram", "figure"),
+    #         [Input("interval-component", "n_intervals")],
+    #     )
+    #     def update_cal_spectrum_histogram(n):
+    #         spectrum = cal_spectrum_thread.get_spectrum()
+    #         status = status_thread.get_status()
+    #         if status is None or spectrum is None:
+    #             return ""
+    #         bandwidth = float(status["bandwidth"])
+    #         cf = float(status["center_frequency"])
+    #         return generate_spectrum_graph(bandwidth, cf, spectrum, is_spec_cal=True)
 
-        @app.callback(
-            Output("raw-spectrum-histogram", "figure"),
-            [Input("interval-component", "n_intervals")],
-        )
-        def update_raw_spectrum_histogram(n):
+    #     @app.callback(
+    #         Output("raw-spectrum-histogram", "figure"),
+    #         [Input("interval-component", "n_intervals")],
+    #     )
+    #     def update_raw_spectrum_histogram(n):
 
-            spectrum = raw_spectrum_thread.get_spectrum()
-            status = status_thread.get_status()
-            if status is None or spectrum is None:
-                return ""
-            bandwidth = float(status["bandwidth"])
-            cf = float(status["center_frequency"])
-            return generate_spectrum_graph(bandwidth, cf, spectrum, is_spec_cal=False)
+    #         spectrum = raw_spectrum_thread.get_spectrum()
+    #         status = status_thread.get_status()
+    #         if status is None or spectrum is None:
+    #             return ""
+    #         bandwidth = float(status["bandwidth"])
+    #         cf = float(status["center_frequency"])
+    #         return generate_spectrum_graph(bandwidth, cf, spectrum, is_spec_cal=False)
 
-        @app.callback(
-            Output("power-graph",
-                   "figure"), [Input("interval-component", "n_intervals")]
-        )
-        def update_power_graph(n):
-            status = status_thread.get_status()
-            if status is None:
-                return ""
-            tsys = float(status["temp_sys"])
-            tcal = float(status["temp_cal"])
-            cal_pwr = float(status["cal_power"])
-            spectrum_history = raw_spectrum_thread.get_history()
-            if spectrum_history is None:
-                return ""
-            return generate_power_history_graph(tsys, tcal, cal_pwr, spectrum_history)
+    #     @app.callback(
+    #         Output("power-graph",
+    #                "figure"), [Input("interval-component", "n_intervals")]
+    #     )
+    #     def update_power_graph(n):
+    #         status = status_thread.get_status()
+    #         if status is None:
+    #             return ""
+    #         tsys = float(status["temp_sys"])
+    #         tcal = float(status["temp_cal"])
+    #         cal_pwr = float(status["cal_power"])
+    #         spectrum_history = raw_spectrum_thread.get_history()
+    #         if spectrum_history is None:
+    #             return ""
+    #         return generate_power_history_graph(tsys, tcal, cal_pwr, spectrum_history)
 
     @app.callback(
         Output("mount-status-panel", "children"),

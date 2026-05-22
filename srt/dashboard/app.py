@@ -430,7 +430,7 @@ def generate_app(config_dir, config_dict):
         config_dict,
         status_thread,
         command_thread,
-        raw_spectrum_thread
+        # raw_spectrum_thread, cal_spectrum_thread
     )
     # Create Callbacks for System Page Objects
     system_page.register_callbacks(app, config_dict, status_thread, command_thread)

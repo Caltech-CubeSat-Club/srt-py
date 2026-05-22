@@ -20,8 +20,11 @@ import numpy as np
 
 from .rotor_control.rotors import Rotor
 from .utilities.object_tracker import EphemerisTracker
-from .utilities.functions import azel_within_range, get_spectrum
+from .utilities.functions import azel_within_range
 
+# placeholder
+def get_spectrum(port=5561, timeout=5.0):
+    return None
 
 class SmallRadioTelescopeDaemon:
     """
