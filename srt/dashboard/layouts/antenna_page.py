@@ -422,7 +422,16 @@ def register_callbacks(app, config, status_thread):
         status = status_thread.get_status()
         if status is not None:
             motor_status = status.get("motor_status", status)
-            amp_currents = motor_status.get("amp_currents", None)
+            rotor_diagnostics: dict[str, any] = motor_status.get("rotor_diagnostics", {})
+            # rotor_diagnostics keys = [
+                #     "mode", "CalSts",
+                #     "AzBrkOn", "ElBrkOn", "EmStopOn",
+                #     "azerr", "elerr", "amp_currents",
+                #     "ElUpPreLim", "ElDnPreLim", "ElUpFinLim", "ElDnFinLim",
+                #     "AzCwPreLim", "AzCcwPreLim", "AzCwFinLim", "AzCcwFinLim",
+                #     "AzLT180", "SimMode", "safe_mode",
+                # ]
+            amp_currents = rotor_diagnostics.get("amp_currents", None)
             t = status.get("time", None)
             if amp_currents is not None and t is not None:
                 _amp_history.append({"time": t, **amp_currents})

@@ -261,7 +261,7 @@ class Moore6mClient(Motor):
         self.last_error      = self._fsm_status.get("last_error",      self.last_error)
         self.retry_count     = self._fsm_status.get("retry_count",     self.retry_count)
 
-    def status(self):
+    def status(self) -> tuple[float, float]:
         resp = self._send_cmd("STATUS")
         self._apply_status(resp)
         return self.az, self.el
@@ -303,7 +303,7 @@ class Moore6mClient(Motor):
         entries = resp.get("history") or []
         return entries[-limit:]
 
-    def get_fsm_status(self):
+    def get_fsm_status(self) -> dict[str, any]:
         if not self._fsm_status:
             resp = self._send_cmd("STATUS")
             self._apply_status(resp)

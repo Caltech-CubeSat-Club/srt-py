@@ -58,7 +58,6 @@ def generate_app(config_dir, config_dict):
     (server, app)
     """
     config_dict["CONFIG_DIR"] = config_dir
-    software = config_dict["SOFTWARE"]
 
     # Set Up Dash app/server objects
     app = dash.Dash(
@@ -69,7 +68,7 @@ def generate_app(config_dir, config_dict):
         ],
     )
     server = cast(Any, app.server)
-    app.title = software
+    app.title = "Moore 6m Telescope Dashboard"
 
     webcam_enabled = bool(config_dict.get("WEBCAM_ENABLE", False))
     webcam_device = int(config_dict.get("WEBCAM_DEVICE_INDEX", 0))
@@ -362,7 +361,7 @@ def generate_app(config_dir, config_dict):
     app.validation_layout = html.Div(
         [
             layout,
-            monitor_page.generate_layout(config_dict["SOFTWARE"], config_dict),
+            monitor_page.generate_layout(config_dict),
             system_page.generate_layout(),
             antenna_page.generate_layout(),
         ]
@@ -431,8 +430,7 @@ def generate_app(config_dir, config_dict):
         config_dict,
         status_thread,
         command_thread,
-        raw_spectrum_thread,
-        software
+        raw_spectrum_thread
     )
     # Create Callbacks for System Page Objects
     system_page.register_callbacks(app, config_dict, status_thread, command_thread)
@@ -547,9 +545,6 @@ def generate_app(config_dir, config_dict):
                 f"- Pointing Err Az, El: {point_err[0]:.1f}, {point_err[1]:.1f} mdeg"
             )
 
-        if config_dict["SOFTWARE"] != "Very Small Radio Telescope":
-            lines.append(f"- Motor Offsets: {az_offset:.1f}, {el_offset:.1f} deg")
-
         return "\n".join(lines)
 
     @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
@@ -567,7 +562,7 @@ def generate_app(config_dir, config_dict):
         """
 
         if pathname in ["/", f"/{pages['Monitor Page']}"]:
-            return monitor_page.generate_layout(config_dict["SOFTWARE"], config_dict)
+            return monitor_page.generate_layout(config_dict)
         elif pathname == f"/{pages['System Page']}":
             return system_page.generate_layout()
         elif pathname == f"/{pages['Antenna Page']}": 

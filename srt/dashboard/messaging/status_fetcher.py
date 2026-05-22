@@ -5,7 +5,7 @@ Thread Which Handles Receiving Status Data with ZMQ
 """
 
 import zmq
-from threading import Thread
+from threading import Thread, Event
 from time import sleep
 import json
 import logging
@@ -33,6 +33,7 @@ class StatusThread(Thread):
         super().__init__(group=group, target=target, name=name, daemon=True)
         self.status = None
         self.port = port
+        self.exit_event = Event()
 
     def run(self):
         """Grabs Most Recent Status From ZMQ and Stores
@@ -49,7 +50,7 @@ class StatusThread(Thread):
 
         logging.warning("StatusThread connected to port %s", self.port)
         
-        while True:
+        while not self.exit_event.is_set():
             try:
                 rec = socket.recv()
                 dump = json.loads(rec)
