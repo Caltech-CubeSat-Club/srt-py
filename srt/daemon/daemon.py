@@ -368,6 +368,9 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
+        if not self.rotor.is_motion_allowed():
+            self.log_message("Motion disabled (safe mode): ignoring n_point_scan command")
+            return
         self.ephemeris_cmd_location = None
         self._radio_put("soutrack", object_id)
         # Send vlsr to radio queue
@@ -443,6 +446,9 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
+        if not self.rotor.is_motion_allowed():
+            self.log_message("Motion disabled (safe mode): ignoring beam_switch command")
+            return
         self.ephemeris_cmd_location = None
         self._radio_put("soutrack", object_id)
         # Send vlsr to radio queue
@@ -501,6 +507,9 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
+        if not self.rotor.is_motion_allowed():
+            self.log_message("Motion disabled (safe mode): ignoring point_at_object command")
+            return
         self.rotor_offsets = (0.0, 0.0)
         self._radio_put("soutrack", object_id)
         # Send vlsr to radio queue
@@ -542,6 +551,9 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
+        if not self.rotor.is_motion_allowed():
+            self.log_message("Motion disabled (safe mode): ignoring point_at_azel command")
+            return  
         # cur_vlsr = self.ephemeris_tracker.calculate_vlsr_azel((az,el))
         # self.radio_queue.put(("vlsr",cur_vlsr))
         # self.current_vlsr = cur_vlsr
@@ -589,6 +601,9 @@ class SmallRadioTelescopeDaemon:
         bool
             True if destination was reached, False otherwise.
         """
+        if not self.rotor.is_motion_allowed():
+            self.log_message("Motion disabled (safe mode): ignoring point_at_offset command")
+            return False
         new_rotor_offsets = (az_off, el_off)
         new_rotor_cmd_location = tuple(
             map(add, self.rotor_destination, new_rotor_offsets)
@@ -622,6 +637,9 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
+        if not self.rotor.is_motion_allowed():
+            self.log_message("Motion disabled (safe mode): ignoring stow command")
+            return
         self.ephemeris_cmd_location = None
         self._radio_put("soutrack", "at_stow")
         self._end_active_observation("move_away")
@@ -665,6 +683,9 @@ class SmallRadioTelescopeDaemon:
 
     def calibrate_encoders(self):
         """Runs motor encoder calibration when supported by motor backend."""
+        if not self.rotor.is_motion_allowed(): 
+            self.log_message("Encoder calibration is unavailable while motion is not allowed")
+            return
         self._end_active_observation("encoder_calibration")
         if not hasattr(self.rotor.motor, "calibrate"):
             self.log_message("Encoder calibration is unavailable for this motor backend")
@@ -821,6 +842,9 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
+        if not self.rotor.is_motion_allowed():
+            self.log_message("Motion disabled (safe mode): ignoring find_object_location command")
+            return
         if name in self.ephemeris_tracker.az_el_dict:
             az, el = self.ephemeris_tracker.az_el_dict[name][0], self.ephemeris_tracker.az_el_dict[name][1]
             self.log_message(f"here {az,el}")
@@ -1198,9 +1222,7 @@ class SmallRadioTelescopeDaemon:
                         self.point_at_object(object_id=command_parts[0])
                 elif command_name == "stow":
                     self.stow()
-                elif command_name == "cal":
-                    self.point_at_azel(*self.cal_location)
-                elif command_name == "calibrate":
+                elif command_name == "calibrate_radio":
                     self.calibrate()
                 elif command_name == "calibrate_encoders":
                     self.calibrate_encoders()
@@ -1225,9 +1247,6 @@ class SmallRadioTelescopeDaemon:
                 elif command_name == "object":
                     if command_parts[-1] in self.ephemeris_locations:
                         self.find_object_location(command_parts[-1])
-                elif command_name == "obj_coords":
-                    self.rotor_location = (
-                        float(command_parts[1]), float(command_parts[2]))
                 elif command_name == "azel":
                     self.point_at_azel(
                         float(command_parts[1]),

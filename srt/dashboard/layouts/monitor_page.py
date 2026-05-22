@@ -241,12 +241,12 @@ def _build_antenna_state_body(motor_status: dict[str, any] | None):
             dbc.Col([
                 html.Small("Az", style={"color": "#555"}),
                 html.Div(f"{az:.3f}°", style={"fontSize": "1.1rem", "fontFamily": "monospace"}),
-                html.Small(f"err: {azerr:+.4f}°", style={"color": "#666", "fontFamily": "monospace"}),
+                html.Small(f"err: {azerr:+.4f}m°", style={"color": "#666", "fontFamily": "monospace"}),
             ], width=3),
             dbc.Col([
                 html.Small("El", style={"color": "#555"}),
                 html.Div(f"{el:.3f}°", style={"fontSize": "1.1rem", "fontFamily": "monospace"}),
-                html.Small(f"err: {elerr:+.4f}°", style={"color": "#666", "fontFamily": "monospace"}),
+                html.Small(f"err: {elerr:+.4f}m°", style={"color": "#666", "fontFamily": "monospace"}),
             ], width=3),
             dbc.Col([
                 html.Small("Az Brake", style={"color": "#555"}),
