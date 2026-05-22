@@ -305,7 +305,7 @@ class SmallRadioTelescopeDaemon:
         stable_needed = max(1, int(self.pointing_error_stable_cycles))
         stable_count = 0
 
-        while True:
+        while self.keep_running:
             reached_by_position = azel_within_range(
                 self.rotor_location, self.rotor_cmd_location
             )
