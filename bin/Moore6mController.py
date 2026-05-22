@@ -268,8 +268,6 @@ class Moore6mController:
         if p is None:
             return
         self._daemon_proc = None
-        p.quit() 
-        time.sleep(0.5)  # Give the daemon a moment to exit gracefully
         if not p.is_alive():
             return
         self._log(f"Stopping daemon (pid {p.pid})")
