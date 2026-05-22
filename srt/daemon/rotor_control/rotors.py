@@ -90,22 +90,22 @@ class Rotor:
             el, self.el_limits
         )
 
-    def get_recent_serial_communications(self, limit=12):
+    def get_recent_serial_communications(self, limit=12) -> list:
         if hasattr(self.motor, "get_recent_serial_communications"):
             return self.motor.get_recent_serial_communications(limit=limit)
         return []
 
-    def get_recent_command_history(self, limit=12):
+    def get_recent_command_history(self, limit=12) -> list:
         if hasattr(self.motor, "get_recent_command_history"):
             return self.motor.get_recent_command_history(limit=limit)
         return []
 
-    def get_fsm_status(self):
+    def get_fsm_status(self) -> dict[str, any]:
         if hasattr(self.motor, "get_fsm_status"):
             return self.motor.get_fsm_status()
         return {}
 
-    def get_pointing_error(self):
+    def get_pointing_error(self) -> tuple[float, float] | None:
         """Returns pointing error (azerr, elerr) in millidegrees when available."""
         if hasattr(self.motor, "azerr") and hasattr(self.motor, "elerr"):
             try:
@@ -114,7 +114,7 @@ class Rotor:
                 return None
         return None
 
-    def get_diagnostics(self):
+    def get_diagnostics(self) -> dict[str, any]:
         keys = [
             "mode", "CalSts",
             "AzBrkOn", "ElBrkOn", "EmStopOn",

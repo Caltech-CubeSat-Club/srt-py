@@ -128,60 +128,95 @@ def generate_antenna_state_panel():
     )
  
  
-def _build_antenna_state_body(motor_status):
-    """Build the antenna state panel content from a motor_status dict.
+def _build_antenna_state_body(motor_status: dict[str, any] | None):
+    """Build the antenna state panel content from a motor_status dict from daemon thread.
  
-    motor_status keys (all optional — defaults to 'unknown' / neutral):
-        fsm_state, last_transition, last_error, safe_mode, retry_count,
-        mode, CalSts,
-        AzBrkOn, ElBrkOn, EmStopOn,
-        ElUpPreLim, ElDnPreLim, ElUpFinLim, ElDnFinLim,
-        AzCwPreLim, AzCcwPreLim, AzCwFinLim, AzCcwFinLim,
-        AzLT180, SimMode,
-        az, el, azerr, elerr,
-        amp_currents  (dict: {"2A01": {"commanded": int, "actual": int}, ...})
+    motor_status keys:
+        "beam_width",
+        "location",
+        "motor_azel",
+        "motor_cmd_azel",
+        "vlsr",
+        "object_locs",
+        "object_time_locs",
+        "az_limits",
+        "el_limits",
+        "stow_loc",
+        "cal_loc",
+        "horizon_points",
+        "center_frequency",
+        "frequency_correction",
+        "bandwidth",
+        "motor_offsets",
+        "queued_item",
+        "queue_size",
+        "emergency_contact",
+        "error_logs",
+        "temp_cal",
+        "temp_sys",
+        "cal_power",
+        "n_point_data",
+        "beam_switch_data",
+        "pointing_error",
+        "pointing_error_history",
+        "rotor_diagnostics",
+        "rotor_fsm_status",
+        "observation_events",
+        "time",
+        "command_history",
+        "serial_communications"
     """
     if motor_status is None:
         return html.P("Motor status unavailable.", style={"color": "#555"})
  
-    fsm_state = motor_status.get("fsm_state", "unknown")
-    state_color = _STATE_COLOR.get(fsm_state, "secondary")
+    fsm_state: str = motor_status.get("rotor_fsm_status", {}).get("state", "Unknown")
+    state_color: str = _STATE_COLOR.get(fsm_state, "secondary")
+
+    rotor_diagnostics: dict[str, any] = motor_status.get("rotor_diagnostics", {})
+    # rotor_diagnostics keys = [
+        #     "mode", "CalSts",
+        #     "AzBrkOn", "ElBrkOn", "EmStopOn",
+        #     "azerr", "elerr", "amp_currents",
+        #     "ElUpPreLim", "ElDnPreLim", "ElUpFinLim", "ElDnFinLim",
+        #     "AzCwPreLim", "AzCcwPreLim", "AzCwFinLim", "AzCcwFinLim",
+        #     "AzLT180", "SimMode", "safe_mode",
+        # ]
  
-    cal_sts = motor_status.get("CalSts", "Unknown")
-    cal_color = _CALSTS_COLOR.get(cal_sts, "secondary")
+    cal_sts: str = rotor_diagnostics.get("CalSts", "Unknown")
+    cal_color: str = _CALSTS_COLOR.get(cal_sts, "secondary")
  
     # RunningTask: 0=Stop, 1=Track (5 is never actually set in firmware)
-    mode = motor_status.get("mode", "Unknown")
-    mode_color = "success" if mode == "Track" else ("secondary" if mode == "Stop" else "warning")
+    mode: str = rotor_diagnostics.get("mode", "Unknown")
+    mode_color: str = "success" if mode == "Track" else ("secondary" if mode == "Stop" else "warning")
  
-    az_brk = motor_status.get("AzBrkOn", None)
-    el_brk = motor_status.get("ElBrkOn", None)
-    estop = motor_status.get("EmStopOn", None)
-    sim = motor_status.get("SimMode", None)
+    az_brk: bool | None = rotor_diagnostics.get("AzBrkOn", None)
+    el_brk: bool | None = rotor_diagnostics.get("ElBrkOn", None)
+    estop: bool | None = rotor_diagnostics.get("EmStopOn", None)
+    sim: bool | None = rotor_diagnostics.get("SimMode", None)
  
-    az = motor_status.get("az", float("nan"))
-    el = motor_status.get("el", float("nan"))
-    azerr = motor_status.get("azerr", float("nan"))
-    elerr = motor_status.get("elerr", float("nan"))
-    last_err = motor_status.get("last_error", "")
-    last_trans = motor_status.get("last_transition", "")
-    safe_mode = motor_status.get("safe_mode", False)
-    retry_count = motor_status.get("retry_count", 0)
+    az: float = motor_status.get("motor_azel",(float("nan"), float("nan")))[0]
+    el: float = motor_status.get("motor_azel",(float("nan"), float("nan")))[1]
+    azerr: float = rotor_diagnostics.get("azerr", float("nan"))
+    elerr: float = rotor_diagnostics.get("elerr", float("nan"))
+    last_err: str = motor_status.get("rotor_fsm_status", {}).get("last_error", "")
+    last_trans: str = motor_status.get("rotor_fsm_status", {}).get("last_transition", "")
+    safe_mode: bool = rotor_diagnostics.get("safe_mode", False)
+    retry_count: int = motor_status.get("fsm_status", {}).get("retry_count", 0)
  
     # Limit switch states — show only active ones prominently, dim inactive
     limit_switches = {
-        "El↑ Pre": motor_status.get("ElUpPreLim", False),
-        "El↓ Pre": motor_status.get("ElDnPreLim", False),
-        "El↑ Fin": motor_status.get("ElUpFinLim", False),
-        "El↓ Fin": motor_status.get("ElDnFinLim", False),
-        "Az CW Pre": motor_status.get("AzCwPreLim", False),
-        "Az CCW Pre": motor_status.get("AzCcwPreLim", False),
-        "Az CW Fin": motor_status.get("AzCwFinLim", False),
-        "Az CCW Fin": motor_status.get("AzCcwFinLim", False),
+        "El↑ Pre": rotor_diagnostics.get("ElUpPreLim", False),
+        "El↓ Pre": rotor_diagnostics.get("ElDnPreLim", False),
+        "El↑ Fin": rotor_diagnostics.get("ElUpFinLim", False),
+        "El↓ Fin": rotor_diagnostics.get("ElDnFinLim", False),
+        "Az CW Pre": rotor_diagnostics.get("AzCwPreLim", False),
+        "Az CCW Pre": rotor_diagnostics.get("AzCcwPreLim", False),
+        "Az CW Fin": rotor_diagnostics.get("AzCwFinLim", False),
+        "Az CCW Fin": rotor_diagnostics.get("AzCcwFinLim", False),
     }
     any_limit = any(limit_switches.values())
  
-    amp_currents = motor_status.get("amp_currents", {})
+    amp_currents = rotor_diagnostics.get("amp_currents", {})
  
     # --- Build layout ---
  
@@ -406,7 +441,7 @@ def generate_srt_second_row():
     Returns
     -------
     Div: html.Div 
-        containing mount status diagnostics if srt
+        containing mount status diagnostics
     """
     return html.Div(
         [
@@ -546,52 +581,7 @@ def generate_third_row():
     )
 
 
-# def generate_point_popup():
-
-#     return html.Div(
-#         [dbc.Modal(
-#             [
-#                 dbc.ModalHeader("Point at Object"),
-#                 dbc.ModalBody(
-#                     [
-#                         html.H5("Confirm Pointing to This Object?"),
-#                         dcc.RadioItems(
-#                             options=[
-#                                 {"label": "Direct Point", "value": ""},
-#                                 {"label": "N-Point Scan", "value": " n"},
-#                                 {"label": "Beam-switch", "value": " b"},
-#                             ],
-#                             id="point-options",
-#                             value="",
-#                         ),
-#                     ]
-#                 ),
-#                 dbc.ModalFooter(
-#                     [
-#                         dbc.Button(
-#                             "Yes",
-#                             id="az-el-graph-btn-yes",
-#                             className="ml-auto",
-#                             # block=True,
-#                             color="primary",
-#                         ),
-#                         dbc.Button(
-#                             "No",
-#                             id="az-el-graph-btn-no",
-#                             className="ml-auto",
-#                             # block=True,
-#                             color="secondary",
-#                         ),
-#                     ]
-#                 ),
-#             ],
-#             id="az-el-graph-modal",
-
-#         ),]
-#     )
-
-
-def generate_popups(software):
+def generate_popups():
     """Generates all 'Pop-up' Modal Components
 
     Returns
@@ -599,13 +589,6 @@ def generate_popups(software):
     Div Containing all Modal Components
     """
     all_objects = get_all_objects()
-
-    if software == "Very Small Radio Telescope":
-        vsrt_open = True
-        srt_open = False
-    else:
-        vsrt_open = False
-        srt_open = True
 
     return html.Div(
         [dbc.Modal(
@@ -645,38 +628,6 @@ def generate_popups(software):
                 ),
             ],
             id="az-el-graph-modal",
-            # is_open=srt_open,
-        ),
-
-            dbc.Modal(
-            [
-                dbc.ModalHeader("Point at Object"),
-                dbc.ModalBody(
-                    [
-                        html.H5("Confirm Pointing to This Object?"),
-                    ]
-                ),
-                dbc.ModalFooter(
-                    [
-                        dbc.Button(
-                            "Yes",
-                            id="az-el-vsrt-btn-yes",
-                            className="ml-auto",
-                            # block=True,
-                            color="primary",
-                        ),
-                        dbc.Button(
-                            "No",
-                            id="az-el-vsrt-btn-no",
-                            className="ml-auto",
-                            # block=True,
-                            color="secondary",
-                        ),
-                    ]
-                ),
-            ],
-            id="az-el-vsrt-modal",
-            # is_open=vsrt_open,
         ),
 
             dbc.Modal(
@@ -1072,13 +1023,11 @@ def generate_popups(software):
     )
 
 
-def generate_layout(software, config_dict=None):
+def generate_layout(config_dict=None):
     """Generates the Basic Layout for the Monitor Page
 
     Parameters
     ----------
-    software : str
-        Name of the software/system
     config_dict : dict, optional
         Configuration dictionary
 
@@ -1095,30 +1044,6 @@ def generate_layout(software, config_dict=None):
         radio_enabled = control_profile != "POINTING_ONLY"
         webcam_enabled = bool(config_dict.get("WEBCAM_ENABLE", False))
     
-    drop_down_buttons_vsrt = {
-        "Coordinates": [
-            dbc.DropdownMenuItem("Set Location", id="btn-set-coords"),
-        ],
-        "Observe": [
-            dbc.DropdownMenuItem("Select Object", id="btn-obs-obj"),
-            dbc.DropdownMenuItem("Enter Coordinates", id="btn-obs-coords"),
-        ],
-        "Radio": [
-            dbc.DropdownMenuItem("Set Frequency", id="btn-set-freq"),
-            dbc.DropdownMenuItem("Set Bandwidth", id="btn-set-samp"),
-        ],
-        "Routine": [
-            dbc.DropdownMenuItem("Start Recording", id="btn-start-record"),
-            dbc.DropdownMenuItem("Stop Recording", id="btn-stop-record"),
-            dbc.DropdownMenuItem("Calibrate Encoders", id="btn-calibrate"),
-            dbc.DropdownMenuItem("Export Obs CSV", id="btn-export-obs"),
-            dbc.DropdownMenuItem("Upload CMD File", id="btn-cmd-file"),
-        ],
-        "Power": [
-            dbc.DropdownMenuItem("Start Daemon", id="btn-start"),
-            dbc.DropdownMenuItem("Shutdown", id="btn-quit"),
-        ],
-    }
     drop_down_buttons_srt = {
         # "Observe": [
         #     dbc.DropdownMenuItem("Select Object", id="btn-obs-obj"),
@@ -1147,25 +1072,7 @@ def generate_layout(software, config_dict=None):
 
     # Hide radio menus in POINTING_ONLY mode.
     if not radio_enabled:
-        drop_down_buttons_vsrt.pop("Radio", None)
         drop_down_buttons_srt.pop("Radio", None)
-    
-    # Build layout content, conditionally including radio plots
-    base_vsrt = [
-        generate_navbar(drop_down_buttons_vsrt),
-        dbc.Alert("Recording", color="danger",
-                  id="recording-alert", is_open=False),
-    ]
-    if radio_enabled:
-        base_vsrt.append(generate_first_row())
-    base_vsrt.extend([
-        generate_second_row(),
-        generate_third_row(),
-        *( [generate_webcam_row()] if webcam_enabled else [] ),
-        generate_popups(software),
-        html.Div(id="signal", style={"display": "none"}),
-        dcc.Download(id="obs-events-download"),
-    ])
     
     base_srt = [
         generate_navbar(
@@ -1190,21 +1097,18 @@ def generate_layout(software, config_dict=None):
         generate_srt_second_row(),
         generate_third_row(),
         *( [generate_webcam_row()] if webcam_enabled else [] ),
-        generate_popups(software),
+        generate_popups(),
         html.Div(id="signal", style={"display": "none"}),
         dcc.Download(id="obs-events-download"),
     ])
     
-    if software == "Very Small Radio Telescope":
-        layout = html.Div(base_vsrt)
-    else:
-        layout = html.Div(base_srt)
+    layout = html.Div(base_srt)
     
     return layout
 
 
 def register_callbacks(
-    app, config, status_thread, command_thread, raw_spectrum_thread, cal_spectrum_thread, software="Moore 6m"
+    app, config, status_thread, command_thread, raw_spectrum_thread, cal_spectrum_thread
 ):
     """Registers the Callbacks for the Monitor Page
 
@@ -1227,13 +1131,6 @@ def register_callbacks(
     -------
     None
     """
-    # config_path = Path(config["CONFIG_DIR"], config_file)
-    # config_dict = config_loader.load_yaml(config_path)
-
-    if software == "Very Small Radio Telescope":
-        vsrt = True
-    else:
-        vsrt = False
 
     control_profile = str(config.get("CONTROL_PROFILE", "FULL_SRT")).upper()
     radio_enabled = control_profile != "POINTING_ONLY"
@@ -1282,102 +1179,101 @@ def register_callbacks(
                 return ""
             return generate_power_history_graph(tsys, tcal, cal_pwr, spectrum_history)
 
-    if not vsrt:
-        @app.callback(
-            Output("mount-status-panel", "children"),
-            [Input("interval-component", "n_intervals")],
-        )
-        def update_mount_status_panel(n):
-            """Render a compact status table for Caltech 6m diagnostics."""
-            status = status_thread.get_status()
-            if status is None:
-                return html.Div("Waiting for daemon status")
+    @app.callback(
+        Output("mount-status-panel", "children"),
+        [Input("interval-component", "n_intervals")],
+    )
+    def update_mount_status_panel(n):
+        """Render a compact status table for Caltech 6m diagnostics."""
+        status = status_thread.get_status()
+        if status is None:
+            return html.Div("Waiting for daemon status")
 
-            diagnostics = status.get("rotor_diagnostics", {}) or {}
-            fsm = status.get("rotor_fsm_status", {}) or diagnostics.get("fsm_status", {})
-            point_err = status.get("pointing_error")
-            rows = [
-                ["Mode", diagnostics.get("mode", "-")],
-                ["Calibration", diagnostics.get("CalSts", "-")],
-                ["Az Brake", "ON" if diagnostics.get("AzBrkOn") else "OFF"],
-                ["El Brake", "ON" if diagnostics.get("ElBrkOn") else "OFF"],
-                ["E-Stop", "ON" if diagnostics.get("EmStopOn") else "OFF"],
-                [
-                    "Motor Az/El (deg)",
-                    f"{status['motor_azel'][0]:.3f}, {status['motor_azel'][1]:.3f}",
-                ],
-                [
-                    "Cmd Az/El (deg)",
-                    f"{status['motor_cmd_azel'][0]:.3f}, {status['motor_cmd_azel'][1]:.3f}",
-                ],
-                [
-                    "Pointing Err (mdeg)",
-                    "-" if not (point_err and len(point_err) == 2) else f"{point_err[0]:.1f}, {point_err[1]:.1f}",
-                ],
-                ["FSM State", (fsm or {}).get("state", "-")],
-                ["FSM Last Transition", (fsm or {}).get("last_transition", "-")],
-                ["FSM Retries", (fsm or {}).get("retry_count", "-")],
-            ]
+        diagnostics = status.get("rotor_diagnostics", {}) or {}
+        fsm = status.get("rotor_fsm_status", {}) or diagnostics.get("fsm_status", {})
+        point_err = status.get("pointing_error")
+        rows = [
+            ["Mode", diagnostics.get("mode", "-")],
+            ["Calibration", diagnostics.get("CalSts", "-")],
+            ["Az Brake", "ON" if diagnostics.get("AzBrkOn") else "OFF"],
+            ["El Brake", "ON" if diagnostics.get("ElBrkOn") else "OFF"],
+            ["E-Stop", "ON" if diagnostics.get("EmStopOn") else "OFF"],
+            [
+                "Motor Az/El (deg)",
+                f"{status['motor_azel'][0]:.3f}, {status['motor_azel'][1]:.3f}",
+            ],
+            [
+                "Cmd Az/El (deg)",
+                f"{status['motor_cmd_azel'][0]:.3f}, {status['motor_cmd_azel'][1]:.3f}",
+            ],
+            [
+                "Pointing Err (mdeg)",
+                "-" if not (point_err and len(point_err) == 2) else f"{point_err[0]:.1f}, {point_err[1]:.1f}",
+            ],
+            ["FSM State", (fsm or {}).get("state", "-")],
+            ["FSM Last Transition", (fsm or {}).get("last_transition", "-")],
+            ["FSM Retries", (fsm or {}).get("retry_count", "-")],
+        ]
 
-            amp = diagnostics.get("amp_currents")
-            if isinstance(amp, dict):
-                for axis in ["2A01", "2A02", "2A03"]:
-                    vals = amp.get(axis, {}) if isinstance(amp.get(axis), dict) else {}
-                    rows.append(
-                        [
-                            f"{axis} Current",
-                            f"cmd {vals.get('commanded', '?')}, act {vals.get('actual', '?')}",
-                        ]
-                    )
-
-            return dbc.Table(
-                [
-                    html.Thead(html.Tr([html.Th("Metric"), html.Th("Value")])),
-                    html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in rows]),
-                ],
-                bordered=True,
-                striped=True,
-                hover=True,
-                size="sm",
-            )
-
-        @app.callback(
-            Output("obs-events-panel", "children"),
-            [Input("interval-component", "n_intervals")],
-        )
-        def update_obs_events_panel(n):
-            status = status_thread.get_status()
-            if status is None:
-                return html.Div("Waiting for daemon status")
-            events = status.get("observation_events", [])
-            if not events:
-                return html.Div("No observation events yet")
-
-            rows = []
-            for event in reversed(events[-20:]):
-                iso_time = event.get("iso_time", "")
-                event_name = event.get("event", "")
-                meta = event.get("metadata", {}) or {}
-                detail = ""
-                if meta.get("object"):
-                    detail = f"object={meta.get('object')}"
-                else:
-                    target = meta.get("target_azel")
-                    if isinstance(target, (list, tuple)) and len(target) == 2:
-                        detail = f"az={float(target[0]):.3f}, el={float(target[1]):.3f}"
-
+        amp = diagnostics.get("amp_currents")
+        if isinstance(amp, dict):
+            for axis in ["2A01", "2A02", "2A03"]:
+                vals = amp.get(axis, {}) if isinstance(amp.get(axis), dict) else {}
                 rows.append(
-                    html.Div(
-                        [
-                            html.Span(iso_time, style={"color": "#666", "marginRight": "8px"}),
-                            html.Strong(event_name),
-                            html.Span(f"  {detail}" if detail else "", style={"marginLeft": "8px"}),
-                        ],
-                        style={"padding": "4px 0", "borderBottom": "1px solid #eee"},
-                    )
+                    [
+                        f"{axis} Current",
+                        f"cmd {vals.get('commanded', '?')}, act {vals.get('actual', '?')}",
+                    ]
                 )
 
-            return html.Div(rows)
+        return dbc.Table(
+            [
+                html.Thead(html.Tr([html.Th("Metric"), html.Th("Value")])),
+                html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in rows]),
+            ],
+            bordered=True,
+            striped=True,
+            hover=True,
+            size="sm",
+        )
+
+    @app.callback(
+        Output("obs-events-panel", "children"),
+        [Input("interval-component", "n_intervals")],
+    )
+    def update_obs_events_panel(n):
+        status = status_thread.get_status()
+        if status is None:
+            return html.Div("Waiting for daemon status")
+        events = status.get("observation_events", [])
+        if not events:
+            return html.Div("No observation events yet")
+
+        rows = []
+        for event in reversed(events[-20:]):
+            iso_time = event.get("iso_time", "")
+            event_name = event.get("event", "")
+            meta = event.get("metadata", {}) or {}
+            detail = ""
+            if meta.get("object"):
+                detail = f"object={meta.get('object')}"
+            else:
+                target = meta.get("target_azel")
+                if isinstance(target, (list, tuple)) and len(target) == 2:
+                    detail = f"az={float(target[0]):.3f}, el={float(target[1]):.3f}"
+
+            rows.append(
+                html.Div(
+                    [
+                        html.Span(iso_time, style={"color": "#666", "marginRight": "8px"}),
+                        html.Strong(event_name),
+                        html.Span(f"  {detail}" if detail else "", style={"marginLeft": "8px"}),
+                    ],
+                    style={"padding": "4px 0", "borderBottom": "1px solid #eee"},
+                )
+            )
+
+        return html.Div(rows)
 
     @app.callback(
         Output("btn-calibrate", "children"),
@@ -1404,63 +1300,62 @@ def register_callbacks(
         motor_status = status.get("motor_status", status)
         return _build_antenna_state_body(motor_status)
 
-    if not vsrt:
-        @app.callback(
-            Output("obs-events-download", "data"),
-            [Input("btn-export-obs", "n_clicks")],
-            prevent_initial_call=True,
-        )
-        def export_observation_events_csv(n_clicks):
-            status = status_thread.get_status()
-            if status is None:
-                raise PreventUpdate
-            events = status.get("observation_events", [])
-            if not events:
-                raise PreventUpdate
+    @app.callback(
+        Output("obs-events-download", "data"),
+        [Input("btn-export-obs", "n_clicks")],
+        prevent_initial_call=True,
+    )
+    def export_observation_events_csv(n_clicks):
+        status = status_thread.get_status()
+        if status is None:
+            raise PreventUpdate
+        events = status.get("observation_events", [])
+        if not events:
+            raise PreventUpdate
 
-            buffer = io.StringIO()
-            writer = csv.writer(buffer)
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "iso_time",
+                "event",
+                "time",
+                "sequence",
+                "object",
+                "target_az",
+                "target_el",
+                "point_index",
+                "point_total",
+                "end_reason",
+            ]
+        )
+
+        for entry in events:
+            meta = entry.get("metadata", {}) or {}
+            target = meta.get("target_azel") if isinstance(meta, dict) else None
+            target_az = ""
+            target_el = ""
+            if isinstance(target, (list, tuple)) and len(target) == 2:
+                target_az = target[0]
+                target_el = target[1]
+
             writer.writerow(
                 [
-                    "iso_time",
-                    "event",
-                    "time",
-                    "sequence",
-                    "object",
-                    "target_az",
-                    "target_el",
-                    "point_index",
-                    "point_total",
-                    "end_reason",
+                    entry.get("iso_time", ""),
+                    entry.get("event", ""),
+                    entry.get("time", ""),
+                    meta.get("sequence", "") if isinstance(meta, dict) else "",
+                    meta.get("object", "") if isinstance(meta, dict) else "",
+                    target_az,
+                    target_el,
+                    meta.get("point_index", "") if isinstance(meta, dict) else "",
+                    meta.get("point_total", "") if isinstance(meta, dict) else "",
+                    meta.get("end_reason", "") if isinstance(meta, dict) else "",
                 ]
             )
 
-            for entry in events:
-                meta = entry.get("metadata", {}) or {}
-                target = meta.get("target_azel") if isinstance(meta, dict) else None
-                target_az = ""
-                target_el = ""
-                if isinstance(target, (list, tuple)) and len(target) == 2:
-                    target_az = target[0]
-                    target_el = target[1]
-
-                writer.writerow(
-                    [
-                        entry.get("iso_time", ""),
-                        entry.get("event", ""),
-                        entry.get("time", ""),
-                        meta.get("sequence", "") if isinstance(meta, dict) else "",
-                        meta.get("object", "") if isinstance(meta, dict) else "",
-                        target_az,
-                        target_el,
-                        meta.get("point_index", "") if isinstance(meta, dict) else "",
-                        meta.get("point_total", "") if isinstance(meta, dict) else "",
-                        meta.get("end_reason", "") if isinstance(meta, dict) else "",
-                    ]
-                )
-
-            filename = f"observation_events_{int(time())}.csv"
-            return dcc.send_string(buffer.getvalue(), filename)
+        filename = f"observation_events_{int(time())}.csv"
+        return dcc.send_string(buffer.getvalue(), filename)
 
     @app.callback(
         Output("start-warning", "children"),
@@ -1517,46 +1412,28 @@ def register_callbacks(
         else:
             return html.Div(["Awaiting Command File"])
 
-    if not vsrt:
-        @app.callback(
-            Output("az-el-graph", "figure"),
-            [Input("interval-component", "n_intervals")],
-        )
-        def update_az_el_graph_srt(n):
-            status = status_thread.get_status()
-            if status is not None:
-                future_points = status.get("object_time_locs", {})
-                return generate_az_el_graph(
-                    status["az_limits"],
-                    status["el_limits"],
-                    status["object_locs"],
-                    status["motor_azel"],
-                    status["stow_loc"],
-                    status["cal_loc"],
-                    status["horizon_points"],
-                    status["beam_width"],
-                    future_points,
-                )
-            return ""
-    else:
-        @app.callback(
-            Output("az-el-graph", "figure"),
-            [Input("interval-component", "n_intervals")],
-        )
-        def update_az_el_graph_vsrt(n):
-            status = status_thread.get_status()
-            if status is not None:
-                return generate_az_el_graph(
-                    status["az_limits"],
-                    status["el_limits"],
-                    status["object_locs"],
-                    status["motor_azel"],
-                    status["stow_loc"],
-                    status["cal_loc"],
-                    status["horizon_points"],
-                    status["beam_width"],
-                )
-            return ""
+
+    @app.callback(
+        Output("az-el-graph", "figure"),
+        [Input("interval-component", "n_intervals")],
+    )
+    def update_az_el_graph_srt(n):
+        status = status_thread.get_status()
+        if status is not None:
+            future_points = status.get("object_time_locs", {})
+            return generate_az_el_graph(
+                status["az_limits"],
+                status["el_limits"],
+                status["object_locs"],
+                status["motor_azel"],
+                status["stow_loc"],
+                status["cal_loc"],
+                status["horizon_points"],
+                status["beam_width"],
+                future_points,
+            )
+        return ""
+
 
     @app.callback(
         Output("zoom-graph",
@@ -1623,12 +1500,8 @@ def register_callbacks(
         else:
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
             if button_id == "az-el-graph-btn-yes":
-                if not vsrt:
-                    command_thread.add_to_queue(
-                        f"{clickData['points'][0]['text']}{mode}")
-                elif vsrt:
-                    command_thread.add_to_queue(
-                        f"object {clickData['points'][0]['text']}")
+                command_thread.add_to_queue(
+                    f"{clickData['points'][0]['text']}{mode}")
             if (
                 n_clicks_yes
                 or n_clicks_no
@@ -1640,123 +1513,7 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    # @ app.callback(
-    #     Output("az-el-vsrt-modal", "is_open"),
-    #     [
-    #         Input("az-el-graph", "clickData"),
-    #         Input("az-el-vsrt-btn-yes", "n_clicks"),
-    #         Input("az-el-vsrt-btn-no", "n_clicks"),
-    #     ],
-    #     [State("az-el-vsrt-modal", "is_open"),
-    #      State("point-options", "value"),],
-    # )
-    # def az_el_click_vsrt_func(clickData, n_clicks_yes, n_clicks_no, is_open, mode):
-
-    #     ctx = dash.callback_context
-    #     if not ctx.triggered:
-    #         return is_open
-    #     else:
-    #         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    #         if button_id == "az-el-graph-btn-yes":
-    #             command_thread.add_to_queue(f"object {object}")
-    #         if (
-    #             n_clicks_yes
-    #             or n_clicks_no
-    #             or (
-    #                 clickData
-    #                 and not clickData["points"][0]["text"] == "Antenna Location"
-    #             )
-    #         ):
-    #             return not is_open
-    #         return is_open
-
-    if vsrt:
-        @ app.callback(
-            Output("obs-obj-modal", "is_open"),
-            [
-                Input("btn-obs-obj", "n_clicks"),
-                Input("obs-obj-btn-yes", "n_clicks"),
-                Input("obs-obj-btn-no", "n_clicks"),
-            ],
-            [State("obs-obj-modal", "is_open"),
-             State("obj-dropdown", "value"),
-             State("auth-session", "data")
-             ],
-        )
-        def set_obs_obj_func(n_clicks_btn, n_clicks_yes, n_clicks_no, is_open, object, session_data):
-            # Reject if not authenticated
-            if not (session_data and session_data.get("authenticated")):
-                return is_open
-
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                return is_open
-            else:
-                button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-                if button_id == "obs-obj-btn-yes":
-                    command_thread.add_to_queue(f"object {object}")
-                if n_clicks_yes or n_clicks_no or n_clicks_btn:
-                    return not is_open
-                return is_open
-
-        @ app.callback(
-            Output("obs-coords-modal", "is_open"),
-            [
-                Input("btn-obs-coords", "n_clicks"),
-                Input("obs-coords-btn-yes", "n_clicks"),
-                Input("obs-coords-btn-no", "n_clicks"),
-            ],
-            [State("obs-coords-modal", "is_open"),
-             State("obj-az", "value"),
-             State("obj-el", "value"),
-             State("auth-session", "data")
-             ],
-        )
-        def set_obs_coords_func(n_clicks_btn, n_clicks_yes, n_clicks_no, is_open, az, el, session_data):
-            # Reject if not authenticated
-            if not (session_data and session_data.get("authenticated")):
-                return is_open
-
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                return is_open
-            else:
-                button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-                if button_id == "obs-coords-btn-yes":
-                    command_thread.add_to_queue(f"obj_coords {az} {el}")
-                if n_clicks_yes or n_clicks_no or n_clicks_btn:
-                    return not is_open
-                return is_open
-
-        @ app.callback(
-            Output("coords-modal", "is_open"),
-            [
-                Input("btn-set-coords", "n_clicks"),
-                Input("coords-btn-yes", "n_clicks"),
-                Input("coords-btn-no", "n_clicks"),
-            ],
-            [State("coords-modal", "is_open"),
-             State("coords-lat", "value"),
-             State("coords-long", "value"),
-             State("auth-session", "data")],
-        )
-        def coords_click_func(n_clicks_btn, n_clicks_yes, n_clicks_no, is_open, lat, long, session_data):
-            # Reject if not authenticated
-            if not (session_data and session_data.get("authenticated")):
-                return is_open
-
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                return is_open
-            else:
-                button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-                if button_id == "coords-btn-yes":
-                    command_thread.add_to_queue(f"coords {lat} {long}")
-                if n_clicks_yes or n_clicks_no or n_clicks_btn:
-                    return not is_open
-                return is_open
-
-    @ app.callback(
+    @app.callback(
         Output("point-modal", "is_open"),
         [
             Input("btn-point-azel", "n_clicks"),
@@ -1787,7 +1544,7 @@ def register_callbacks(
             return is_open
 
     if radio_enabled:
-        @ app.callback(
+        @app.callback(
             Output("freq-modal", "is_open"),
             [
                 Input("btn-set-freq", "n_clicks"),
@@ -1983,73 +1740,39 @@ def register_callbacks(
                 return not is_open
             return is_open
 
-    if vsrt:
-        @ app.callback(
-            Output("signal", "children"),
-            [
-                Input("btn-stop-record", "n_clicks"),
-                Input("btn-quit", "n_clicks"),
-                Input("btn-calibrate", "n_clicks"),
-            ],
-            [State("recording-alert", "is_open"), State("auth-session", "data")]
-        )
-        def cmd_button_pressed_vsrt(
-            n_clicks_stop_record,
-            n_clicks_shutdown,
-            n_clicks_calibrate,
-            is_open,
-            session_data
-        ):
-            # Reject if not authenticated
-            if not (session_data and session_data.get("authenticated")):
-                return ""
+    @app.callback(
+        Output("signal", "children"),
+        [
+            Input("btn-estop", "n_clicks"),
+            Input("btn-stop-record", "n_clicks"),
+            Input("btn-quit", "n_clicks"),
+            Input("btn-calibrate", "n_clicks"),
+        ],
+        [State("recording-alert", "is_open"), State("auth-session", "data")]
+    )
+    def cmd_button_pressed_srt(
+        n_clicks_estop,
+        n_clicks_stop_record,
+        n_clicks_shutdown,
+        n_clicks_calibrate,
+        is_open,
+        session_data
+    ):
+        # Reject if not authenticated
+        if not (session_data and session_data.get("authenticated")):
+            return ""
 
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                return ""
-            else:
-                button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-                if button_id == "btn-stop-record":
-                    command_thread.add_to_queue("roff")
-                    return not is_open
-                elif button_id == "btn-quit":
-                    command_thread.add_to_queue("quit")
-                elif button_id == "btn-calibrate":
-                    command_thread.add_to_queue("calibrate_encoders")
-    else:
-        @ app.callback(
-            Output("signal", "children"),
-            [
-                Input("btn-estop", "n_clicks"),
-                Input("btn-stop-record", "n_clicks"),
-                Input("btn-quit", "n_clicks"),
-                Input("btn-calibrate", "n_clicks"),
-            ],
-            [State("recording-alert", "is_open"), State("auth-session", "data")]
-        )
-        def cmd_button_pressed_srt(
-            n_clicks_estop,
-            n_clicks_stop_record,
-            n_clicks_shutdown,
-            n_clicks_calibrate,
-            is_open,
-            session_data
-        ):
-            # Reject if not authenticated
-            if not (session_data and session_data.get("authenticated")):
-                return ""
-
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                return ""
-            else:
-                button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-                if button_id == "btn-estop":
-                    command_thread.add_to_queue("spa")
-                elif button_id == "btn-stop-record":
-                    command_thread.add_to_queue("roff")
-                    return not is_open
-                elif button_id == "btn-quit":
-                    command_thread.add_to_queue("quit")
-                elif button_id == "btn-calibrate":
-                    command_thread.add_to_queue("calibrate_encoders")
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            return ""
+        else:
+            button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+            if button_id == "btn-estop":
+                command_thread.add_to_queue("spa")
+            elif button_id == "btn-stop-record":
+                command_thread.add_to_queue("roff")
+                return not is_open
+            elif button_id == "btn-quit":
+                command_thread.add_to_queue("quit")
+            elif button_id == "btn-calibrate":
+                command_thread.add_to_queue("calibrate_encoders")
