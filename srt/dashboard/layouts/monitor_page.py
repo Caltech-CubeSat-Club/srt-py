@@ -272,9 +272,9 @@ def _build_antenna_state_body(motor_status: dict[str, any] | None):
  
     estop_row = html.Div(
         [
-            _indicator_pill("E-Stop", estop if estop is not None else False,
+            _indicator_pill("Physical E-Stop Button", estop if estop is not None else False,
                             color_true="danger", color_false="success",
-                            true_text="⚠ E-STOP ACTIVE", false_text="E-Stop: clear"),
+                            true_text="⚠ Physical E-STOP Button ACTIVE", false_text="Physical E-Stop Button: clear"),
             _indicator_pill("Retries", retry_count > 0, color_true="warning",
                             color_false="success",
                             true_text=f"Retries: {retry_count}", false_text="Comms OK"),
@@ -295,7 +295,7 @@ def _build_antenna_state_body(motor_status: dict[str, any] | None):
         [
             html.Small(
                 "Limit Switches" + (" — ⚠ ACTIVE" if any_limit else " — clear"),
-                style={"color": "#e05050" if any_limit else "#555", "display": "block", "marginBottom": "3px"},
+                style={"color": "#e05050", "display": "block", "marginBottom": "3px"},
             ),
             limit_pills,
         ],
