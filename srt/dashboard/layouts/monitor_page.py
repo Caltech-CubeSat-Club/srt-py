@@ -1038,11 +1038,9 @@ def generate_layout(config_dict=None):
     """
     # Check if we should hide radio plots
     radio_enabled = True
-    webcam_enabled = False
     if config_dict:
         control_profile = config_dict.get("CONTROL_PROFILE", "FULL_SRT").upper()
         radio_enabled = control_profile != "POINTING_ONLY"
-        webcam_enabled = bool(config_dict.get("WEBCAM_ENABLE", False))
     
     drop_down_buttons_srt = {
         # "Observe": [
@@ -1096,7 +1094,6 @@ def generate_layout(config_dict=None):
         generate_srt_azel(),
         generate_srt_second_row(),
         generate_third_row(),
-        *( [generate_webcam_row()] if webcam_enabled else [] ),
         generate_popups(),
         html.Div(id="signal", style={"display": "none"}),
         dcc.Download(id="obs-events-download"),

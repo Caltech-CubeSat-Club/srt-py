@@ -59,7 +59,6 @@ If absent the plots show empty.
 """
 
 from collections import deque
-from datetime import datetime
 
 try:
     from dash import dcc, html
@@ -120,18 +119,20 @@ LPR_PARAMS = [
     ("pElAr",   "pElAr",   "El axis ratio (motor °/s per antenna °/s)"),
 ]
 
-AMP_IDS = ("2A01", "2A02", "2A03")
+AMP_IDS = ("2A01", "2A02")
 AMP_LABELS = {
-    "2A01": "2A01 (El)",
-    "2A02": "2A02 (Az-Y)",
-    "2A03": "2A03 (Az-Z)",
+    "2A01": "2A01 (Az)",
+    "2A02": "2A02 (El)",
+    # "2A03": "2A03 (Az-Z)",
 }
+
+AMP_HISTORY_WINDOW_SEC = 5 * 60
 
 # Colours per amp
 _AMP_COLORS = {
     "2A01": ("#0288d1", "#01579b"),   # (commanded, actual)
     "2A02": ("#388e3c", "#1b5e20"),
-    "2A03": ("#ef6c00", "#bf360c"),
+    # "2A03": ("#ef6c00", "#bf360c"),
 }
 
 
@@ -335,13 +336,30 @@ def _build_amp_current_graph(history):
             plot_bgcolor="white",
             paper_bgcolor="white",
             font=dict(color="#333"),
-            xaxis=dict(title="Time (UTC)", gridcolor="#e5e5e5"),
+            xaxis=dict(title="Seconds", gridcolor="#e5e5e5"),
             yaxis=dict(title="Current (DAC counts)", gridcolor="#e5e5e5"),
             margin=dict(l=40, r=10, t=10, b=40),
         )
         return fig
 
-    times = [datetime.utcfromtimestamp(e["time"]) for e in history]
+    valid_times = [
+        entry.get("time")
+        for entry in history
+        if isinstance(entry, dict)
+        and isinstance(entry.get("time"), (int, float))
+    ]
+    if valid_times:
+        latest_time = max(valid_times)
+        times = [
+            (entry["time"] - latest_time)
+            if isinstance(entry, dict)
+            and isinstance(entry.get("time"), (int, float))
+            else None
+            for entry in history
+        ]
+    else:
+        last_index = max(len(history) - 1, 0)
+        times = [idx - last_index for idx in range(len(history))]
 
     for amp_id in AMP_IDS:
         cmd_color, act_color = _AMP_COLORS[amp_id]
@@ -378,7 +396,7 @@ def _build_amp_current_graph(history):
         paper_bgcolor="white",
         font=dict(color="#333", size=11),
         xaxis=dict(
-            title="Time (UTC)",
+            title="Seconds",
             gridcolor="#e5e5e5",
             zerolinecolor="#ccc",
         ),
@@ -402,6 +420,27 @@ def _build_amp_current_graph(history):
         uirevision="amp-currents",
     )
     return fig
+
+
+def _trim_amp_history(history, window_seconds=AMP_HISTORY_WINDOW_SEC):
+    if not history:
+        return []
+    times = [
+        entry.get("time")
+        for entry in history
+        if isinstance(entry, dict)
+    ]
+    times = [t for t in times if isinstance(t, (int, float))]
+    if not times:
+        return history
+    latest = max(times)
+    cutoff = latest - window_seconds
+    return [
+        entry for entry in history
+        if isinstance(entry, dict)
+        and isinstance(entry.get("time"), (int, float))
+        and entry["time"] >= cutoff
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -438,9 +477,10 @@ def register_callbacks(app, config, status_thread):
 
         # Also accept pre-built history from the daemon if it publishes one
         if status is not None and "amp_current_history" in status:
-            return _build_amp_current_graph(status["amp_current_history"])
+            windowed = _trim_amp_history(status["amp_current_history"])
+            return _build_amp_current_graph(windowed)
 
-        return _build_amp_current_graph(list(_amp_history))
+        return _build_amp_current_graph(_trim_amp_history(list(_amp_history)))
 
     # LPR parameter value outputs — one per parameter
     lpr_output_ids = [f"lpr-{key}" for key, _, _ in LPR_PARAMS]

@@ -781,14 +781,33 @@ def generate_pointing_error_graph(error_history, timerange, axisstatus=None):
             {"time": float(timerange) * 60.0, "azerr_mdeg": 0.0, "elerr_mdeg": 0.0},
         ]
 
-    newest_t = error_history[-1]["time"]
+    times_raw = [
+        pt.get("time")
+        for pt in error_history
+        if isinstance(pt, dict)
+        and isinstance(pt.get("time"), (int, float))
+    ]
+    if not times_raw:
+        times_raw = [0.0]
+
+    newest_t = max(times_raw)
     cutoff = newest_t - 60.0 * float(timerange)
-    filtered = [pt for pt in error_history if pt["time"] >= cutoff]
+    filtered = [
+        pt for pt in error_history
+        if isinstance(pt, dict)
+        and isinstance(pt.get("time"), (int, float))
+        and pt["time"] >= cutoff
+    ]
     if not filtered:
         filtered = error_history
 
-    t0 = filtered[0]["time"]
-    xvals = [pt["time"] - t0 for pt in filtered]
+    xvals = [
+        (pt["time"] - newest_t)
+        if isinstance(pt, dict)
+        and isinstance(pt.get("time"), (int, float))
+        else None
+        for pt in filtered
+    ]
     azvals = [pt.get("azerr_mdeg", np.nan) for pt in filtered]
     elvals = [pt.get("elerr_mdeg", np.nan) for pt in filtered]
 

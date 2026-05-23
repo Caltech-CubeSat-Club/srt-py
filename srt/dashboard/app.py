@@ -240,6 +240,37 @@ def generate_app(config_dir, config_dict):
     else:
         encoded_image = b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 
+    if webcam_enabled:
+        sidebar_media = html.Div(
+            [
+                html.H4("Live Webcam"),
+                html.Img(
+                    id="sidebar-webcam-feed",
+                    src="/video_feed",
+                    style={
+                        "width": "100%",
+                        "height": "auto",
+                        "maxHeight": "260px",
+                        "objectFit": "contain",
+                        "backgroundColor": "black",
+                        "borderRadius": "4px",
+                    },
+                ),
+            ]
+        )
+    else:
+        sidebar_media = html.Div(
+            [
+                html.H4("Telescope"),
+                html.Img(
+                    src="data:image/png;base64,{}".format(
+                        encoded_image.decode()
+                    ),
+                    style={"height": "100%", "width": "100%"},
+                ),
+            ]
+        )
+
     side_content = {
         "Status": dcc.Markdown(id="sidebar-status"),
         "Pages": html.Div(
@@ -259,16 +290,7 @@ def generate_app(config_dir, config_dict):
                 ),
             ]
         ),
-        "Image": html.Div(
-            [
-                html.Img(
-                    src="data:image/png;base64,{}".format(
-                        encoded_image.decode()
-                    ),
-                    style={"height": "100%", "width": "100%"},
-                ),
-            ]
-        ),
+        "Image": sidebar_media,
     }
     sidebar = generate_sidebar(side_title, side_content)
 
