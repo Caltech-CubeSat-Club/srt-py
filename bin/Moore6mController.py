@@ -694,9 +694,10 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
             comms = controller.moore6m.get_recent_serial_communications(limit=10)
             comm_list.delete(0, tk.END)
             for c in reversed(comms):
+                local_time = c.get("time", "") or ""
                 comm_list.insert(
                     tk.END,
-                    f"{c.get('time', '')}  "
+                    f"{local_time}  "
                     f"{c.get('direction', ''):4s}  "
                     f"{c.get('payload', '')}",
                 )

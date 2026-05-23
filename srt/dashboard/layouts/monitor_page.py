@@ -35,7 +35,6 @@ from .graphs import (
     generate_az_el_graph,
     generate_az_time_graph,
     generate_el_time_graph,
-    generate_pointing_error_graph,
     generate_power_history_graph,
     generate_spectrum_graph,
     generate_zoom_graph,
@@ -559,28 +558,6 @@ def generate_second_row():
     )
 
 
-def generate_third_row():
-    """Generates Third Row (Pointing Error Time) Display
-
-    Returns
-    -------
-    Div Containing Third Row Objects
-    """
-    return html.Div([
-        html.Div(
-                    [
-                        html.Label("Select Time Range in Minutes", style={
-                            "color": "darkgray", "margin-top": "10px", "margin-left": "20px"}),
-                        dcc.Slider(5, 60, 5, id="timeinput"),
-                        dcc.Graph(id="az-el-elevation")],
-                    className="pretty_container twelve columns",
-                    ),
-    ],
-        className="flex-display",
-        style={"margin": dict(l=10, r=5, t=5, b=5)},
-    )
-
-
 def generate_popups():
     """Generates all 'Pop-up' Modal Components
 
@@ -1093,7 +1070,6 @@ def generate_layout(config_dict=None):
     base_srt.extend([
         generate_srt_azel(),
         generate_srt_second_row(),
-        generate_third_row(),
         generate_popups(),
         html.Div(id="signal", style={"display": "none"}),
         dcc.Download(id="obs-events-download"),
@@ -1248,7 +1224,7 @@ def register_callbacks(
 
         rows = []
         for event in reversed(events[-20:]):
-            iso_time = event.get("iso_time", "")
+            time_text = event.get("time", "")
             event_name = event.get("event", "")
             meta = event.get("metadata", {}) or {}
             detail = ""
@@ -1262,7 +1238,7 @@ def register_callbacks(
             rows.append(
                 html.Div(
                     [
-                        html.Span(iso_time, style={"color": "#666", "marginRight": "8px"}),
+                        html.Span(time_text, style={"color": "#666", "marginRight": "8px"}),
                         html.Strong(event_name),
                         html.Span(f"  {detail}" if detail else "", style={"marginLeft": "8px"}),
                     ],
@@ -1314,9 +1290,8 @@ def register_callbacks(
         writer = csv.writer(buffer)
         writer.writerow(
             [
-                "iso_time",
-                "event",
                 "time",
+                "event",
                 "sequence",
                 "object",
                 "target_az",
@@ -1338,9 +1313,8 @@ def register_callbacks(
 
             writer.writerow(
                 [
-                    entry.get("iso_time", ""),
-                    entry.get("event", ""),
                     entry.get("time", ""),
+                    entry.get("event", ""),
                     meta.get("sequence", "") if isinstance(meta, dict) else "",
                     meta.get("object", "") if isinstance(meta, dict) else "",
                     target_az,
@@ -1449,30 +1423,6 @@ def register_callbacks(
                 status["horizon_points"],
                 status["beam_width"],
             )
-        return ""
-
-    @app.callback(
-        Output("az-el-elevation", "figure"),
-        [
-            Input("interval-component", "n_intervals"),
-            Input("timeinput", "value"),
-        ]
-    )
-    def update_az_el_time_graph(n, range):
-        status = status_thread.get_status()
-        if status is not None:
-            error_hist = status.get("pointing_error_history", [])
-            current_err = status.get("pointing_error")
-            if (not error_hist) and current_err is not None and len(current_err) == 2:
-                error_hist = [
-                    {
-                        "time": time(),
-                        "azerr_mdeg": float(current_err[0]),
-                        "elerr_mdeg": float(current_err[1]),
-                    }
-                ]
-            if error_hist:
-                return generate_pointing_error_graph(error_hist, range)
         return ""
 
     @ app.callback(

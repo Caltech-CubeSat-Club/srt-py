@@ -5,6 +5,7 @@ Daemon-side motor interfaces and ZMQ-backed motor clients.
 """
 import json
 import logging
+from datetime import datetime
 from collections import deque
 from threading import Lock
 from abc import ABC, abstractmethod
@@ -55,7 +56,7 @@ class Motor(ABC):
     def _record_serial_comm(self, direction, payload):
         """Record a serial communication event for dashboard diagnostics."""
         self.serial_communications.append({
-            "time": Time.now().isot,
+            "time": datetime.now().astimezone().isoformat(timespec="seconds"),
             "direction": direction,
             "payload": str(payload),
         })

@@ -5,6 +5,7 @@ Serial-backed controller for the Moore/Caltech 6m rotor.
 
 import logging
 from collections import deque
+from datetime import datetime
 from enum import Enum
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
@@ -23,6 +24,10 @@ from parse import parse
 deg: Any = getattr(_u, "deg")
 
 
+def _local_iso_now():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
 class Motor:
     """Minimal base class for serial-backed motors."""
 
@@ -36,7 +41,7 @@ class Motor:
 
     def _record_serial_comm(self, direction, payload):
         self.serial_communications.append({
-            "time": Time.now().isot,
+            "time": _local_iso_now(),
             "direction": direction,
             "payload": str(payload),
         })
@@ -112,7 +117,7 @@ class Moore6mSerial(Motor):
         self._serial_lock = Lock()
         self._history_lock = Lock()
         self.state = Moore6mSerial.State.DISCONNECTED
-        self.last_transition = Time.now().isot
+        self.last_transition = _local_iso_now()
         self.last_error = ""
         self.retry_count = 0
         self.max_command_retries = 2
@@ -169,7 +174,7 @@ class Moore6mSerial(Motor):
             return
         prev = self.state
         self.state = new_state
-        self.last_transition = Time.now().isot
+        self.last_transition = _local_iso_now()
         if reason:
             logging.warning("state transition: %s -> %s (%s)", prev.value, new_state.value, reason)
         else:
@@ -234,7 +239,7 @@ class Moore6mSerial(Motor):
         with self._history_lock:
             self.command_history.append(
                 {
-                    "time": Time.now().isot,
+                    "time": _local_iso_now(),
                     "command": command_text,
                     "expected": expected_prefix,
                     "response": str(response),

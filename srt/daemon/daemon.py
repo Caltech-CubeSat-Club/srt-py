@@ -5,7 +5,7 @@ Main Control and Orchestration Class for the Small Radio Telescope
 """
 
 from time import sleep, time
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from threading import Thread
 from queue import Queue, Empty
 from collections import deque
@@ -215,14 +215,14 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
-        self.command_error_logs.append((time(), message))
+        timestamp = time()
+        local_iso = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone().isoformat(timespec="seconds")
+        self.command_error_logs.append((local_iso, message))
         print(message)
 
     def _record_observation_event(self, event_type, metadata=None):
-        timestamp = time()
         event = {
-            "time": timestamp,
-            "iso_time": datetime.utcfromtimestamp(timestamp).isoformat() + "Z",
+            "time": datetime.now().astimezone().isoformat(timespec="seconds"),
             "event": event_type,
             "metadata": metadata or {},
         }
@@ -267,13 +267,13 @@ class SmallRadioTelescopeDaemon:
         # Flatten the data for CSV
         rows = []
         fieldnames = [
-            "iso_time", "event", "sequence", "object", "target_azel_az", 
+            "time", "event", "sequence", "object", "target_azel_az",
             "target_azel_el", "end_reason", "point_index", "point_total"
         ]
         
         for event in events:
             row = {
-                "iso_time": event.get("iso_time", ""),
+                "time": event.get("time", ""),
                 "event": event.get("event", ""),
                 "sequence": event.get("metadata", {}).get("sequence", ""),
                 "object": event.get("metadata", {}).get("object", ""),

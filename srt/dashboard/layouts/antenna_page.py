@@ -59,6 +59,7 @@ If absent the plots show empty.
 """
 
 from collections import deque
+from time import time
 
 try:
     from dash import dcc, html
@@ -70,6 +71,7 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
 
+from .graphs import generate_pointing_error_graph
 from .navbar import generate_navbar
 
 
@@ -254,9 +256,29 @@ def generate_layout():
                     ),
                     html.Small(
                         "Commanded (dashed) and actual (solid) currents per amplifier. "
-                        "Units are raw DAC counts (±2047 ≈ ±10 V). "
-                        "2A01 = El, 2A02 = Az-Y, 2A03 = Az-Z.",
+                        "Units are raw DAC counts (±2047 ≈ ±10 V). ",
                         style={"color": "#556", "display": "block", "marginTop": "4px"},
+                    ),
+                ],
+                style={"padding": "10px 12px"},
+            ),
+        ],
+        className="mb-3",
+        style={},
+    )
+
+    pointing_error_panel = dbc.Card(
+        [
+            dbc.CardHeader(
+                html.H5("Pointing Error", className="mb-0"),
+                style={"borderBottom": "1px solid #dee2e6"},
+            ),
+            dbc.CardBody(
+                [
+                    dcc.Graph(
+                        id="az-el-elevation",
+                        style={"height": "280px"},
+                        config={"displayModeBar": False},
                     ),
                 ],
                 style={"padding": "10px 12px"},
@@ -281,7 +303,7 @@ def generate_layout():
                 [
                     dbc.Row(
                         [
-                            dbc.Col(amp_panel, width=12, lg=5),
+                            dbc.Col([amp_panel, pointing_error_panel], width=12, lg=5),
                             dbc.Col(lpr_panel, width=12, lg=7),
                         ],
                         style={"margin": "10px 4px"},
@@ -481,6 +503,27 @@ def register_callbacks(app, config, status_thread):
             return _build_amp_current_graph(windowed)
 
         return _build_amp_current_graph(_trim_amp_history(list(_amp_history)))
+
+    @app.callback(
+        Output("az-el-elevation", "figure"),
+        [Input("interval-component", "n_intervals")],
+    )
+    def update_az_el_time_graph(n):
+        status = status_thread.get_status()
+        if status is not None:
+            error_hist = status.get("pointing_error_history", [])
+            current_err = status.get("pointing_error")
+            if (not error_hist) and current_err is not None and len(current_err) == 2:
+                error_hist = [
+                    {
+                        "time": time(),
+                        "azerr_mdeg": float(current_err[0]),
+                        "elerr_mdeg": float(current_err[1]),
+                    }
+                ]
+            if error_hist:
+                return generate_pointing_error_graph(error_hist, 5)
+        return ""
 
     # LPR parameter value outputs — one per parameter
     lpr_output_ids = [f"lpr-{key}" for key, _, _ in LPR_PARAMS]

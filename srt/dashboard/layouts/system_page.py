@@ -51,7 +51,7 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
 from urllib.parse import quote as urlquote
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -260,33 +260,45 @@ def register_callbacks(app, config, status_thread, command_thread):
         channels = channels or []
 
         # Helper function to parse timestamps from various formats
-        def parse_timestamp(iso_time_str):
-            if not iso_time_str:
-                return 0.0
+        def parse_timestamp(value):
+            if value is None:
+                return None
+            if isinstance(value, (int, float)):
+                return float(value)
             try:
-                s = str(iso_time_str).strip()
-                if s.endswith('Z'):
-                    s = s.replace('Z', '+00:00')
-                elif '+' not in s and s.count('-') <= 2:
-                    # covers both "2026-05-20T01:36:22.148" and "2026-05-19 18:48:01"
-                    s = s + '+00:00'
+                s = str(value).strip()
+            except Exception:
+                return None
+            if not s:
+                return None
+            try:
+                if s.endswith("Z"):
+                    s = s[:-1] + "+00:00"
                 return datetime.fromisoformat(s).timestamp()
             except (ValueError, AttributeError):
-                return 0.0
+                return None
+
+        def format_time_display(value):
+            if value is None:
+                return ""
+            if isinstance(value, (int, float)):
+                return datetime.fromtimestamp(
+                    float(value), tz=timezone.utc
+                ).astimezone().isoformat(timespec="seconds")
+            return str(value).strip()
 
         entries = []
 
         if "daemon" in channels:
             for log_time, log_txt in status.get("error_logs", []):
-                try:
-                    ts = float(log_time)
-                except (ValueError, TypeError):
-                    # log_time is a formatted string like "2026-05-19 18:48:01"
-                    ts = parse_timestamp(log_time)
+                ts = parse_timestamp(log_time)
+                if ts is None:
+                    ts = 0.0
+                shown_time = format_time_display(log_time)
                 entries.append((
                     ts,
                     "daemon",
-                    f"{log_time} | {log_txt}",
+                    f"{shown_time} | {log_txt}",
                 ))
 
         if "serial" in channels:
@@ -294,15 +306,21 @@ def register_callbacks(app, config, status_thread, command_thread):
                 # Try to extract timestamp from multiple possible field names/formats
                 iso_time = entry.get("time", "") or entry.get("iso_time", "")
                 ts = parse_timestamp(iso_time)
+                if ts is None:
+                    ts = 0.0
+                shown_time = format_time_display(iso_time)
                 
                 direction = str(entry.get("direction", "?")).upper()
                 payload = entry.get("payload", "")
-                entries.append((ts, "serial", f"{iso_time} | {direction}: {payload}"))
+                entries.append((ts, "serial", f"{shown_time} | {direction}: {payload}"))
 
         if "commands" in channels:
             for entry in status.get("command_history", []):
                 iso_time = entry.get("time", "") or entry.get("iso_time", "")
                 ts = parse_timestamp(iso_time)
+                if ts is None:
+                    ts = 0.0
+                shown_time = format_time_display(iso_time)
                 
                 cmd = entry.get("command", "")
                 success = entry.get("success", False)
@@ -313,14 +331,19 @@ def register_callbacks(app, config, status_thread, command_thread):
                     (
                         ts,
                         "commands",
-                        f"{iso_time} | {label} {cmd} (retries={retries}, total={total_ms}ms)",
+                        f"{shown_time} | {label} {cmd} (retries={retries}, total={total_ms}ms)",
                     )
                 )
 
         if "observations" in channels:
             for entry in status.get("observation_events", []):
-                iso_time = entry.get("iso_time", "") or entry.get("time", "")
-                ts = parse_timestamp(iso_time)
+                time_text = entry.get("time", "")
+                ts = parse_timestamp(entry.get("time", None))
+                if ts is None:
+                    ts = parse_timestamp(time_text)
+                if ts is None:
+                    ts = 0.0
+                shown_time = format_time_display(time_text)
                 
                 event_name = entry.get("event", "")
                 meta = entry.get("metadata", {}) or {}
@@ -331,7 +354,7 @@ def register_callbacks(app, config, status_thread, command_thread):
                     details = f" object={obj}"
                 elif isinstance(target, (list, tuple)) and len(target) == 2:
                     details = f" az={target[0]}, el={target[1]}"
-                entries.append((ts, "observations", f"{iso_time} | {event_name}{details}"))
+                entries.append((ts, "observations", f"{shown_time} | {event_name}{details}"))
 
         # Sort by timestamp, with list position as tiebreaker to maintain order for messages with same timestamp
         entries_with_idx = [(i, ts, channel, msg) for i, (ts, channel, msg) in enumerate(entries)]
