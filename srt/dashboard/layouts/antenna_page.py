@@ -277,7 +277,7 @@ def generate_layout():
                 [
                     dcc.Graph(
                         id="az-el-elevation",
-                        style={"height": "280px"},
+                        style={"height": "400px"},
                         config={"displayModeBar": False},
                     ),
                 ],
