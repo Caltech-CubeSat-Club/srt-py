@@ -9,6 +9,8 @@ from threading import Thread, Event
 from time import sleep
 import json
 import logging
+from typing import Any, Callable, Dict, Optional, Tuple
+from ...daemon.rotor_control.types import DaemonStatus, RotorState
 
 
 class StatusThread(Thread):
@@ -31,7 +33,7 @@ class StatusThread(Thread):
             Port of the Status Data ZMQ PUB/SUB Socket
         """
         super().__init__(group=group, target=target, name=name, daemon=True)
-        self.status = None
+        self.status: Optional[DaemonStatus] = None
         self.port = port
         self.exit_event = Event()
 
@@ -54,12 +56,12 @@ class StatusThread(Thread):
             try:
                 rec = socket.recv()
                 dump = json.loads(rec)
-                self.status = dump
+                self.status = DaemonStatus.from_dict(dump)
             except zmq.error.ZMQError as e:
                 logging.error("StatusThread recv error: %s", str(e))
                 sleep(0.1)
 
-    def get_status(self):
+    def get_status(self) -> DaemonStatus | None:
         """Return Most Recent Status Dictionary
 
         Returns

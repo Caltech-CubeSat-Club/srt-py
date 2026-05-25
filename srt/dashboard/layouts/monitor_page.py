@@ -43,6 +43,8 @@ from .graphs import (
 from astropy.table import Table
 from srt import config_loader
 
+from ...daemon.rotor_control import DaemonStatus, RotorState
+
 
 root_folder = Path(__file__).parent.parent.parent.parent
 
@@ -127,95 +129,48 @@ def generate_antenna_state_panel():
     )
  
  
-def _build_antenna_state_body(motor_status: dict[str, any] | None):
+def _build_antenna_state_body(motor_status: RotorState | None):
     """Build the antenna state panel content from a motor_status dict from daemon thread.
- 
-    motor_status keys:
-        "beam_width",
-        "location",
-        "motor_azel",
-        "motor_cmd_azel",
-        "vlsr",
-        "object_locs",
-        "object_time_locs",
-        "az_limits",
-        "el_limits",
-        "stow_loc",
-        "cal_loc",
-        "horizon_points",
-        "center_frequency",
-        "frequency_correction",
-        "bandwidth",
-        "motor_offsets",
-        "queued_item",
-        "queue_size",
-        "emergency_contact",
-        "error_logs",
-        "temp_cal",
-        "temp_sys",
-        "cal_power",
-        "n_point_data",
-        "beam_switch_data",
-        "pointing_error",
-        "pointing_error_history",
-        "rotor_diagnostics",
-        "rotor_fsm_status",
-        "observation_events",
-        "time",
-        "command_history",
-        "serial_communications"
     """
     if motor_status is None:
         return html.P("Motor status unavailable.", style={"color": "#555"})
  
-    fsm_state: str = motor_status.get("rotor_fsm_status", {}).get("state", "Unknown")
+    fsm_state = motor_status.fsm_state
     state_color: str = _STATE_COLOR.get(fsm_state, "secondary")
-
-    rotor_diagnostics: dict[str, any] = motor_status.get("rotor_diagnostics", {})
-    # rotor_diagnostics keys = [
-        #     "mode", "CalSts",
-        #     "AzBrkOn", "ElBrkOn", "EmStopOn",
-        #     "azerr", "elerr", "amp_currents",
-        #     "ElUpPreLim", "ElDnPreLim", "ElUpFinLim", "ElDnFinLim",
-        #     "AzCwPreLim", "AzCcwPreLim", "AzCwFinLim", "AzCcwFinLim",
-        #     "AzLT180", "SimMode", "safe_mode",
-        # ]
  
-    cal_sts: str = rotor_diagnostics.get("CalSts", "Unknown")
+    cal_sts = motor_status.cal_sts
     cal_color: str = _CALSTS_COLOR.get(cal_sts, "secondary")
  
     # RunningTask: 0=Stop, 1=Track (5 is never actually set in firmware)
-    mode: str = rotor_diagnostics.get("mode", "Unknown")
+    mode = motor_status.loop_mode
     mode_color: str = "success" if mode == "Track" else ("secondary" if mode == "Stop" else "warning")
  
-    az_brk: bool | None = rotor_diagnostics.get("AzBrkOn", None)
-    el_brk: bool | None = rotor_diagnostics.get("ElBrkOn", None)
-    estop: bool | None = rotor_diagnostics.get("EmStopOn", None)
-    sim: bool | None = rotor_diagnostics.get("SimMode", None)
+    az_brk = motor_status.az_brake
+    el_brk: bool | None = motor_status.el_brake
+    estop: bool | None = motor_status.estop
+    sim: bool | None = motor_status.sim_mode
  
-    az: float = motor_status.get("motor_azel",(float("nan"), float("nan")))[0]
-    el: float = motor_status.get("motor_azel",(float("nan"), float("nan")))[1]
-    azerr: float = rotor_diagnostics.get("azerr", float("nan"))
-    elerr: float = rotor_diagnostics.get("elerr", float("nan"))
-    last_err: str = motor_status.get("rotor_fsm_status", {}).get("last_error", "")
-    last_trans: str = motor_status.get("rotor_fsm_status", {}).get("last_transition", "")
-    safe_mode: bool = rotor_diagnostics.get("safe_mode", False)
-    retry_count: int = motor_status.get("fsm_status", {}).get("retry_count", 0)
+    az, el = motor_status.az, motor_status.el
+    azerr, elerr = motor_status.az_err, motor_status.el_err
+    last_err: str = motor_status.last_error
+    last_trans: str = motor_status.last_transition
+    safe_mode: bool = motor_status.safe_mode
+    retry_count: int = motor_status.retry_count
  
     # Limit switch states — show only active ones prominently, dim inactive
     limit_switches = {
-        "El↑ Pre": rotor_diagnostics.get("ElUpPreLim", False),
-        "El↓ Pre": rotor_diagnostics.get("ElDnPreLim", False),
-        "El↑ Fin": rotor_diagnostics.get("ElUpFinLim", False),
-        "El↓ Fin": rotor_diagnostics.get("ElDnFinLim", False),
-        "Az CW Pre": rotor_diagnostics.get("AzCwPreLim", False),
-        "Az CCW Pre": rotor_diagnostics.get("AzCcwPreLim", False),
-        "Az CW Fin": rotor_diagnostics.get("AzCwFinLim", False),
-        "Az CCW Fin": rotor_diagnostics.get("AzCcwFinLim", False),
+        "El↑ Pre": motor_status.el_up_pre,
+        "El↓ Pre": motor_status.el_dn_pre,
+        "El↑ Fin": motor_status.el_up_fin,
+        "El↓ Fin": motor_status.el_dn_fin,
+        "Az CW Pre": motor_status.az_cw_pre,
+        "Az CCW Pre": motor_status.az_ccw_pre,
+        "Az CW Fin": motor_status.az_cw_fin,
+        "Az CCW Fin": motor_status.az_ccw_fin,
     }
     any_limit = any(limit_switches.values())
  
-    amp_currents = rotor_diagnostics.get("amp_currents", {})
+    amp_currents = motor_status.amp_currents
  
     # --- Build layout ---
  
@@ -1153,64 +1108,6 @@ def register_callbacks(
     #         return generate_power_history_graph(tsys, tcal, cal_pwr, spectrum_history)
 
     @app.callback(
-        Output("mount-status-panel", "children"),
-        [Input("interval-component", "n_intervals")],
-    )
-    def update_mount_status_panel(n):
-        """Render a compact status table for Caltech 6m diagnostics."""
-        status = status_thread.get_status()
-        if status is None:
-            return html.Div("Waiting for daemon status")
-
-        diagnostics = status.get("rotor_diagnostics", {}) or {}
-        fsm = status.get("rotor_fsm_status", {}) or diagnostics.get("fsm_status", {})
-        point_err = status.get("pointing_error")
-        rows = [
-            ["Mode", diagnostics.get("mode", "-")],
-            ["Calibration", diagnostics.get("CalSts", "-")],
-            ["Az Brake", "ON" if diagnostics.get("AzBrkOn") else "OFF"],
-            ["El Brake", "ON" if diagnostics.get("ElBrkOn") else "OFF"],
-            ["E-Stop", "ON" if diagnostics.get("EmStopOn") else "OFF"],
-            [
-                "Motor Az/El (deg)",
-                f"{status['motor_azel'][0]:.3f}, {status['motor_azel'][1]:.3f}",
-            ],
-            [
-                "Cmd Az/El (deg)",
-                f"{status['motor_cmd_azel'][0]:.3f}, {status['motor_cmd_azel'][1]:.3f}",
-            ],
-            [
-                "Pointing Err (mdeg)",
-                "-" if not (point_err and len(point_err) == 2) else f"{point_err[0]:.1f}, {point_err[1]:.1f}",
-            ],
-            ["FSM State", (fsm or {}).get("state", "-")],
-            ["FSM Last Transition", (fsm or {}).get("last_transition", "-")],
-            ["FSM Retries", (fsm or {}).get("retry_count", "-")],
-        ]
-
-        amp = diagnostics.get("amp_currents")
-        if isinstance(amp, dict):
-            for axis in ["2A01", "2A02", "2A03"]:
-                vals = amp.get(axis, {}) if isinstance(amp.get(axis), dict) else {}
-                rows.append(
-                    [
-                        f"{axis} Current",
-                        f"cmd {vals.get('commanded', '?')}, act {vals.get('actual', '?')}",
-                    ]
-                )
-
-        return dbc.Table(
-            [
-                html.Thead(html.Tr([html.Th("Metric"), html.Th("Value")])),
-                html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in rows]),
-            ],
-            bordered=True,
-            striped=True,
-            hover=True,
-            size="sm",
-        )
-
-    @app.callback(
         Output("obs-events-panel", "children"),
         [Input("interval-component", "n_intervals")],
     )
@@ -1218,7 +1115,7 @@ def register_callbacks(
         status = status_thread.get_status()
         if status is None:
             return html.Div("Waiting for daemon status")
-        events = status.get("observation_events", [])
+        events = status.observation_events
         if not events:
             return html.Div("No observation events yet")
 
@@ -1256,10 +1153,8 @@ def register_callbacks(
         status = status_thread.get_status()
         if status is None:
             return "Calibrate Encoders"
-        diagnostics = status.get("rotor_diagnostics", {}) or {}
-        cal_sts = diagnostics.get("CalSts")
-        if cal_sts:
-            return f"Cal Encoders ({cal_sts})"
+        if status.rotor.cal_sts:
+            return f"Cal Encoders ({status.rotor.cal_sts})"
         return "Calibrate Encoders"
 
     @app.callback(
@@ -1270,8 +1165,7 @@ def register_callbacks(
         status = status_thread.get_status()
         if status is None:
             return _build_antenna_state_body(None)
-        motor_status = status.get("motor_status", status)
-        return _build_antenna_state_body(motor_status)
+        return _build_antenna_state_body(status.rotor)
 
     @app.callback(
         Output("obs-events-download", "data"),
@@ -1336,7 +1230,7 @@ def register_callbacks(
         status = status_thread.get_status()
         if status is None:
             return "SRT Daemon Not Detected"
-        latest_time = status["time"]
+        latest_time = status.time
         if time() - latest_time < 10:
             return "SRT Daemon Already On!"
         else:
@@ -1391,16 +1285,16 @@ def register_callbacks(
     def update_az_el_graph_srt(n):
         status = status_thread.get_status()
         if status is not None:
-            future_points = status.get("object_time_locs", {})
+            future_points = status.object_time_locs
             return generate_az_el_graph(
-                status["az_limits"],
-                status["el_limits"],
-                status["object_locs"],
-                status["motor_azel"],
-                status["stow_loc"],
-                status["cal_loc"],
-                status["horizon_points"],
-                status["beam_width"],
+                status.az_limits,
+                status.el_limits,
+                status.object_locs,
+                status.motor_azel,
+                status.stow_loc,
+                status.cal_loc,
+                status.horizon_points,
+                status.beam_width,
                 future_points,
             )
         return ""
@@ -1412,18 +1306,16 @@ def register_callbacks(
     )
     def update_zoom_graph(n):
         status = status_thread.get_status()
-        if status is not None:
-            return generate_zoom_graph(
-                status["az_limits"],
-                status["el_limits"],
-                status["object_locs"],
-                status["motor_azel"],
-                status["stow_loc"],
-                status["cal_loc"],
-                status["horizon_points"],
-                status["beam_width"],
-            )
-        return ""
+        return generate_zoom_graph(
+            status.az_limits,
+            status.el_limits,
+            status.object_locs,
+            status.motor_azel,
+            status.stow_loc,
+            status.cal_loc,
+            status.horizon_points,
+            status.beam_width,
+        )
 
     @ app.callback(
         Output("az-el-graph-modal", "is_open"),

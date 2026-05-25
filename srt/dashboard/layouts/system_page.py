@@ -236,9 +236,9 @@ def register_callbacks(app, config, status_thread, command_thread):
     )
     def update_contact_info(n):
         status = status_thread.get_status()
-        if status is None or "emergency_contact" not in status:
+        if status is None:
             return ""
-        status = status["emergency_contact"]
+        status = status.emergency_contact
         status_string = f"""
          - Name: {status["name"]}
          - Email: {status["email"]}
@@ -290,7 +290,7 @@ def register_callbacks(app, config, status_thread, command_thread):
         entries = []
 
         if "daemon" in channels:
-            for log_time, log_txt in status.get("error_logs", []):
+            for log_time, log_txt in status.error_logs:
                 ts = parse_timestamp(log_time)
                 if ts is None:
                     ts = 0.0
@@ -302,7 +302,7 @@ def register_callbacks(app, config, status_thread, command_thread):
                 ))
 
         if "serial" in channels:
-            for entry in status.get("serial_communications", []):
+            for entry in status.serial_communications:
                 # Try to extract timestamp from multiple possible field names/formats
                 iso_time = entry.get("time", "") or entry.get("iso_time", "")
                 ts = parse_timestamp(iso_time)
@@ -315,7 +315,7 @@ def register_callbacks(app, config, status_thread, command_thread):
                 entries.append((ts, "serial", f"{shown_time} | {direction}: {payload}"))
 
         if "commands" in channels:
-            for entry in status.get("command_history", []):
+            for entry in status.command_history:
                 iso_time = entry.get("time", "") or entry.get("iso_time", "")
                 ts = parse_timestamp(iso_time)
                 if ts is None:
@@ -336,7 +336,7 @@ def register_callbacks(app, config, status_thread, command_thread):
                 )
 
         if "observations" in channels:
-            for entry in status.get("observation_events", []):
+            for entry in status.observation_events:
                 time_text = entry.get("time", "")
                 ts = parse_timestamp(entry.get("time", None))
                 if ts is None:
@@ -386,7 +386,7 @@ def register_callbacks(app, config, status_thread, command_thread):
     def update_command_queue_display(n):
         status = status_thread.get_status()
         if status is None or (
-            status["queue_size"] == 0 and status["queued_item"] == "None"
+            status.queue_size == 0 and status.queued_item == "None"
         ):
             return "SRT Inactive"
         return "SRT in Use!"
@@ -399,8 +399,8 @@ def register_callbacks(app, config, status_thread, command_thread):
         status = status_thread.get_status()
         if status is None:
             return ""
-        current_cmd = status["queued_item"]
-        queue_size = status["queue_size"]
+        current_cmd = status.queued_item
+        queue_size = status.queue_size
         status_string = f"""
         ##### Command Queue Status
          - Running Command: {current_cmd}

@@ -835,7 +835,7 @@ def generate_pointing_error_graph(error_history, timerange, axisstatus=None):
     )
 
     fig.update_layout(
-        title="Pointing Error vs Time",
+        # title="Pointing Error vs Time",
         xaxis_title="Seconds",
         yaxis_title="Error (mdeg)",
         uirevision=True,

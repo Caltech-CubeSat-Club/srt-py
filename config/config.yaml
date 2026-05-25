@@ -70,3 +70,41 @@ SPECTRUM_ANALYZER_STOP_HZ: 1425500000
 SPECTRUM_ANALYZER_RBW_HZ: 1000
 SPECTRUM_ANALYZER_VBW_HZ: 100
 SPECTRUM_ANALYZER_REF_LEVEL_DBM: -80
+MOTOR_LPR_PARAMS:
+  pAzKo:    0.4
+  pElKo:    0.4
+  pAzKv:    2.0
+  pElKv:    2.0
+  pAze:     0.01
+  pEle:     0.01
+  pAzAmax:  1.5
+  pElAmax:  1.0
+  pAzVmax:  2.5
+  pElVmax:  1.0
+  pAzImax:  1.0
+  pElImax:  5.0
+  pAzKpp:   2.0
+  pElKpp:   1.2
+  pAzKpi:   1.0
+  pElKpi:   1.0
+  pAzKvp:   0.8
+  pElKvp:   1.5
+  pAzKvi:   0.0
+  pElKvi:   0.0
+  pAzKff:   1.0
+  pElKff:   1.0
+  pAzTmax:  800.0
+  pElTmax:  1200.0
+  pAzTmin:  -800.0
+  pElTmin:  -1300.0
+  pAzTsgn:  1.0
+  pElTsgn:  1.0
+  pAzTbias: 150.0
+  pAzEcr:   144000.0
+  pElEcr:   144000.0
+  pAzMEcr:  20000.0
+  pElMEcr:  20000.0
+  pAzEpo:   -301.087
+  pElEpo:   118.5
+  pAzAr:    1522.5
+  pElAr:    19749.0

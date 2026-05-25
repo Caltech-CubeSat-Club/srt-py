@@ -18,7 +18,8 @@ import json
 import logging
 import numpy as np
 
-from .rotor_control.rotors import Rotor
+from .rotor_control import make_driver
+from .rotor_control.types import LprParams, DaemonStatus, RadioState, RotorState
 from .utilities.object_tracker import EphemerisTracker
 from .utilities.functions import azel_within_range
 
@@ -139,18 +140,20 @@ class SmallRadioTelescopeDaemon:
         self.current_vlsr = 0.0
         self.ephemeris_cmd_location = None
 
-        # Create Rotor Command Helper Object
-        self.rotor = Rotor(
-            self.motor_type,
-            self.motor_port,
-            self.motor_baudrate,
-            self.az_limits,
-            self.el_limits,
+        # Create Rotor Driver Object
+        lpr_dict = config_dict.get("MOTOR_LPR_PARAMS")
+        if not lpr_dict:
+            raise RuntimeError("MOTOR_LPR_PARAMS missing from config")
+        self.rotor = make_driver(
+            motor_type=self.motor_type,
+            port=self.motor_port,
+            baudrate=self.motor_baudrate,
+            az_limits=self.az_limits,
+            el_limits=self.el_limits,
+            lpr_params=LprParams.from_dict(lpr_dict),
         )
-        # Start from current motor position so daemon startup does not
-        # immediately command a move to stow.
         try:
-            current_azel = self.rotor.get_azimuth_elevation()
+            current_azel = (self.rotor.get_state().az, self.rotor.get_state().el)
         except Exception:
             current_azel = self.stow_location
 
@@ -198,8 +201,8 @@ class SmallRadioTelescopeDaemon:
         self.beam_switch_data = []
         self.pointing_error = None
         self.pointing_error_history = deque(maxlen=900)
-        self.rotor_diagnostics = {}
-        self.rotor_fsm_status = {}
+        self.amp_current_history = deque(maxlen=900)
+        self._rotor_state = RotorState()
         self.observation_events = deque(maxlen=1200)
         self.active_observation = None
 
@@ -945,31 +948,47 @@ class SmallRadioTelescopeDaemon:
         while self.keep_running:
             try:
                 current_rotor_cmd_location = self.rotor_cmd_location
+                state = self.rotor.get_state()
+
                 if not azel_within_range(
-                    self.rotor_location,
+                    (state.az, state.el),
                     current_rotor_cmd_location,
                     bounds=(
                         float(self.tracking_command_deadband_deg),
                         float(self.tracking_command_deadband_deg),
                     ),
                 ):
-                    if self.rotor.is_motion_allowed():
-                        self.rotor.set_azimuth_elevation(*current_rotor_cmd_location)
+                    if not state.safe_mode:
+                        self.rotor.point(*current_rotor_cmd_location)
 
+                # Refresh state after possible point command
+                state = self.rotor.get_state()
                 past_rotor_location = self.rotor_location
-                self.rotor_location = self.rotor.get_azimuth_elevation()
-                self.pointing_error = self.rotor.get_pointing_error()
-                self.rotor_diagnostics = self.rotor.get_diagnostics()
-                self.rotor_fsm_status = self.rotor.get_fsm_status()
-                if self.pointing_error is not None:
-                    self.pointing_error_history.append(
-                        {
-                            "time": time(),
-                            "azerr_mdeg": float(self.pointing_error[0]),
-                            "elerr_mdeg": float(self.pointing_error[1]),
-                        }
-                    )
-                if not self.rotor_location == past_rotor_location:
+                self.rotor_location = (state.az, state.el)
+                self._rotor_state = state
+
+                if state.az_err is not None and state.el_err is not None:
+                    self.pointing_error = (state.az_err, state.el_err)
+                    self.pointing_error_history.append({
+                        "time": time(),
+                        "azerr_mdeg": float(state.az_err),
+                        "elerr_mdeg": float(state.el_err),
+                    })
+                else:
+                    self.pointing_error = None
+
+                if isinstance(state.amp_currents, dict):
+                    amp_sample = {"time": time()}
+                    for amp_id, amp_vals in state.amp_currents.items():
+                        if isinstance(amp_vals, dict):
+                            amp_sample[amp_id] = {
+                                "commanded": amp_vals.get("commanded"),
+                                "actual": amp_vals.get("actual"),
+                            }
+                    if len(amp_sample) > 1:
+                        self.amp_current_history.append(amp_sample)
+
+                if self.rotor_location != past_rotor_location:
                     g_lat, g_lon = self.ephemeris_tracker.convert_to_gal_coord(
                         self.rotor_location
                     )
@@ -1012,54 +1031,54 @@ class SmallRadioTelescopeDaemon:
         
         while self.keep_running:
             try:
-                status = {
-                    "beam_width": self.beamwidth,
-                    "location": self.station,
-                    "motor_azel": self.rotor_location,
-                    "motor_cmd_azel": self.rotor_cmd_location,
-                    "vlsr": self.current_vlsr,
-                    "object_locs": self.ephemeris_locations,
-                    "object_time_locs": self.ephemeris_time_locs,
-                    "az_limits": self.az_limits,
-                    "el_limits": self.el_limits,
-                    "stow_loc": self.stow_location,
-                    "cal_loc": self.cal_location,
-                    "horizon_points": self.horizon_points,
-                    "center_frequency": self.radio_center_frequency,
-                    "frequency_correction": self.radio_frequency_correction,
-                    "bandwidth": self.radio_sample_frequency,
-                    "motor_offsets": self.rotor_offsets,
-                    "queued_item": self.current_queue_item,
-                    "queue_size": self.command_queue.qsize(),
-                    "emergency_contact": self.contact,
-                    "error_logs": self.command_error_logs,
-                    "temp_cal": self.temp_cal,
-                    "temp_sys": self.temp_sys,
-                    "cal_power": self.cal_power,
-                    "n_point_data": self.n_point_data,
-                    "beam_switch_data": self.beam_switch_data,
-                    "pointing_error": self.pointing_error,
-                    "pointing_error_history": list(self.pointing_error_history),
-                    "rotor_diagnostics": self.rotor_diagnostics,
-                    "rotor_fsm_status": self.rotor_fsm_status,
-                    "observation_events": list(self.observation_events)[-80:],
-                    "time": time(),
-                }
+                radio = RadioState(
+                    center_frequency=self.radio_center_frequency,
+                    bandwidth=self.radio_sample_frequency,
+                    frequency_correction=self.radio_frequency_correction,
+                    temp_sys=self.temp_sys,
+                    temp_cal=self.temp_cal,
+                    cal_power=self.cal_power,
+                )
                 try:
-                    status["serial_communications"] = (
-                        self.rotor.get_recent_serial_communications(limit=12)
-                    )
+                    serial_comms = self.rotor.get_recent_serial_communications(limit=12)
                 except Exception:
-                    status["serial_communications"] = []
-
+                    serial_comms = []
                 try:
-                    status["command_history"] = self.rotor.get_recent_command_history(
-                        limit=12
-                    )
+                    cmd_history = self.rotor.get_recent_command_history(limit=12)
                 except Exception:
-                    status["command_history"] = []
+                    cmd_history = []
 
-                serialized = json.dumps(status, default=_json_default)
+                status = DaemonStatus(
+                    rotor = self._rotor_state,
+                    radio = radio,
+                    beam_width = self.beamwidth,
+                    az_limits = self.az_limits,
+                    el_limits = self.el_limits,
+                    stow_loc = self.stow_location,
+                    cal_loc = self.cal_location,
+                    horizon_points = self.horizon_points,
+                    location = self.station,
+                    object_locs = self.ephemeris_locations,
+                    object_time_locs = self.ephemeris_time_locs,
+                    vlsr = self.ephemeris_vlsr,
+                    motor_offsets = self.rotor_offsets,
+                    pointing_error = self.pointing_error,
+                    pointing_error_history = list(self.pointing_error_history)[-100:],
+                    amp_current_history = list(self.amp_current_history)[-100:],
+                    queued_item = self.current_queue_item,
+                    queue_size = self.command_queue.qsize(),
+                    error_logs = self.command_error_logs[-100:],
+                    observation_events = list(self.observation_events)[-100:],
+                    serial_communications = serial_comms,
+                    command_history = cmd_history,
+                    n_point_data = self.n_point_data,
+                    beam_switch_data = self.beam_switch_data,
+                    cal_values = self.cal_values,
+                    emergency_contact = self.contact,
+                    time = time()
+                )
+
+                serialized = json.dumps(status.to_dict(), default=_json_default)
                 status_socket.send_string(serialized)
             except Exception as e:
                 logging.exception("Status publish error: %s", str(e))
@@ -1206,7 +1225,7 @@ class SmallRadioTelescopeDaemon:
                 if command_name == "spa":
                     self.log_message("SPA command received - Stopping all rotor motors")
                     try:
-                        self.rotor.motor.stop()
+                        self.rotor.spa()
                         self.log_message("Rotor motors stopped successfully")
                     except Exception as e:
                         self.log_message(f"Error stopping rotor: {str(e)}")

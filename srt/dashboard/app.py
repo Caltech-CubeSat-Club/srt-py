@@ -546,11 +546,10 @@ def generate_app(config_dir, config_dict):
             - Waiting for daemon status stream
             """
         else:
-            az = status["motor_azel"][0]
-            el = status["motor_azel"][1]
-            az_offset = status["motor_offsets"][0]
-            el_offset = status["motor_offsets"][1]
-            time_dif = time() - status["time"]
+            az = status.az
+            el = status.el
+            az_offset, el_offset = status.motor_offsets
+            time_dif = time() - status.time
             if time_dif > 5:
                 status_string = "Serial Link Not Available"
             else:
@@ -561,7 +560,7 @@ def generate_app(config_dir, config_dict):
             f"- Motor Az, El: {az:.1f}, {el:.1f} deg",
         ]
 
-        point_err = status.get("pointing_error")
+        point_err = status.pointing_error
         if point_err is not None and len(point_err) == 2:
             lines.append(
                 f"- Pointing Err Az, El: {point_err[0]:.1f}, {point_err[1]:.1f} mdeg"

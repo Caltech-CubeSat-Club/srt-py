@@ -58,7 +58,6 @@ Similarly, amp current history is expected under "amp_current_history":
 If absent the plots show empty.
 """
 
-from collections import deque
 from time import time
 
 try:
@@ -73,6 +72,9 @@ import plotly.graph_objects as go
 
 from .graphs import generate_pointing_error_graph
 from .navbar import generate_navbar
+
+from ...daemon.rotor_control import RotorState, DaemonStatus
+from ...dashboard.messaging.status_fetcher import StatusThread
 
 
 # ---------------------------------------------------------------------------
@@ -320,31 +322,6 @@ def generate_layout():
 # Helpers for building graph and reading params
 # ---------------------------------------------------------------------------
 
-def _lpr_values_from_status(status):
-    """Extract LPR param values from status dict.
-
-    Returns a dict keyed by pAzKo etc., values as floats or None.
-    Handles both list (positional) and dict (named) forms.
-    """
-    if status is None:
-        return {}
-    raw = status.get("lpr_params", None)
-    if raw is None:
-        # Fall back to motor_status sub-key
-        motor_status = status.get("motor_status", {})
-        raw = motor_status.get("lpr_params", None)
-    if raw is None:
-        return {}
-    if isinstance(raw, list):
-        result = {}
-        for i, (key, _, _) in enumerate(LPR_PARAMS):
-            result[key] = raw[i] if i < len(raw) else None
-        return result
-    if isinstance(raw, dict):
-        return raw
-    return {}
-
-
 def _build_amp_current_graph(history):
     """Build a Plotly figure from amp current history.
 
@@ -469,11 +446,8 @@ def _trim_amp_history(history, window_seconds=AMP_HISTORY_WINDOW_SEC):
 # Callbacks
 # ---------------------------------------------------------------------------
 
-def register_callbacks(app, config, status_thread):
+def register_callbacks(app, config, status_thread: StatusThread):
     """Register callbacks for the antenna diagnostics page."""
-
-    # Rolling buffer for amp current history (last 300 samples ≈ 5 min at 1 Hz)
-    _amp_history = deque(maxlen=300)
 
     @app.callback(
         Output("amp-current-graph", "figure"),
@@ -481,28 +455,22 @@ def register_callbacks(app, config, status_thread):
     )
     def update_amp_current_graph(n):
         status = status_thread.get_status()
-        if status is not None:
-            motor_status = status.get("motor_status", status)
-            rotor_diagnostics: dict[str, any] = motor_status.get("rotor_diagnostics", {})
-            # rotor_diagnostics keys = [
-                #     "mode", "CalSts",
-                #     "AzBrkOn", "ElBrkOn", "EmStopOn",
-                #     "azerr", "elerr", "amp_currents",
-                #     "ElUpPreLim", "ElDnPreLim", "ElUpFinLim", "ElDnFinLim",
-                #     "AzCwPreLim", "AzCcwPreLim", "AzCwFinLim", "AzCcwFinLim",
-                #     "AzLT180", "SimMode", "safe_mode",
-                # ]
-            amp_currents = rotor_diagnostics.get("amp_currents", None)
-            t = status.get("time", None)
-            if amp_currents is not None and t is not None:
-                _amp_history.append({"time": t, **amp_currents})
+        if status is None:
+            return _build_amp_current_graph([])
 
-        # Also accept pre-built history from the daemon if it publishes one
-        if status is not None and "amp_current_history" in status:
-            windowed = _trim_amp_history(status["amp_current_history"])
-            return _build_amp_current_graph(windowed)
+        amp_history = status.amp_current_history or []
+        if amp_history:
+            return _build_amp_current_graph(_trim_amp_history(amp_history))
 
-        return _build_amp_current_graph(_trim_amp_history(list(_amp_history)))
+        # Backward-compatible fallback when daemon has not published history yet.
+        amp_currents = status.rotor.amp_currents
+        t = status.time
+        if amp_currents is not None and t is not None:
+            return _build_amp_current_graph([
+                {"time": t, **amp_currents}
+            ])
+
+        return _build_amp_current_graph([])
 
     @app.callback(
         Output("az-el-elevation", "figure"),
@@ -511,8 +479,8 @@ def register_callbacks(app, config, status_thread):
     def update_az_el_time_graph(n):
         status = status_thread.get_status()
         if status is not None:
-            error_hist = status.get("pointing_error_history", [])
-            current_err = status.get("pointing_error")
+            error_hist = status.pointing_error_history
+            current_err = status.pointing_error
             if (not error_hist) and current_err is not None and len(current_err) == 2:
                 error_hist = [
                     {
@@ -534,10 +502,12 @@ def register_callbacks(app, config, status_thread):
     )
     def update_lpr_params(n):
         status = status_thread.get_status()
-        values = _lpr_values_from_status(status)
+        if status is None:
+            return ["—"] * len(LPR_PARAMS)
+        lpr = status.lpr.to_dict()
         result = []
         for key, _, _ in LPR_PARAMS:
-            v = values.get(key, None)
+            v = lpr.get(key)
             if v is None:
                 result.append("—")
             else:

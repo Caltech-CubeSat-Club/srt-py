@@ -51,7 +51,8 @@ try:
 except Exception:
     tk = None
 
-from srt.daemon.rotor_control.moore6m_serial import Moore6mSerial
+from srt.daemon.rotor_control import make_driver
+from srt.daemon.rotor_control.types import LprParams
 from srt import config_loader
 
 
@@ -155,15 +156,20 @@ class Moore6mController:
         self._log_lines : list = []
         self._log_dirty = False
 
-        logging.warning(
-            "Initialising Moore6mSerial on %s @ %d baud", serial_port, baudrate
-        )
-        self.moore6m = Moore6mSerial(
+        lpr_dict = self.config_dict.get("MOTOR_LPR_PARAMS")
+        if not lpr_dict:
+            raise RuntimeError("MOTOR_LPR_PARAMS missing from config")
+        lpr_params = LprParams.from_dict(lpr_dict)
+
+        self.moore6m = make_driver(
+            motor_type=self.config_dict.get("MOTOR_TYPE", "MOORE6M"),
             port=serial_port,
             baudrate=baudrate,
+            az_limits=self.config_dict.get("AZIMUTH_LIMITS", (-89, 449)),
+            el_limits=self.config_dict.get("ELEVATION_LIMITS", (15, 81)),
+            lpr_params=lpr_params,
             safe_mode=bool(safe_mode),
         )
-        logging.warning("Moore6mSerial ready")
 
         self._zmq_ctx      = zmq.Context()
         self._cmd_socket   = self._zmq_ctx.socket(zmq.REP)
@@ -333,23 +339,13 @@ class Moore6mController:
 
     def _send_spa_immediate(self) -> bool:
         try:
-            m = self.moore6m
-            if hasattr(m, "_serial_lock") and hasattr(m, "serial") and m.serial:
-                with m._serial_lock:
-                    m._record_serial_comm("sent", "SPA (immediate)")
-                    m.serial.write(b"SPA\r")
-                    time.sleep(0.01)
-                if m.state not in (Moore6mSerial.State.FAULT,
-                                   Moore6mSerial.State.SHUTDOWN):
-                    m._transition_state(
-                        Moore6mSerial.State.READY, "stop-all immediate"
-                    )
-                self._log("SPA sent (immediate)")
-                return True
+            self.moore6m.spa()
+            self._log("SPA sent (immediate)")
+            return True
         except Exception:
             logging.exception("Immediate SPA failed")
             self._log("ERROR: immediate SPA failed")
-        return False
+            return False
 
     # ------------------------------------------------------------------
     # Shutdown
@@ -360,24 +356,12 @@ class Moore6mController:
             return
         self._running.clear()
         self._log("Controller shutting down")
-
         self.stop_daemon()
         self.stop_dashboard()
-
         try:
-            if hasattr(self.moore6m, "_command_worker_stop"):
-                self.moore6m._command_worker_stop.set()
-            m = self.moore6m
-            if hasattr(m, "serial") and m.serial and m.serial.is_open:
-                try:
-                    m.serial.write(b"SPA\r")
-                except Exception:
-                    pass
-                m.serial.close()
-            m._transition_state(Moore6mSerial.State.SHUTDOWN, "cleanup invoked")
+            self.moore6m.shutdown()
         except Exception:
-            logging.exception("Error during serial shutdown")
-
+            logging.exception("Error during driver shutdown")
         for sock in (self._cmd_socket, self._estop_socket):
             try:
                 sock.setsockopt(zmq.LINGER, 0)
@@ -398,49 +382,29 @@ class Moore6mController:
         cmd   = parts[0].upper() if parts else ""
         try:
             if cmd in ("STATUS", "GET_STATUS"):
-                az, el = self.moore6m.status()
-                fsm    = self.moore6m.get_fsm_status()
-                _fields = [
-                    "mode", "CalSts", "AzBrkOn", "ElBrkOn", "EmStopOn",
-                    "azerr", "elerr", "amp_currents", "safe_mode",
-                    "ElUpPreLim", "ElDnPreLim", "ElUpFinLim", "ElDnFinLim",
-                    "AzCwPreLim", "AzCcwPreLim", "AzCwFinLim", "AzCcwFinLim",
-                    "AzLT180", "SimMode",
-                ]
-                diagnostics = {k: getattr(self.moore6m, k, None) for k in _fields}
-                return {"ok": True, "fsm": fsm, "az": az, "el": el,
-                        "diagnostics": diagnostics}
+                state = self.moore6m.get_state()
+                return {"ok": True, "rotor_state": state.to_dict()}
 
             if cmd == "POINT" and len(parts) >= 3:
-                res = self.moore6m.point(float(parts[1]), float(parts[2]))
-                return {"ok": True, "response": res}
-
-            if cmd == "POINT_RADEC" and len(parts) >= 3:
-                res = self.moore6m.point_radec(float(parts[1]), float(parts[2]))
-                return {"ok": True, "response": res}
+                self.moore6m.point(float(parts[1]), float(parts[2]))
+                return {"ok": True}
 
             if cmd == "CALIBRATE":
-                threading.Thread(
-                    target=self.moore6m.calibrate, daemon=True
-                ).start()
+                threading.Thread(target=self.moore6m.calibrate, daemon=True).start()
                 return {"ok": True}
 
             if cmd == "STARTUP":
-                threading.Thread(
-                    target=self.moore6m.startup, daemon=True
-                ).start()
+                threading.Thread(target=self.moore6m.startup, daemon=True).start()
                 return {"ok": True}
 
             if cmd in ("SPA", "ESTOP"):
                 return {"ok": self._send_spa_immediate()}
 
             if cmd == "GET_COMM_HISTORY":
-                return {"ok": True,
-                        "history": self.moore6m.get_recent_command_history(limit=20)}
+                return {"ok": True, "history": self.moore6m.get_recent_command_history(limit=20)}
 
             if cmd == "GET_SERIAL_COMM":
-                return {"ok": True,
-                        "serial": self.moore6m.get_recent_serial_communications(limit=20)}
+                return {"ok": True, "serial": self.moore6m.get_recent_serial_communications(limit=20)}
 
             if cmd == "DAEMON_START":
                 return {"ok": self.start_daemon()}
@@ -560,7 +524,7 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
     motor_frm = ttk.LabelFrame(root, text="Motor Control", padding=6)
     motor_frm.pack(fill="x", padx=8, pady=2)
 
-    estop_engaged = tk.BooleanVar(value=bool(controller.moore6m.safe_mode))
+    estop_engaged = tk.BooleanVar(value=controller.moore6m.get_state().safe_mode)
 
     # Forward-declare so the lambda can reference it after creation
     estop_btn_ref = [None]
@@ -569,19 +533,8 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
         btn = estop_btn_ref[0]
         if not estop_engaged.get():
             def _engage():
-                m = controller.moore6m
-                if hasattr(m, "serial") and m.serial:
-                    try:
-                        with m._serial_lock:
-                            for _ in range(3):
-                                m.serial.write(b"\r")
-                                time.sleep(0.003)
-                    except Exception:
-                        pass
-                for _ in range(3):
-                    controller._send_spa_immediate()
-                    time.sleep(0.05)
-                controller.moore6m.safe_mode = True
+                controller.moore6m.spa()          # handles flush + SPA internally
+                controller.moore6m.set_safe_mode(True)
                 controller._log("E-STOP ENGAGED — motion commands blocked")
             threading.Thread(target=_engage, daemon=True).start()
             estop_engaged.set(True)
@@ -591,7 +544,7 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
                     fg="white", bg="#cc0000", activebackground="#990000",
                 )
         else:
-            controller.moore6m.safe_mode = False
+            controller.moore6m.set_safe_mode(False)
             estop_engaged.set(False)
             if btn:
                 btn.configure(
@@ -602,18 +555,8 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
             controller._log("E-stop released — motion commands re-enabled")
 
     def _do_flush_startup():
-        m = controller.moore6m
-        if hasattr(m, "serial") and m.serial:
-            try:
-                with m._serial_lock:
-                    for _ in range(8):
-                        m.serial.write(b"\r")
-                        time.sleep(0.003)
-                threading.Thread(target=m.startup, daemon=True).start()
-                controller._log("Flush+Startup initiated")
-            except Exception:
-                logging.exception("Flush+Startup failed")
-                controller._log("ERROR: Flush+Startup failed")
+        threading.Thread(target=controller.moore6m.startup, daemon=True).start()
+        controller._log("Startup initiated")
 
     def _do_calibrate():
         threading.Thread(
@@ -634,7 +577,7 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
                command=_do_calibrate).grid(row=0, column=2, padx=4, pady=2)
 
     # Reflect initial safe_mode state in button appearance
-    if bool(controller.moore6m.safe_mode):
+    if bool(controller.moore6m.get_state().safe_mode):
         estop_btn.configure(
             text="⚠ E-STOP ENGAGED — click to release",
             fg="white", bg="#cc0000", activebackground="#990000",
@@ -682,32 +625,22 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
     # ---- Periodic update ----
     def _update_gui():
         try:
-            fsm = controller.moore6m.get_fsm_status()
-            state_var.set(fsm.get("state", "—"))
-            pos_var.set(
-                f"az: {controller.moore6m.az:.3f}°  "
-                f"el: {controller.moore6m.el:.3f}°"
-            )
-            cal_var.set(getattr(controller.moore6m, "CalSts", "—") or "—")
-            mode_var.set(getattr(controller.moore6m, "mode",   "—") or "—")
+            state = controller.moore6m.get_state()
+            state_var.set(state.fsm_state)
+            pos_var.set(f"az: {state.az:.3f}°  el: {state.el:.3f}°")
+            cal_var.set(state.cal_sts)
+            mode_var.set(state.loop_mode)
 
             comms = controller.moore6m.get_recent_serial_communications(limit=10)
             comm_list.delete(0, tk.END)
             for c in reversed(comms):
-                local_time = c.get("time", "") or ""
-                comm_list.insert(
-                    tk.END,
-                    f"{local_time}  "
-                    f"{c.get('direction', ''):4s}  "
-                    f"{c.get('payload', '')}",
-                )
+                comm_list.insert(tk.END,
+                    f"{c.get('time','')}  {c.get('direction',''):4s}  {c.get('payload','')}")
             _refresh_svc()
         except Exception:
             pass
-
         if controller.log_is_dirty():
             _append_new_log_lines()
-
         root.after(poll_ms, _update_gui)
 
     root.after(poll_ms, _update_gui)
