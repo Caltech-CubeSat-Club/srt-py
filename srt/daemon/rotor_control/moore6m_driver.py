@@ -255,7 +255,7 @@ class Moore6mDriver:
     def _read_response_line(self) -> str:
         try:
             response = self.serial.read_until(b"\r")
-        except (serial.SerialException, serial.portNotOpenError):
+        except (serial.SerialException, serial.PortNotOpenError):
             return ""
         response = response.strip().decode("utf-8", errors="replace")
         if response:
