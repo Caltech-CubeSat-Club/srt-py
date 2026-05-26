@@ -480,7 +480,7 @@ def register_callbacks(app, config, status_thread: StatusThread):
         status = status_thread.get_status()
         if status is not None:
             error_hist = status.pointing_error_history
-            current_err = status.pointing_error
+            current_err = (status.rotor.az_err, status.rotor.el_err)
             if (not error_hist) and current_err is not None and len(current_err) == 2:
                 error_hist = [
                     {
