@@ -305,7 +305,7 @@ class SmallRadioTelescopeDaemon:
 
     def _wait_for_rotor_target(self, settle_time=0.0):
         """Wait for rotor to reach the current command location and settle."""
-        if not self.rotor.is_motion_allowed():
+        if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): skipping wait for rotor target")
             return False
         timeout = max(0.1, float(self.rotor_move_timeout))
@@ -374,7 +374,7 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
-        if not self.rotor.is_motion_allowed():
+        if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): ignoring n_point_scan command")
             return
         self.ephemeris_cmd_location = None
@@ -452,7 +452,7 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
-        if not self.rotor.is_motion_allowed():
+        if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): ignoring beam_switch command")
             return
         self.ephemeris_cmd_location = None
@@ -513,7 +513,7 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
-        if not self.rotor.is_motion_allowed():
+        if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): ignoring point_at_object command")
             return
         self.rotor_offsets = (0.0, 0.0)
@@ -557,7 +557,7 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
-        if not self.rotor.is_motion_allowed():
+        if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): ignoring point_at_azel command")
             return  
         # cur_vlsr = self.ephemeris_tracker.calculate_vlsr_azel((az,el))
@@ -607,7 +607,7 @@ class SmallRadioTelescopeDaemon:
         bool
             True if destination was reached, False otherwise.
         """
-        if not self.rotor.is_motion_allowed():
+        if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): ignoring point_at_offset command")
             return False
         new_rotor_offsets = (az_off, el_off)
@@ -643,7 +643,7 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
-        if not self.rotor.is_motion_allowed():
+        if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): ignoring stow command")
             return
         self.ephemeris_cmd_location = None
@@ -689,7 +689,7 @@ class SmallRadioTelescopeDaemon:
 
     def calibrate_encoders(self):
         """Runs motor encoder calibration when supported by motor backend."""
-        if not self.rotor.is_motion_allowed(): 
+        if self.rotor._state.safe_mode:
             self.log_message("Encoder calibration is unavailable while motion is not allowed")
             return
         self._end_active_observation("encoder_calibration")
@@ -848,7 +848,7 @@ class SmallRadioTelescopeDaemon:
         -------
         None
         """
-        if not self.rotor.is_motion_allowed():
+        if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): ignoring find_object_location command")
             return
         if name in self.ephemeris_tracker.az_el_dict:
