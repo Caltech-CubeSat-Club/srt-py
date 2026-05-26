@@ -1305,7 +1305,7 @@ def register_callbacks(
                "figure"), [Input("interval-component", "n_intervals")]
     )
     def update_zoom_graph(n):
-        status = status_thread.get_status()
+        status = status_thread.get_status() or DaemonStatus()
         return generate_zoom_graph(
             status.az_limits,
             status.el_limits,

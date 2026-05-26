@@ -4,17 +4,20 @@ Single root process for all Caltech 6m telescope control activities.
 
 Architecture
 ------------
-- Moore6mSerial      : owned directly in this process (serial port)
+- Moore6mDriver      : owned directly in this process (serial port)
 - ZMQ REP socket     : queued command/response for Moore6mClient (port 5566)
 - ZMQ PULL socket    : immediate e-stop bypass (port 5567)
-- SRT daemon         : multiprocessing.Process — killed instantly on stop
+- SRT daemon         : threading.Thread — shares driver instance; stopped via quit()
 - Dash dashboard     : multiprocessing.Process — killed instantly on stop
 - Tkinter GUI        : runs on main thread
 
-Using Process (not Thread) for daemon and dashboard means:
-  - stop() can call .kill() for an immediate, guaranteed OS-level kill
-  - ports are released by the OS the moment the process dies
-  - no ZMQ/waitress/Dash internal threads can block our shutdown
+The daemon runs as a Thread (not a Process) so it can share the single
+Moore6mDriver instance that owns the serial port. Stopping the daemon calls
+SmallRadioTelescopeDaemon.quit(), which sets keep_running = False and lets
+all daemon threads exit naturally within one loop iteration.
+
+The dashboard remains a Process because it has no need for shared serial
+state, and Process gives an instant, guaranteed OS-level kill on stop.
 
 The controller itself exits via os._exit(0) which bypasses Python's
 shutdown sequence entirely (ZMQ C-level threads cannot block it).
@@ -31,6 +34,7 @@ CLI args (all optional, override config where applicable):
     --estop-port  ZMQ e-stop PULL port (default 5567)
     --safe-mode   Start with motion/control commands blocked
     --nogui       Headless mode (no Tkinter window; run until Ctrl-C)
+    --autostart   Auto-start daemon and dashboard on launch
 """
 
 import argparse
@@ -72,16 +76,6 @@ LOG_MAXLINES = 500
 # ---------------------------------------------------------------------------
 # Process target functions (must be module-level for multiprocessing spawn)
 # ---------------------------------------------------------------------------
-
-def _run_daemon(config_dir, config_dict):
-    from srt.daemon import daemon as srt_d
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s [%(threadName)s]: %(message)s",
-    )
-    d = srt_d.SmallRadioTelescopeDaemon(config_dir, config_dict)
-    d.srt_daemon_main()
-
 
 def _run_dashboard(config_dir, config_dict):
     from waitress import serve
@@ -249,20 +243,27 @@ class Moore6mController:
     # ------------------------------------------------------------------
     # Daemon process
     # ------------------------------------------------------------------
-
+    
     def start_daemon(self) -> bool:
         if self.daemon_is_running():
             self._log("Daemon already running")
             return True
         try:
-            self._daemon_proc = multiprocessing.Process(
-                target=_run_daemon,
-                args=(self.config_dir, self.config_dict),
+            from srt.daemon import daemon as srt_d
+            d = srt_d.SmallRadioTelescopeDaemon(
+                self.config_dir,
+                self.config_dict,
+                rotor=self.moore6m,   # <-- share the existing driver
+            )
+            t = threading.Thread(
+                target=d.srt_daemon_main,
                 name="srt-daemon",
                 daemon=True,
             )
-            self._daemon_proc.start()
-            self._log(f"Daemon started (pid {self._daemon_proc.pid})")
+            t.start()
+            self._daemon_proc = t   # rename to self._daemon_thread if you want clarity
+            self._daemon_obj = d    # keep a reference so you can call d.quit() on stop
+            self._log("Daemon started (thread)")
             return True
         except Exception:
             logging.exception("Failed to start daemon")
@@ -270,23 +271,21 @@ class Moore6mController:
             return False
 
     def stop_daemon(self):
-        p = self._daemon_proc
-        if p is None:
+        d = getattr(self, '_daemon_obj', None)
+        t = getattr(self, '_daemon_proc', None)
+        if d is None:
             return
+        self._daemon_obj = None
         self._daemon_proc = None
-        if not p.is_alive():
-            return
-        self._log(f"Stopping daemon (pid {p.pid})")
-        p.terminate()
-        p.join(timeout=2.0)
-        if p.is_alive():
-            self._log("Daemon did not terminate cleanly, killing")
-            p.kill()
-            p.join(timeout=1.0)
+        self._log("Stopping daemon")
+        d.quit()                  # sets d.keep_running = False
+        if t is not None and t.is_alive():
+            t.join(timeout=5.0)
         self._log("Daemon stopped")
 
     def daemon_is_running(self) -> bool:
-        return bool(self._daemon_proc and self._daemon_proc.is_alive())
+        t = getattr(self, '_daemon_proc', None)
+        return bool(t and t.is_alive())
 
     # ------------------------------------------------------------------
     # Dashboard process

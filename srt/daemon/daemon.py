@@ -32,7 +32,7 @@ class SmallRadioTelescopeDaemon:
     Controller Class for the Small Radio Telescope
     """
 
-    def __init__(self, config_directory, config_dict):
+    def __init__(self, config_directory, config_dict, rotor=None):
         """Initializer for the Small Radio Telescope Daemon
 
         Parameters
@@ -141,17 +141,20 @@ class SmallRadioTelescopeDaemon:
         self.ephemeris_cmd_location = None
 
         # Create Rotor Driver Object
-        lpr_dict = config_dict.get("MOTOR_LPR_PARAMS")
-        if not lpr_dict:
-            raise RuntimeError("MOTOR_LPR_PARAMS missing from config")
-        self.rotor = make_driver(
-            motor_type=self.motor_type,
-            port=self.motor_port,
-            baudrate=self.motor_baudrate,
-            az_limits=self.az_limits,
-            el_limits=self.el_limits,
-            lpr_params=LprParams.from_dict(lpr_dict),
-        )
+        if rotor is not None:
+            self.rotor = rotor
+        else:
+            lpr_dict = config_dict.get("MOTOR_LPR_PARAMS")
+            if not lpr_dict:
+                raise RuntimeError("MOTOR_LPR_PARAMS missing from config")
+            self.rotor = make_driver(
+                motor_type=self.motor_type,
+                port=self.motor_port,
+                baudrate=self.motor_baudrate,
+                az_limits=self.az_limits,
+                el_limits=self.el_limits,
+                lpr_params=LprParams.from_dict(lpr_dict),
+            )
         try:
             current_azel = (self.rotor.get_state().az, self.rotor.get_state().el)
         except Exception:
