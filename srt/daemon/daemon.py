@@ -524,7 +524,10 @@ class SmallRadioTelescopeDaemon:
         self.current_vlsr = cur_vlsr
         new_rotor_cmd_location = self.ephemeris_locations[object_id]
         self._end_active_observation("move_away")
-        if self.rotor.angles_within_bounds(*new_rotor_cmd_location):
+        if (
+            self.rotor.az_limits[0] <= new_rotor_cmd_location[0] <= self.rotor.az_limits[1]
+            and self.rotor.el_limits[0] <= new_rotor_cmd_location[1] <= self.rotor.el_limits[1]
+        ):
             self.ephemeris_cmd_location = object_id
             self.rotor_destination = new_rotor_cmd_location
             self.rotor_cmd_location = new_rotor_cmd_location
