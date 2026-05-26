@@ -1065,7 +1065,6 @@ class SmallRadioTelescopeDaemon:
                     object_time_locs = self.ephemeris_time_locs,
                     vlsr = self.ephemeris_vlsr,
                     motor_offsets = self.rotor_offsets,
-                    pointing_error = self.pointing_error,
                     pointing_error_history = list(self.pointing_error_history)[-100:],
                     amp_current_history = list(self.amp_current_history)[-100:],
                     queued_item = self.current_queue_item,

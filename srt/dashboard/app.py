@@ -560,7 +560,7 @@ def generate_app(config_dir, config_dict):
             f"- Motor Az, El: {az:.1f}, {el:.1f} deg",
         ]
 
-        point_err = status.pointing_error
+        point_err = (status.rotor.az_err, status.rotor.el_err)
         if point_err is not None and len(point_err) == 2:
             lines.append(
                 f"- Pointing Err Az, El: {point_err[0]:.1f}, {point_err[1]:.1f} mdeg"

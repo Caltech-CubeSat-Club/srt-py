@@ -376,10 +376,7 @@ class DaemonStatus:
     vlsr:             float = 0.0
 
     # ---- Pointing ----
-    motor_azel:             Tuple         = (0.0, 0.0)
-    motor_cmd_azel:         Tuple         = (0.0, 0.0)
     motor_offsets:          Tuple         = (0.0, 0.0)
-    pointing_error:         Optional[Any] = None
     pointing_error_history: List          = field(default_factory=list)
     amp_current_history:    List          = field(default_factory=list)
 
