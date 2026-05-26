@@ -318,7 +318,7 @@ class SmallRadioTelescopeDaemon:
             reached_by_position = azel_within_range(
                 self.rotor_location, self.rotor_cmd_location
             )
-            point_err = self.rotor.get_pointing_error()
+            point_err = (self.rotor.az_err, self.rotor.el_err)
             reached_by_error = False
             if point_err is not None:
                 azerr_mdeg, elerr_mdeg = point_err
@@ -406,7 +406,10 @@ class SmallRadioTelescopeDaemon:
 
             new_rotor_offsets = (az_dif, el_dif)
 
-            if self.rotor.angles_within_bounds(*scan_center):
+            if (
+                self.rotor.az_limits[0] <= scan_center[0] <= self.rotor.az_limits[1]
+                and self.rotor.el_limits[0] <= scan_center[1] <= self.rotor.el_limits[1]
+            ):
                 self.rotor_destination = scan_center
                 if not self.point_at_offset(
                     *new_rotor_offsets,
@@ -470,7 +473,10 @@ class SmallRadioTelescopeDaemon:
             az_dif_scalar = np.cos(new_rotor_destination[1] * np.pi / 180.0)
             az_dif = (j % 3 - 1) * self.beamwidth / az_dif_scalar
             new_rotor_offsets = (az_dif, 0)
-            if self.rotor.angles_within_bounds(*new_rotor_destination):
+            if (
+                self.rotor.az_limits[0] <= new_rotor_destination[0] <= self.rotor.az_limits[1]
+                and self.rotor.el_limits[0] <= new_rotor_destination[1] <= self.rotor.el_limits[1]
+            ):
                 self.rotor_destination = new_rotor_destination
                 if not self.point_at_offset(
                     *new_rotor_offsets,
@@ -578,7 +584,10 @@ class SmallRadioTelescopeDaemon:
         new_rotor_destination = (az, el)
         new_rotor_cmd_location = new_rotor_destination
         self._end_active_observation("move_away")
-        if self.rotor.angles_within_bounds(*new_rotor_cmd_location):
+        if (
+            self.rotor.az_limits[0] <= new_rotor_cmd_location[0] <= self.rotor.az_limits[1]
+            and self.rotor.el_limits[0] <= new_rotor_cmd_location[1] <= self.rotor.el_limits[1]
+        ):
             self.rotor_destination = new_rotor_destination
             self.rotor_cmd_location = new_rotor_cmd_location
             if self._wait_for_rotor_target():
@@ -618,7 +627,10 @@ class SmallRadioTelescopeDaemon:
             map(add, self.rotor_destination, new_rotor_offsets)
         )
         self._end_active_observation("move_away")
-        if self.rotor.angles_within_bounds(*new_rotor_cmd_location):
+        if (
+            self.rotor.az_limits[0] <= new_rotor_cmd_location[0] <= self.rotor.az_limits[1]
+            and self.rotor.el_limits[0] <= new_rotor_cmd_location[1] <= self.rotor.el_limits[1]
+        ):
             self.rotor_offsets = new_rotor_offsets
             self.rotor_cmd_location = new_rotor_cmd_location
             if self._wait_for_rotor_target():
@@ -864,7 +876,10 @@ class SmallRadioTelescopeDaemon:
 
         new_rotor_cmd_location = (az, el)
         self._end_active_observation("move_away")
-        if self.rotor.angles_within_bounds(*new_rotor_cmd_location):
+        if (
+            self.rotor.az_limits[0] <= new_rotor_cmd_location[0] <= self.rotor.az_limits[1]
+            and self.rotor.el_limits[0] <= new_rotor_cmd_location[1] <= self.rotor.el_limits[1]
+        ):
             self.ephemeris_cmd_location = name
             self.rotor_destination = new_rotor_cmd_location
             self.rotor_cmd_location = new_rotor_cmd_location
@@ -920,9 +935,13 @@ class SmallRadioTelescopeDaemon:
                 new_rotor_cmd_location = tuple(
                     map(add, new_rotor_destination, self.rotor_offsets)
                 )
-                if self.rotor.angles_within_bounds(
-                    *new_rotor_destination
-                ) and self.rotor.angles_within_bounds(*new_rotor_cmd_location):
+                if (
+                    self.rotor.az_limits[0] <= new_rotor_destination[0] <= self.rotor.az_limits[1]
+                    and self.rotor.el_limits[0] <= new_rotor_destination[1] <= self.rotor.el_limits[1]
+                ) and (
+                    self.rotor.az_limits[0] <= new_rotor_cmd_location[0] <= self.rotor.az_limits[1]
+                    and self.rotor.el_limits[0] <= new_rotor_cmd_location[1] <= self.rotor.el_limits[1]
+                ):
                     self.rotor_destination = new_rotor_destination
                     self.rotor_cmd_location = new_rotor_cmd_location
                 else:
