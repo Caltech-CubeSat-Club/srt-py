@@ -315,10 +315,11 @@ class SmallRadioTelescopeDaemon:
         stable_count = 0
 
         while self.keep_running:
+            state = self.rotor.get_state()
             reached_by_position = azel_within_range(
-                self.rotor_location, self.rotor_cmd_location
+                (state.az, state.el), (state.az_cmd, state.el_cmd), (self.tracking_command_deadband_deg, self.tracking_command_deadband_deg)
             )
-            point_err = (self.rotor.az_err, self.rotor.el_err)
+            point_err = (state.az_err, state.el_err)
             reached_by_error = False
             if point_err is not None:
                 azerr_mdeg, elerr_mdeg = point_err
