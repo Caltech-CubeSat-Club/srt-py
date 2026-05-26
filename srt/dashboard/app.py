@@ -195,28 +195,6 @@ def generate_app(config_dir, config_dict):
     command_thread = CommandThread(port=5556)
     command_thread.start()
 
-    # Start Spectrum Analyzer Thread if enabled
-    spectrum_analyzer_enabled = bool(config_dict.get("SPECTRUM_ANALYZER_ENABLE", False))
-    raw_spectrum_thread = None
-    
-    if spectrum_analyzer_enabled:
-        spectrum_serial = str(config_dict.get("SPECTRUM_ANALYZER_SERIAL", "SSA3PCED7R1040"))
-        spectrum_start_hz = float(config_dict.get("SPECTRUM_ANALYZER_START_HZ", 1415.5e6))
-        spectrum_stop_hz = float(config_dict.get("SPECTRUM_ANALYZER_STOP_HZ", 1425.5e6))
-        spectrum_rbw_hz = float(config_dict.get("SPECTRUM_ANALYZER_RBW_HZ", 1e3))
-        spectrum_vbw_hz = float(config_dict.get("SPECTRUM_ANALYZER_VBW_HZ", 1e2))
-        spectrum_ref_level_dbm = float(config_dict.get("SPECTRUM_ANALYZER_REF_LEVEL_DBM", -80))
-        
-        raw_spectrum_thread = SpectrumThread(
-            instrument_serial=spectrum_serial,
-            start_hz=spectrum_start_hz,
-            stop_hz=spectrum_stop_hz,
-            rbw_hz=spectrum_rbw_hz,
-            vbw_hz=spectrum_vbw_hz,
-            ref_level_dbm=spectrum_ref_level_dbm,
-        )
-        raw_spectrum_thread.start()
-
     # Dictionary of Pages and matching URL prefixes
     pages = {
         "Monitor Page": "monitor-page",

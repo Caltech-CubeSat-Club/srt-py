@@ -318,13 +318,14 @@ class RotorState:
 
 @dataclass
 class RadioState:
-    """Radio / SDR subsystem state."""
-    center_frequency:     float = 0.0
-    bandwidth:            float = 0.0
-    frequency_correction: float = 0.0
-    temp_sys:             float = 0.0
-    temp_cal:             float = 0.0
-    cal_power:            float = 1.0
+    """Radio / Spectrum Analyzer subsystem state."""
+    enabled: bool = False
+    serial_number: str = ""
+    start_frequency_hz: int = 1415500000
+    stop_frequency_hz: int = 1425500000
+    rbw_hz: int = 1000
+    vbw_hz: int = 100
+    ref_level_dbm: int = -80
 
     def to_dict(self) -> dict:
         return asdict(self)

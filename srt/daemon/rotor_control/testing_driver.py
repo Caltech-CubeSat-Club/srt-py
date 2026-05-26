@@ -8,7 +8,7 @@ import copy
 from threading import RLock
 from time import monotonic
 
-from .types import LprParams, RotorState
+from ..types import LprParams, RotorState
 
 
 class TestingDriver:

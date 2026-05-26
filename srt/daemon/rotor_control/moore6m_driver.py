@@ -40,7 +40,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 from parse import parse
 
-from .types import LprParams, RotorState
+from ..types import LprParams, RotorState
 
 
 # ---------------------------------------------------------------------------

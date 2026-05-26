@@ -19,12 +19,9 @@ This is the only place that knows which driver class maps to which type string.
     )
     state: RotorState = driver.get_state()
 
-Types
------
-    from srt.daemon.rotor_control import LprParams, RotorState, DaemonStatus
 """
 
-from .types import DaemonStatus, LprParams, RadioState, RotorState
+from ..types import LprParams
 from .moore6m_driver import Moore6mDriver
 from .testing_driver import TestingDriver
 
@@ -90,8 +87,4 @@ __all__ = [
     "make_driver",
     "Moore6mDriver",
     "TestingDriver",
-    "LprParams",
-    "RotorState",
-    "RadioState",
-    "DaemonStatus",
 ]
