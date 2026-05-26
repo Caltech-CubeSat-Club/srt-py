@@ -31,11 +31,10 @@ import platform
 from threading import Event, Lock, Thread
 from typing import Any, cast
 
-from .layouts import monitor_page, system_page, antenna_page
+from .layouts import monitor_page, system_page, antenna_page, spectrum_page
 from .layouts.sidebar import generate_sidebar
 from .messaging.status_fetcher import StatusThread
 from .messaging.command_dispatcher import CommandThread
-from .messaging.spectrum_fetcher import SpectrumThread
 
 try:
     import cv2  # type: ignore[reportMissingImports]
@@ -200,6 +199,7 @@ def generate_app(config_dir, config_dict):
         "Monitor Page": "monitor-page",
         "System Page": "system-page",
         "Antenna Page": "antenna-page",
+        "Spectrum Page": "spectrum-page",
     }
     if "DASHBOARD_REFRESH_MS" in config_dict.keys():
         refresh_time = config_dict["DASHBOARD_REFRESH_MS"]  # ms
@@ -364,6 +364,7 @@ def generate_app(config_dir, config_dict):
             monitor_page.generate_layout(config_dict),
             system_page.generate_layout(),
             antenna_page.generate_layout(),
+            spectrum_page.generate_layout(config_dict),
         ]
     )  # Necessary for Allowing Other Files to Create Callbacks
 
@@ -435,6 +436,7 @@ def generate_app(config_dir, config_dict):
     # Create Callbacks for System Page Objects
     system_page.register_callbacks(app, config_dict, status_thread, command_thread)
     antenna_page.register_callbacks(app, config_dict, status_thread)
+    spectrum_page.register_callbacks(app, config_dict, status_thread, command_thread)
 
     # # Create Callbacks for figure page callbacks
     # figure_page.register_callbacks(app,config_dict, status_thread)
@@ -566,6 +568,8 @@ def generate_app(config_dir, config_dict):
             return system_page.generate_layout()
         elif pathname == f"/{pages['Antenna Page']}": 
             return antenna_page.generate_layout()
+        elif pathname == f"/{pages['Spectrum Page']}":
+            return spectrum_page.generate_layout(config_dict)
         # If the user tries to reach a different page, return a 404 message
         return dbc.Jumbotron(
             [

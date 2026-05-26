@@ -2,28 +2,33 @@
 
 Canonical dataclass definitions for all telescope state.
 
-Three classes:
-  LprParams     — the 37 servo loop parameters sent via the LPR command
-  RotorState    — complete motor/servo snapshot (replaces rotor_diagnostics
-                  + rotor_fsm_status dicts)
-  DaemonStatus  — everything the daemon publishes (replaces the ad-hoc dict
-                  in update_status)
+Key classes:
+    LprParams       — the 37 servo loop parameters sent via the LPR command
+    RotorState      — complete motor/servo snapshot (replaces rotor_diagnostics
+                      + rotor_fsm_status dicts)
+    SpectrumConfig  — user-configurable spectrum analyzer settings
+    SpectrumFrame   — one acquired spectrum snapshot
+    DaemonStatus    — everything the daemon publishes (replaces the ad-hoc dict
+                      in update_status)
 
 No dependencies on any other part of the codebase — safe to import anywhere.
 
 Serialisation
 -------------
 Every class has to_dict() / from_dict() so the existing ZMQ JSON publish
-path keeps working.  DaemonStatus.to_dict() also emits legacy flat keys
-(rotor_diagnostics, rotor_fsm_status, center_frequency, …) so dashboard
-callbacks need not all change at once.
+path keeps working.  DaemonStatus.to_dict() also emits legacy rotor
+keys (rotor_diagnostics, rotor_fsm_status) so dashboard callbacks need
+not all change at once.
 """
 
 from __future__ import annotations
 
 import time as _time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 # ---------------------------------------------------------------------------
@@ -313,29 +318,153 @@ class RotorState:
 
 
 # ---------------------------------------------------------------------------
-# Radio state
+# Spectrum analyzer types
 # ---------------------------------------------------------------------------
 
-@dataclass
-class RadioState:
-    """Radio / Spectrum Analyzer subsystem state."""
-    enabled: bool = False
-    serial_number: str = ""
-    start_frequency_hz: int = 1415500000
-    stop_frequency_hz: int = 1425500000
-    rbw_hz: int = 1000
-    vbw_hz: int = 100
-    ref_level_dbm: int = -80
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
 
-    def to_dict(self) -> dict:
-        return asdict(self)
+
+def _coerce_optional_bool(value: Any) -> Optional[bool]:
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip().lower() in {"none", "null", ""}:
+        return None
+    return _coerce_bool(value)
+
+
+def _coerce_tuple(value: Any, default: Tuple[float, float]) -> Tuple[float, float]:
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        return (float(value[0]), float(value[1]))
+    if isinstance(value, str) and "," in value:
+        parts = [p.strip() for p in value.split(",") if p.strip()]
+        if len(parts) == 2:
+            return (float(parts[0]), float(parts[1]))
+    return default
+
+
+@dataclass
+class SpectrumConfig:
+    """All user-configurable settings. Live-updatable."""
+
+    instrument_serial: str = "SSA3PCED7R1040"
+    freq_mode: str = "start_stop"
+    start_hz: float = 1.0e9
+    stop_hz: float = 1.9e9
+    center_hz: float = 1.4205e9
+    span_hz: float = 200.0e6
+    rbw_hz: float = 1.0e6
+    vbw_hz: float = 100.0e3
+    ref_level_dbm: float = -30.0
+    y_axis_mode: str = "db_per_div"
+    y_db_per_div: float = 10.0
+    y_num_divs: int = 10
+    y_lim_dbm: Tuple[float, float] = (-120.0, -30.0)
+    atten_auto: bool = True
+    atten_db: float = 0.0
+    preamp_on: Optional[bool] = True
+    trace_type: str = "clear_write"
+    num_averages: int = 300
+    x_units: str = "MHz"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "instrument_serial": self.instrument_serial,
+            "freq_mode": self.freq_mode,
+            "start_hz": float(self.start_hz),
+            "stop_hz": float(self.stop_hz),
+            "center_hz": float(self.center_hz),
+            "span_hz": float(self.span_hz),
+            "rbw_hz": float(self.rbw_hz),
+            "vbw_hz": float(self.vbw_hz),
+            "ref_level_dbm": float(self.ref_level_dbm),
+            "y_axis_mode": self.y_axis_mode,
+            "y_db_per_div": float(self.y_db_per_div),
+            "y_num_divs": int(self.y_num_divs),
+            "y_lim_dbm": (float(self.y_lim_dbm[0]), float(self.y_lim_dbm[1])),
+            "atten_auto": bool(self.atten_auto),
+            "atten_db": float(self.atten_db),
+            "preamp_on": self.preamp_on,
+            "trace_type": self.trace_type,
+            "num_averages": int(self.num_averages),
+            "x_units": self.x_units,
+        }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "RadioState":
+    def from_dict(cls, d: Dict[str, Any]) -> "SpectrumConfig":
         if not d:
             return cls()
-        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+        base = cls()
+        return cls(
+            instrument_serial=str(d.get("instrument_serial", base.instrument_serial)),
+            freq_mode=str(d.get("freq_mode", base.freq_mode)),
+            start_hz=float(d.get("start_hz", base.start_hz)),
+            stop_hz=float(d.get("stop_hz", base.stop_hz)),
+            center_hz=float(d.get("center_hz", base.center_hz)),
+            span_hz=float(d.get("span_hz", base.span_hz)),
+            rbw_hz=float(d.get("rbw_hz", base.rbw_hz)),
+            vbw_hz=float(d.get("vbw_hz", base.vbw_hz)),
+            ref_level_dbm=float(d.get("ref_level_dbm", base.ref_level_dbm)),
+            y_axis_mode=str(d.get("y_axis_mode", base.y_axis_mode)),
+            y_db_per_div=float(d.get("y_db_per_div", base.y_db_per_div)),
+            y_num_divs=int(d.get("y_num_divs", base.y_num_divs)),
+            y_lim_dbm=_coerce_tuple(d.get("y_lim_dbm"), base.y_lim_dbm),
+            atten_auto=_coerce_bool(d.get("atten_auto", base.atten_auto)),
+            atten_db=float(d.get("atten_db", base.atten_db)),
+            preamp_on=_coerce_optional_bool(d.get("preamp_on", base.preamp_on)),
+            trace_type=str(d.get("trace_type", base.trace_type)),
+            num_averages=int(d.get("num_averages", base.num_averages)),
+            x_units=str(d.get("x_units", base.x_units)),
+        )
 
+
+@dataclass
+class SpectrumFrame:
+    """One acquired and processed spectrum snapshot."""
+
+    freq_hz: "np.ndarray"
+    power_dbm: "np.ndarray"
+    raw_dbm: "np.ndarray"
+    sweep_index: int = 0
+    timestamp: float = 0.0
+    config: SpectrumConfig = field(default_factory=SpectrumConfig)
+    avg_count: int = 1
+
+    def to_dict(self) -> Dict[str, Any]:
+        def _to_list(value: Any) -> List[float]:
+            if hasattr(value, "tolist"):
+                return value.tolist()
+            return list(value)
+
+        return {
+            "freq_hz": _to_list(self.freq_hz),
+            "power_dbm": _to_list(self.power_dbm),
+            "raw_dbm": _to_list(self.raw_dbm),
+            "sweep_index": int(self.sweep_index),
+            "timestamp": float(self.timestamp),
+            "avg_count": int(self.avg_count),
+            "config": self.config.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "SpectrumFrame":
+        if not d:
+            raise ValueError("SpectrumFrame.from_dict requires a dict")
+        return cls(
+            freq_hz=d.get("freq_hz"),
+            power_dbm=d.get("power_dbm"),
+            raw_dbm=d.get("raw_dbm"),
+            sweep_index=int(d.get("sweep_index", 0)),
+            timestamp=float(d.get("timestamp", 0.0)),
+            config=SpectrumConfig.from_dict(d.get("config") or {}),
+            avg_count=int(d.get("avg_count", 1)),
+        )
 
 # ---------------------------------------------------------------------------
 # Daemon status publish
@@ -355,8 +484,8 @@ class DaemonStatus:
     # ---- Rotor (replaces rotor_diagnostics + rotor_fsm_status) ----
     rotor: RotorState = field(default_factory=RotorState)
 
-    # ---- Radio ----
-    radio: RadioState = field(default_factory=RadioState)
+    # ---- Spectrum ----
+    spectrum: Dict = field(default_factory=dict)
 
     # ---- Antenna geometry ----
     beam_width:     float         = 0.0
@@ -427,7 +556,6 @@ class DaemonStatus:
     def to_dict(self) -> dict:
         d = asdict(self)
         d["rotor"] = self.rotor.to_dict()
-        d["radio"] = self.radio.to_dict()
 
         # Legacy flat keys — keeps existing dashboard callbacks working
         d["rotor_diagnostics"] = self.rotor.to_dict()
@@ -438,12 +566,6 @@ class DaemonStatus:
             "retry_count":     self.rotor.retry_count,
             "safe_mode":       self.rotor.safe_mode,
         }
-        d["center_frequency"]     = self.radio.center_frequency
-        d["bandwidth"]            = self.radio.bandwidth
-        d["frequency_correction"] = self.radio.frequency_correction
-        d["temp_sys"]             = self.radio.temp_sys
-        d["temp_cal"]             = self.radio.temp_cal
-        d["cal_power"]            = self.radio.cal_power
         return d
 
     @classmethod
@@ -464,19 +586,9 @@ class DaemonStatus:
             rotor_raw.setdefault("retry_count",      fsm.get("retry_count", 0))
             rotor_raw.setdefault("safe_mode",        fsm.get("safe_mode", False))
 
-        # Radio: prefer nested, fall back to legacy flat keys
-        radio_raw = d.get("radio") or {
-            "center_frequency":     d.get("center_frequency", 0.0),
-            "bandwidth":            d.get("bandwidth", 0.0),
-            "frequency_correction": d.get("frequency_correction", 0.0),
-            "temp_sys":             d.get("temp_sys", 0.0),
-            "temp_cal":             d.get("temp_cal", 0.0),
-            "cal_power":            d.get("cal_power", 1.0),
-        }
-
         skip = {
-            "rotor", "radio", "rotor_diagnostics", "rotor_fsm_status",
-            "center_frequency", "bandwidth", "frequency_correction",
+            "rotor", "rotor_diagnostics", "rotor_fsm_status",
+            "radio", "center_frequency", "bandwidth", "frequency_correction",
             "temp_sys", "temp_cal", "cal_power",
         }
         kwargs = {
@@ -485,5 +597,4 @@ class DaemonStatus:
         }
         inst = cls(**kwargs)
         inst.rotor = RotorState.from_dict(dict(rotor_raw)) if rotor_raw else RotorState()
-        inst.radio = RadioState.from_dict(radio_raw)
         return inst

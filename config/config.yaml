@@ -54,13 +54,24 @@ WEBCAM_DEVICE_INDEX: 0
 WEBCAM_TARGET_FPS: 10
 WEBCAM_JPEG_QUALITY: 70
 WEBCAM_MAX_WIDTH: 960
-SPECTRUM_ANALYZER_ENABLE: false
-SPECTRUM_ANALYZER_SERIAL: SSA3PCED7R1040
-SPECTRUM_ANALYZER_START_HZ: 1415500000
-SPECTRUM_ANALYZER_STOP_HZ: 1425500000
-SPECTRUM_ANALYZER_RBW_HZ: 1000
-SPECTRUM_ANALYZER_VBW_HZ: 100
-SPECTRUM_ANALYZER_REF_LEVEL_DBM: -80
+SPECTRUM_ANALYZER:
+  instrument_serial: "SSA3PCED7R1040"
+  freq_mode: "start_stop"
+  start_hz: 1000000000
+  stop_hz: 1900000000
+  rbw_hz: 1000000
+  vbw_hz: 100000
+  ref_level_dbm: -30
+  y_axis_mode: "db_per_div"
+  y_db_per_div: 10
+  y_num_divs: 10
+  y_lim_dbm: [-120, -30]
+  atten_auto: false
+  atten_db: 0
+  preamp_on: true
+  trace_type: "clear_write"
+  num_averages: 300
+  x_units: "MHz"
 MOTOR_LPR_PARAMS:
   pAzKo:    0.4
   pElKo:    0.4

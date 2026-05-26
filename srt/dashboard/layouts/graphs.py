@@ -740,6 +740,84 @@ def generate_spectrum_graph(bandwidth, cf, spectrum, is_spec_cal):
     return fig
 
 
+def _spectrum_x_scale_and_label(x_units: str) -> tuple[float, str]:
+    units = str(x_units or "").strip().lower()
+    if units == "hz":
+        return 1.0, "Frequency (Hz)"
+    if units == "khz":
+        return 1e3, "Frequency (kHz)"
+    if units == "ghz":
+        return 1e9, "Frequency (GHz)"
+    return 1e6, "Frequency (MHz)"
+
+
+def _apply_spectrum_yaxis(fig, y_dbm: np.ndarray, config) -> None:
+    mode = str(getattr(config, "y_axis_mode", "auto")).lower()
+
+    if y_dbm.size == 0:
+        return
+
+    if mode == "auto":
+        ymin = float(np.nanmin(y_dbm))
+        ymax = float(np.nanmax(y_dbm))
+        margin = max(1.0, 0.05 * abs(ymax - ymin))
+        fig.update_yaxes(range=[ymin - margin, ymax + margin])
+        return
+
+    if mode == "fixed_limits":
+        y_lim = getattr(config, "y_lim_dbm", (-120.0, -30.0))
+        fig.update_yaxes(range=[float(y_lim[0]), float(y_lim[1])])
+        return
+
+    if mode == "db_per_div":
+        y_top = float(getattr(config, "ref_level_dbm", -30.0))
+        y_db_per_div = float(getattr(config, "y_db_per_div", 10.0))
+        y_num_divs = float(getattr(config, "y_num_divs", 10))
+        y_bottom = y_top - y_db_per_div * y_num_divs
+        fig.update_yaxes(range=[y_bottom, y_top], dtick=y_db_per_div)
+        return
+
+    fig.update_yaxes(range=[np.nanmin(y_dbm), np.nanmax(y_dbm)])
+
+
+def build_spectrum_figure(freq_hz, power_dbm, config, sweep_index=0, avg_count=0):
+    """Build a live spectrum plotly figure using SpectrumConfig display settings."""
+    if freq_hz is None or power_dbm is None or len(freq_hz) == 0:
+        return empty_spectrum_figure()
+
+    freq_hz = np.asarray(freq_hz, dtype=float)
+    power_dbm = np.asarray(power_dbm, dtype=float)
+
+    scale, xlabel = _spectrum_x_scale_and_label(getattr(config, "x_units", "MHz"))
+    title = f"Live Spectrum | sweep {sweep_index} | avg {avg_count}"
+
+    fig = go.Figure(
+        data=[
+            go.Scatter(
+                x=freq_hz / scale,
+                y=power_dbm,
+                mode="lines",
+                name="Spectrum",
+            )
+        ],
+        layout={
+            "title": title,
+            "xaxis_title": xlabel,
+            "yaxis_title": "Power (dBm)",
+            "height": 400,
+            "margin": dict(l=30, r=30, b=30, t=50, pad=4),
+            "uirevision": True,
+        },
+    )
+
+    _apply_spectrum_yaxis(fig, power_dbm, config)
+    return fig
+
+
+def empty_spectrum_figure():
+    return emptygraph("Frequency", "Power (dBm)", "Live Spectrum")
+
+
 def emptygraph(xlabel, ylabel, title):
     """Creates an empty figure.
 

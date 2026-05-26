@@ -10,7 +10,7 @@ from time import sleep
 import json
 import logging
 from typing import Any, Callable, Dict, Optional, Tuple
-from ...daemon.rotor_control.types import DaemonStatus, RotorState
+from ...daemon.types import DaemonStatus, RotorState
 
 
 class StatusThread(Thread):

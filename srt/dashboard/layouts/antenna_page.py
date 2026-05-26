@@ -73,7 +73,7 @@ import plotly.graph_objects as go
 from .graphs import generate_pointing_error_graph
 from .navbar import generate_navbar
 
-from ...daemon.rotor_control import RotorState, DaemonStatus
+from ...daemon.types import RotorState, DaemonStatus
 from ...dashboard.messaging.status_fetcher import StatusThread
 
 

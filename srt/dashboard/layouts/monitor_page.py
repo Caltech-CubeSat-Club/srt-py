@@ -43,7 +43,7 @@ from .graphs import (
 from astropy.table import Table
 from srt import config_loader
 
-from ...daemon.rotor_control import DaemonStatus, RotorState
+from ...daemon.types import DaemonStatus, RotorState
 
 
 root_folder = Path(__file__).parent.parent.parent.parent
@@ -300,40 +300,6 @@ def _build_antenna_state_body(motor_status: RotorState | None):
     return html.Div([top_badges, position_row, estop_row, limit_section, amp_section, error_section, meta])
  
 
-
-def generate_first_row():
-    """Generates First Row (Power and Spectrum) Display
-
-    Returns
-    -------
-    Div Containing First Row Objects
-    """
-    return html.Div(
-        [
-            html.Div(
-                [
-                    html.Div(
-                        [dcc.Graph(id="power-graph")],
-                        className="pretty_container six columns",
-                    ),
-                    html.Div(
-                        [
-                            dcc.Graph(id="cal-spectrum-histogram"),
-                            dcc.Graph(id="raw-spectrum-histogram"),
-                        ],
-                        className="pretty_container six columns",
-                    ),
-                ],
-                className="flex-display",
-                style={
-                    "justify-content": "center",
-                    "margin": "5px",
-                },
-            ),
-        ]
-    )
-
-
 def generate_srt_azel():
     """Generates AzEl  Display
 
@@ -485,33 +451,6 @@ def generate_webcam_row():
             )
         ]
     )
-
-
-def generate_second_row():
-    """Generates Second Row (AzEl and AzEl Zoom) Display
-
-    Returns
-    -------
-    Div Containing Second Row Objects
-    """
-    return html.Div(
-        html.Div(
-            [
-                html.Div(
-                    [dcc.Graph(id="az-el-graph")],
-                    className="pretty_container six columns",
-                ),
-
-                html.Div(
-                    [dcc.Graph(id="zoom-graph")],
-                    className="pretty_container six columns",
-                ),
-            ],
-            className="flex-display",
-            style={"margin": dict(l=10, r=5, t=5, b=5)},
-        ),
-    )
-
 
 def generate_popups():
     """Generates all 'Pop-up' Modal Components
@@ -1020,8 +959,6 @@ def generate_layout(config_dict=None):
         dbc.Alert("Recording", color="danger",
                   id="recording-alert", is_open=False),
     ]
-    if radio_enabled:
-        base_srt.append(generate_first_row())
     base_srt.extend([
         generate_srt_azel(),
         generate_srt_second_row(),

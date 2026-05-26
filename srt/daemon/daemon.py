@@ -19,13 +19,10 @@ import logging
 import numpy as np
 
 from .rotor_control import make_driver
-from .rotor_control.types import LprParams, DaemonStatus, RadioState, RotorState
+from .radio_control import SiglentDriver
+from .types import LprParams, DaemonStatus, RotorState, SpectrumConfig
 from .utilities.object_tracker import EphemerisTracker
 from .utilities.functions import azel_within_range
-
-# placeholder
-def get_spectrum(port=5561, timeout=5.0):
-    return None
 
 class SmallRadioTelescopeDaemon:
     """
@@ -152,6 +149,45 @@ class SmallRadioTelescopeDaemon:
         self._rotor_state = RotorState()
         self.observation_events = deque(maxlen=1200)
         self.active_observation = None
+
+        spectrum_config = self._load_spectrum_config(config_dict)
+        self.spectrum_driver = SiglentDriver(spectrum_config)
+
+    def _load_spectrum_config(self, config_dict) -> SpectrumConfig:
+        block = config_dict.get("SPECTRUM_ANALYZER")
+        if isinstance(block, dict):
+            return SpectrumConfig.from_dict(block)
+
+        legacy = {}
+        if "SPECTRUM_ANALYZER_SERIAL" in config_dict:
+            legacy["instrument_serial"] = config_dict.get("SPECTRUM_ANALYZER_SERIAL")
+        if "SPECTRUM_ANALYZER_START_HZ" in config_dict:
+            legacy["start_hz"] = config_dict.get("SPECTRUM_ANALYZER_START_HZ")
+        if "SPECTRUM_ANALYZER_STOP_HZ" in config_dict:
+            legacy["stop_hz"] = config_dict.get("SPECTRUM_ANALYZER_STOP_HZ")
+        if "SPECTRUM_ANALYZER_RBW_HZ" in config_dict:
+            legacy["rbw_hz"] = config_dict.get("SPECTRUM_ANALYZER_RBW_HZ")
+        if "SPECTRUM_ANALYZER_VBW_HZ" in config_dict:
+            legacy["vbw_hz"] = config_dict.get("SPECTRUM_ANALYZER_VBW_HZ")
+        if "SPECTRUM_ANALYZER_REF_LEVEL_DBM" in config_dict:
+            legacy["ref_level_dbm"] = config_dict.get("SPECTRUM_ANALYZER_REF_LEVEL_DBM")
+
+        if legacy:
+            return SpectrumConfig.from_dict(legacy)
+        return SpectrumConfig()
+
+    @staticmethod
+    def _parse_key_value_pairs(parts):
+        updates = {}
+        for part in parts:
+            if "=" not in part:
+                continue
+            key, value = part.split("=", 1)
+            key = key.strip()
+            if not key:
+                continue
+            updates[key] = value.strip().strip("\"").strip("'")
+        return updates
 
     def log_message(self, message):
         """Writes Contents to a Logging List and Prints
@@ -603,6 +639,10 @@ class SmallRadioTelescopeDaemon:
         None
         """
         self.keep_running = False
+        try:
+            self.spectrum_driver.stop()
+        except Exception:
+            pass
 
     def find_object_location(self, name):
         """Get azel location of given object and sets as rotor location. 
@@ -799,7 +839,16 @@ class SmallRadioTelescopeDaemon:
         
         while self.keep_running:
             try:
-                radio = RadioState( )
+                frame = self.spectrum_driver.get_latest()
+                spectrum_payload = {
+                    "freq_hz": frame.freq_hz.tolist() if frame else [],
+                    "power_dbm": frame.power_dbm.tolist() if frame else [],
+                    "sweep_index": frame.sweep_index if frame else 0,
+                    "timestamp": frame.timestamp if frame else 0.0,
+                    "avg_count": frame.avg_count if frame else 0,
+                    "config": self.spectrum_driver.get_config().to_dict(),
+                    "connected": self.spectrum_driver.connected,
+                }
                 try:
                     serial_comms = self.rotor.get_recent_serial_communications(limit=12)
                 except Exception:
@@ -811,7 +860,7 @@ class SmallRadioTelescopeDaemon:
 
                 status = DaemonStatus(
                     rotor = self._rotor_state,
-                    radio = radio,
+                    spectrum = spectrum_payload,
                     beam_width = self.beamwidth,
                     az_limits = self.az_limits,
                     el_limits = self.el_limits,
@@ -833,7 +882,6 @@ class SmallRadioTelescopeDaemon:
                     command_history = cmd_history,
                     n_point_data = self.n_point_data,
                     beam_switch_data = self.beam_switch_data,
-                    cal_values = self.cal_values,
                     emergency_contact = self.contact,
                     time = time()
                 )
@@ -958,6 +1006,14 @@ class SmallRadioTelescopeDaemon:
                     self.point_at_offset(
                         float(command_parts[1]), float(command_parts[2])
                     )
+                elif command_name == "spectrum_config":
+                    updates = self._parse_key_value_pairs(command_parts[1:])
+                    if updates:
+                        self.spectrum_driver.update_config(updates)
+                elif command_name == "spectrum_start":
+                    self.spectrum_driver.start()
+                elif command_name == "spectrum_stop":
+                    self.spectrum_driver.stop()
                 elif (
                     command_name.isnumeric()
                 ):  # If Command is a Number, Sleep that Long
@@ -990,3 +1046,8 @@ class SmallRadioTelescopeDaemon:
                 self.log_message(str(e))
             except ConnectionRefusedError as e:
                 self.log_message(str(e))
+
+        try:
+            self.spectrum_driver.stop()
+        except Exception:
+            pass

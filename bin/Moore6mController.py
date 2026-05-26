@@ -56,7 +56,7 @@ except Exception:
     tk = None
 
 from srt.daemon.rotor_control import make_driver
-from srt.daemon.rotor_control.types import LprParams
+from srt.daemon.types import LprParams
 from srt import config_loader
 
 
@@ -283,6 +283,44 @@ class Moore6mController:
             t.join(timeout=5.0)
         self._log("Daemon stopped")
 
+    def start_spectrum(self) -> bool:
+        d = getattr(self, "_daemon_obj", None)
+        if d is None:
+            self._log("Spectrum start requested but daemon not running")
+            return False
+        try:
+            d.spectrum_driver.start()
+            self._log("Spectrum driver start requested")
+            return True
+        except Exception:
+            logging.exception("Failed to start spectrum driver")
+            self._log("ERROR: spectrum driver failed to start")
+            return False
+
+    def stop_spectrum(self):
+        d = getattr(self, "_daemon_obj", None)
+        if d is None:
+            self._log("Spectrum stop requested but daemon not running")
+            return
+        try:
+            d.spectrum_driver.stop()
+            self._log("Spectrum driver stopped")
+        except Exception:
+            logging.exception("Failed to stop spectrum driver")
+            self._log("ERROR: spectrum driver failed to stop")
+
+    def spectrum_status(self) -> str:
+        d = getattr(self, "_daemon_obj", None)
+        if d is None:
+            return "daemon stopped"
+        driver = getattr(d, "spectrum_driver", None)
+        if driver is None:
+            return "unavailable"
+        running = bool(getattr(driver, "running", False))
+        if not running:
+            return "stopped"
+        return "connected" if driver.connected else "running"
+
     def daemon_is_running(self) -> bool:
         t = getattr(self, '_daemon_proc', None)
         return bool(t and t.is_alive())
@@ -480,12 +518,14 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
 
     daemon_status_var    = tk.StringVar(value="stopped")
     dashboard_status_var = tk.StringVar(value="stopped")
+    spectrum_status_var  = tk.StringVar(value="stopped")
 
     def _refresh_svc():
         daemon_status_var.set(
             "running" if controller.daemon_is_running() else "stopped")
         dashboard_status_var.set(
             "running" if controller.dashboard_is_running() else "stopped")
+        spectrum_status_var.set(controller.spectrum_status())
 
     def _start_daemon():
         controller.start_daemon()
@@ -503,6 +543,14 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
         threading.Thread(target=controller.stop_dashboard, daemon=True).start()
         root.after(500, _refresh_svc)
 
+    def _start_spectrum():
+        controller.start_spectrum()
+        _refresh_svc()
+
+    def _stop_spectrum():
+        threading.Thread(target=controller.stop_spectrum, daemon=True).start()
+        root.after(500, _refresh_svc)
+
     ttk.Button(svc_frm, text="Start Daemon",    command=_start_daemon).grid(
         row=0, column=0, padx=4, pady=2)
     ttk.Button(svc_frm, text="Stop Daemon",     command=_stop_daemon).grid(
@@ -518,6 +566,14 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
     ttk.Label(svc_frm,  text="Dashboard:").grid(row=1, column=2, padx=(12, 2))
     ttk.Label(svc_frm,  textvariable=dashboard_status_var).grid(
         row=1, column=3, padx=(0, 12))
+
+    ttk.Button(svc_frm, text="Start Spectrum", command=_start_spectrum).grid(
+        row=2, column=0, padx=4, pady=2)
+    ttk.Button(svc_frm, text="Stop Spectrum",  command=_stop_spectrum).grid(
+        row=2, column=1, padx=4, pady=2)
+    ttk.Label(svc_frm,  text="Spectrum:").grid(row=2, column=2, padx=(12, 2))
+    ttk.Label(svc_frm,  textvariable=spectrum_status_var).grid(
+        row=2, column=3, padx=(0, 12))
 
     # ---- Motor control ----
     motor_frm = ttk.LabelFrame(root, text="Motor Control", padding=6)
