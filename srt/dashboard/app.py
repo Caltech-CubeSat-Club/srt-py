@@ -191,8 +191,6 @@ def generate_app(config_dir, config_dict):
     status_thread = StatusThread(port=5555)
     status_thread.start()
 
-    radio_cfg = status_thread.get_status().spectrum
-
     command_thread = CommandThread(port=5556)
     command_thread.start()
 
@@ -366,7 +364,7 @@ def generate_app(config_dir, config_dict):
             monitor_page.generate_layout(config_dict),
             system_page.generate_layout(),
             antenna_page.generate_layout(),
-            spectrum_page.generate_layout(radio_cfg),
+            spectrum_page.generate_layout(config_dict),
         ]
     )  # Necessary for Allowing Other Files to Create Callbacks
 
@@ -570,7 +568,7 @@ def generate_app(config_dir, config_dict):
         elif pathname == f"/{pages['Antenna Page']}": 
             return antenna_page.generate_layout()
         elif pathname == f"/{pages['Spectrum Page']}":
-            return spectrum_page.generate_layout(radio_cfg)
+            return spectrum_page.generate_layout(config_dict)
         # If the user tries to reach a different page, return a 404 message
         return dbc.Container(
             [
