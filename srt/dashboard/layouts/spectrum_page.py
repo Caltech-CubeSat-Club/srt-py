@@ -90,20 +90,11 @@ def _live_config_from_status(status) -> Optional[SpectrumConfig]:
     return SpectrumConfig.from_dict(cfg if isinstance(cfg, dict) else cfg.to_dict())
 
 
-def _describe_target(status) -> str:
+def _describe_target(status: DaemonStatus) -> str:
     """Return a string like 'Moon az=250.2 el=45.1' or 'az=180.0 el=30.0'."""
-    if status is None:
-        return ""
-    if isinstance(status, dict):
-        azel = status.get("motor_azel") or (0.0, 0.0)
-        queued = status.get("queued_item") or ""
-    else:
-        azel = getattr(status, "motor_azel", (0.0, 0.0))
-        queued = getattr(status, "queued_item", "")
-    az, el = float(azel[0]), float(azel[1])
-    if queued and queued not in ("None", "none", ""):
-        return f"{queued} az={az:.2f} el={el:.2f}"
-    return f"az={az:.2f} el={el:.2f}"
+    if status.queued_item and status.queued_item not in ("None", "none", ""):
+        return f"{status.queued_item} az={status.az:.2f} el={status.el:.2f}"
+    return f"az={status.az:.2f} el={status.el:.2f}"
 
 
 def _make_csv_header(config: SpectrumConfig, target_str: str, sweep_index: int, avg_count: int) -> str:
@@ -516,114 +507,7 @@ def register_callbacks(app, config, status_thread, command_thread):
         )
 
     # ------------------------------------------------------------------
-    # Individual field send (debounced inputs fire on change)
-    # Each one sends only its own field immediately.
-    # ------------------------------------------------------------------
-
-    def _send_single(key, value):
-        if value is None:
-            return
-        if isinstance(value, bool):
-            value_str = "true" if value else "false"
-        elif value is None:
-            value_str = "none"
-        else:
-            value_str = str(value)
-        command_thread.add_to_queue(f"spectrum_config {key}={value_str}")
-
-    # Fields that map directly to SpectrumConfig keys
-    _direct_fields = [
-        ("spectrum-instrument-serial", "instrument_serial", str),
-        ("spectrum-freq-mode",         "freq_mode",         str),
-        ("spectrum-start-hz",          "start_hz",          float),
-        ("spectrum-stop-hz",           "stop_hz",           float),
-        ("spectrum-center-hz",         "center_hz",         float),
-        ("spectrum-span-hz",           "span_hz",           float),
-        ("spectrum-rbw-hz",            "rbw_hz",            float),
-        ("spectrum-vbw-hz",            "vbw_hz",            float),
-        ("spectrum-ref-level",         "ref_level_dbm",     float),
-        ("spectrum-atten-db",          "atten_db",          float),
-        ("spectrum-trace-type",        "trace_type",        str),
-        ("spectrum-num-averages",      "num_averages",      int),
-        ("spectrum-x-units",           "x_units",           str),
-        ("spectrum-y-axis-mode",       "y_axis_mode",       str),
-        ("spectrum-y-db-per-div",      "y_db_per_div",      float),
-        ("spectrum-y-num-divs",        "y_num_divs",        int),
-    ]
-
-    for input_id, config_key, cast in _direct_fields:
-        # Use default arg capture to avoid closure-over-loop-variable bug
-        @app.callback(
-            Output(input_id, "valid"),
-            Input(input_id, "value"),
-            prevent_initial_call=True,
-        )
-        def _send_field(value, _key=config_key, _cast=cast):
-            if value is None:
-                raise PreventUpdate
-            try:
-                _send_single(_key, _cast(value))
-            except (ValueError, TypeError):
-                pass
-            return False  # valid=False means no green border — we don't want validation styling
-
-    # Attenuation auto toggle (select → bool)
-    @app.callback(
-        Output("spectrum-atten-auto", "valid"),
-        Input("spectrum-atten-auto", "value"),
-        prevent_initial_call=True,
-    )
-    def _send_atten_auto(value):
-        if value is None:
-            raise PreventUpdate
-        _send_single("atten_auto", value == "auto")
-        return False
-
-    # Preamp toggle (select → bool | None)
-    @app.callback(
-        Output("spectrum-preamp", "valid"),
-        Input("spectrum-preamp", "value"),
-        prevent_initial_call=True,
-    )
-    def _send_preamp(value):
-        if value is None:
-            raise PreventUpdate
-        preamp_on = True if value == "on" else (False if value == "off" else None)
-        _send_single("preamp_on", "none" if preamp_on is None
-                     else ("true" if preamp_on else "false"))
-        return False
-
-    # y_lim_dbm — two inputs combine into one tuple
-    @app.callback(
-        Output("spectrum-y-lim-min", "valid"),
-        Input("spectrum-y-lim-min", "value"),
-        State("spectrum-y-lim-max", "value"),
-        prevent_initial_call=True,
-    )
-    def _send_y_lim_min(y_min, y_max):
-        if y_min is None or y_max is None:
-            raise PreventUpdate
-        command_thread.add_to_queue(
-            f"spectrum_config y_lim_dbm={float(y_min)},{float(y_max)}"
-        )
-        return False
-
-    @app.callback(
-        Output("spectrum-y-lim-max", "valid"),
-        Input("spectrum-y-lim-max", "value"),
-        State("spectrum-y-lim-min", "value"),
-        prevent_initial_call=True,
-    )
-    def _send_y_lim_max(y_max, y_min):
-        if y_min is None or y_max is None:
-            raise PreventUpdate
-        command_thread.add_to_queue(
-            f"spectrum_config y_lim_dbm={float(y_min)},{float(y_max)}"
-        )
-        return False
-
-    # ------------------------------------------------------------------
-    # Apply all (manual bulk fallback)
+    # Apply all
     # ------------------------------------------------------------------
 
     @app.callback(
