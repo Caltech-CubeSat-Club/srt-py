@@ -439,7 +439,7 @@ def register_callbacks(app, config, status_thread, command_thread):
 
     @app.callback(
         [Output(cid, "value") for cid in _live_inputs],
-        Input("interval-component", "n_intervals"),
+        Input("spectrum-connection", "children"), # Update when connection status changes
         prevent_initial_call=False,
     )
     def sync_controls_from_live(n):
