@@ -780,7 +780,7 @@ def _apply_spectrum_yaxis(fig, y_dbm: np.ndarray, config) -> None:
     fig.update_yaxes(range=[np.nanmin(y_dbm), np.nanmax(y_dbm)])
 
 
-def build_spectrum_figure(freq_hz, power_dbm, config, sweep_index=0, avg_count=0):
+def build_spectrum_figure(freq_hz, power_dbm, config, sweep_index=0, avg_count=0, title_extra: str = ""):
     """Build a live spectrum plotly figure using SpectrumConfig display settings."""
     if freq_hz is None or power_dbm is None or len(freq_hz) == 0:
         return empty_spectrum_figure()
@@ -789,7 +789,7 @@ def build_spectrum_figure(freq_hz, power_dbm, config, sweep_index=0, avg_count=0
     power_dbm = np.asarray(power_dbm, dtype=float)
 
     scale, xlabel = _spectrum_x_scale_and_label(getattr(config, "x_units", "MHz"))
-    title = f"Live Spectrum | sweep {sweep_index} | avg {avg_count}"
+    title = f"Live Spectrum | sweep {sweep_index} | avg {avg_count} {title_extra}".strip()
 
     fig = go.Figure(
         data=[
