@@ -485,7 +485,7 @@ class DaemonStatus:
     rotor: RotorState = field(default_factory=RotorState)
 
     # ---- Spectrum ----
-    spectrum: Dict = field(default_factory=dict)
+    spectrum: SpectrumConfig = field(default_factory=SpectrumConfig)
 
     # ---- Antenna geometry ----
     beam_width:     float         = 0.0

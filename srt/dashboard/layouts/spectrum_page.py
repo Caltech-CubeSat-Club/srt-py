@@ -136,11 +136,10 @@ def _make_export_filename(config: SpectrumConfig, target_str: str, ext: str) -> 
 # Layout
 # ---------------------------------------------------------------------------
 
-def generate_layout(config_dict=None):
+def generate_layout(config: SpectrumConfig = None):
     # Use defaults — live values loaded by callback on page load
-    config = SpectrumConfig()
-    if isinstance(config_dict, dict) and isinstance(config_dict.get("SPECTRUM_ANALYZER"), dict):
-        config = SpectrumConfig.from_dict(config_dict["SPECTRUM_ANALYZER"])
+    if config is None:
+        config = SpectrumConfig()
 
     frequency_group = _card("Frequency", [
         _label("Instrument serial"),
@@ -425,46 +424,46 @@ def register_callbacks(app, config, status_thread, command_thread):
     # Uses n_intervals so it updates once after page load.
     # ------------------------------------------------------------------
 
-    _live_inputs = [
-        "spectrum-instrument-serial", "spectrum-freq-mode",
-        "spectrum-start-hz", "spectrum-stop-hz",
-        "spectrum-center-hz", "spectrum-span-hz",
-        "spectrum-rbw-hz", "spectrum-vbw-hz",
-        "spectrum-ref-level", "spectrum-atten-auto", "spectrum-atten-db",
-        "spectrum-preamp", "spectrum-trace-type", "spectrum-num-averages",
-        "spectrum-x-units", "spectrum-y-axis-mode",
-        "spectrum-y-db-per-div", "spectrum-y-num-divs",
-        "spectrum-y-lim-min", "spectrum-y-lim-max",
-    ]
+    # _live_inputs = [
+    #     "spectrum-instrument-serial", "spectrum-freq-mode",
+    #     "spectrum-start-hz", "spectrum-stop-hz",
+    #     "spectrum-center-hz", "spectrum-span-hz",
+    #     "spectrum-rbw-hz", "spectrum-vbw-hz",
+    #     "spectrum-ref-level", "spectrum-atten-auto", "spectrum-atten-db",
+    #     "spectrum-preamp", "spectrum-trace-type", "spectrum-num-averages",
+    #     "spectrum-x-units", "spectrum-y-axis-mode",
+    #     "spectrum-y-db-per-div", "spectrum-y-num-divs",
+    #     "spectrum-y-lim-min", "spectrum-y-lim-max",
+    # ]
 
-    @app.callback(
-        [Output(cid, "value") for cid in _live_inputs],
-        Input("spectrum-connection", "children"), # Update when connection status changes
-        prevent_initial_call=False,
-    )
-    def sync_controls_from_live(n):
-        status = status_thread.get_status()
-        cfg = _live_config_from_status(status)
-        if cfg is None:
-            raise PreventUpdate
+    # @app.callback(
+    #     [Output(cid, "value") for cid in _live_inputs],
+    #     Input("spectrum-connection", "children"), # Update when connection status changes
+    #     prevent_initial_call=False,
+    # )
+    # def sync_controls_from_live(n):
+    #     status = status_thread.get_status()
+    #     cfg = _live_config_from_status(status)
+    #     if cfg is None:
+    #         raise PreventUpdate
 
-        return [
-            cfg.instrument_serial,
-            cfg.freq_mode,
-            cfg.start_hz, cfg.stop_hz,
-            cfg.center_hz, cfg.span_hz,
-            cfg.rbw_hz, cfg.vbw_hz,
-            cfg.ref_level_dbm,
-            "auto" if cfg.atten_auto else "manual",
-            cfg.atten_db,
-            ("on" if cfg.preamp_on is True else "off" if cfg.preamp_on is False else "keep"),
-            cfg.trace_type,
-            cfg.num_averages,
-            cfg.x_units,
-            cfg.y_axis_mode,
-            cfg.y_db_per_div, cfg.y_num_divs,
-            cfg.y_lim_dbm[0], cfg.y_lim_dbm[1],
-        ]
+    #     return [
+    #         cfg.instrument_serial,
+    #         cfg.freq_mode,
+    #         cfg.start_hz, cfg.stop_hz,
+    #         cfg.center_hz, cfg.span_hz,
+    #         cfg.rbw_hz, cfg.vbw_hz,
+    #         cfg.ref_level_dbm,
+    #         "auto" if cfg.atten_auto else "manual",
+    #         cfg.atten_db,
+    #         ("on" if cfg.preamp_on is True else "off" if cfg.preamp_on is False else "keep"),
+    #         cfg.trace_type,
+    #         cfg.num_averages,
+    #         cfg.x_units,
+    #         cfg.y_axis_mode,
+    #         cfg.y_db_per_div, cfg.y_num_divs,
+    #         cfg.y_lim_dbm[0], cfg.y_lim_dbm[1],
+    #     ]
 
     # ------------------------------------------------------------------
     # Toggle visibility callbacks (instant, no server round-trip needed,
