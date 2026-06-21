@@ -505,7 +505,7 @@ class DaemonStatus:
     # ---- Ephemeris ----
     object_locs:      Dict  = field(default_factory=dict)
     object_time_locs: Dict  = field(default_factory=dict)
-    vlsr:             Dict = {}
+    vlsr:             Dict = field(default_factory=dict)
 
     # ---- Pointing ----
     motor_offsets:          Tuple         = (0.0, 0.0)
