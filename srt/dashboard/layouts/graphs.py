@@ -19,7 +19,8 @@ def generate_az_el_graph(
     stow_position,
     cal_position,
     horizon_points,
-    beam_width
+    beam_width,
+    future_points_dict=None,
 ):
     """Generates Figure for Displaying AzEl Locations
 
@@ -40,7 +41,7 @@ def generate_az_el_graph(
     horizon_points : list((float, float))
         Points to Build Outline of Horizon of Interfering Objects (i.e. Skyline in AzEl)
     beam_width : float
-        Beamwidth of the antenna
+        Beamwidth of the antenna in degrees
 
     Returns
     -------
@@ -53,45 +54,98 @@ def generate_az_el_graph(
     el_lower_display_lim = 0
     el_upper_display_lim = 90
 
-    # Markers for celestial objects
+    # Markers for celestial objects - with proper click support
     fig.add_trace(
         go.Scatter(
             x=[points_dict[name][0] for name in points_dict],
             y=[points_dict[name][1] for name in points_dict],
             text=[name for name in points_dict],
-            # hovertext=[name for name in points_dict],
             name="Celestial Objects",
             mode="markers+text",
             textposition="top center",
-            marker_color=["rgba(152, 0, 0, .8)" for _ in points_dict],
+            marker=dict(
+                color="rgba(152, 0, 0, .8)",
+                size=8,
+            ),
+            hovertemplate="<b>%{text}</b><extra></extra>",
+            hoverlabel=dict(namelength=-1),
         )
     )
 
-    # Marker for visability, basicaslly beamwidth  with azimuth stretched out for high elevation angles.
+    # Optional future trajectories - shown with subtle opacity, more visible on hover
+    if isinstance(future_points_dict, dict) and future_points_dict:
+        # Parse offset keys safely (JSON deserialization converts int keys to strings)
+        offsets = []
+        for k in future_points_dict.keys():
+            try:
+                offset_int = int(k) if isinstance(k, str) else k
+                # Skip offset=0 to avoid blocking current object position
+                if offset_int > 0:
+                    offsets.append(offset_int)
+            except (ValueError, TypeError):
+                continue
+        offsets = sorted(offsets)
+
+        for name in points_dict:
+            xs = []
+            ys = []
+            times = []
+            customdata = []
+            for offset in offsets:
+                # Look up using string key (from JSON) or int key
+                offset_key = str(offset) if str(offset) in future_points_dict else offset
+                pos = future_points_dict.get(offset_key, {}).get(name)
+                if not (isinstance(pos, (list, tuple)) and len(pos) == 2):
+                    continue
+                # Explicitly skip offset==0 regardless of key type (redundant, but extra safe)
+                if int(offset) == 0:
+                    continue
+                az_val, el_val = float(pos[0]), float(pos[1])
+                xs.append(az_val)
+                ys.append(el_val)
+                # Add trajectory info to hovertext
+                hours = float(offset) / 3600.0
+                times.append(f"{hours:.1f}h")
+                customdata.append({"name": name, "offset": offset})
+
+            # Only plot if there are at least 2 valid (non-0h) points
+            if len(xs) >= 2:
+                fig.add_trace(
+                    go.Scatter(
+                        x=xs,
+                        y=ys,
+                        mode="lines+markers",
+                        line={"dash": "dot", "width": 1, "color": "rgba(100, 0, 0, 0.5)"},
+                        marker={"size": 3, "color": "rgba(100, 0, 0, 0.5)"},
+                        opacity=0.4,  # Slightly darker and more visible
+                        text=[name]*len(xs),
+                        customdata=customdata,
+                        hovertext=[f"{name} +{t}" for t in times],
+                        hoverinfo="text",
+                        showlegend=False,
+                        name=f"{name} (future)",
+                    )
+                )
+
+    # Beam footprint marker: ellipse in Az/El with azimuth stretch by cos(elevation).
 
     az_l = current_location[0]
     el_l = current_location[1]
-    el_u = el_l + .5*beam_width
-    el_d = el_l - .5*beam_width
+    el_radius = 0.5 * beam_width
+    cos_el = np.cos(el_l * np.pi / 180.0)
+    az_radius = el_radius / max(abs(cos_el), 1e-3)
 
-    azu = .5*beam_width/np.cos(el_u * np.pi / 180.0)
-    azd = .5*beam_width/np.cos(el_d * np.pi / 180.0)
-    x_vec = [max(az_l-azd, 0), min(az_l-azu, 360),
-             max(az_l+azu, 0), min(az_l+azd, 360), max(az_l-azd, 0)]
-    y_vec = [max(el_d, 0), min(el_u, 90), min(
-        el_u, 90), min(el_d, 90), max(el_d, 0)]
-
-    fig.add_trace(
-        go.Scatter(
-            x=x_vec,
-            y=y_vec,
-            fill="toself",
-            fillcolor="rgba(147,112,219,0.1)",
-            text=["Visability"],
-            name='Visability',
-            mode="markers",
-            marker_color=["rgba(147,112,219, .8)" for _ in x_vec]
-        )
+    fig.add_shape(
+        type="circle",
+        xref="x",
+        yref="y",
+        x0=max(0, az_l - az_radius),
+        y0=max(0, el_l - el_radius),
+        x1=min(360, az_l + az_radius),
+        y1=min(90, el_l + el_radius),
+        fillcolor="rgba(147,112,219,0.1)",
+        line=dict(color="rgba(147,112,219,0.8)", width=1),
+        layer="below",
     )
 
     fig.add_trace(
@@ -234,7 +288,7 @@ def generate_az_el_graph(
                     y=1.02, xanchor="right", x=1),
     )
     fig.update_xaxes(range=[az_lower_display_lim, az_upper_display_lim])
-    fig.update_yaxes(range=[el_lower_display_lim, el_upper_display_lim])
+    fig.update_yaxes(range=[-30, el_upper_display_lim])  # Allow zooming to negative elevations
 
     return fig
 
@@ -294,18 +348,20 @@ def generate_zoom_graph(
             marker_color=["rgba(152, 0, 0, .8)" for _ in points_dict],
         )
     )
+    el_radius = 0.5 * beam_width
+    cos_el = np.cos(current_location[1] * np.pi / 180.0)
+    az_radius = el_radius / max(abs(cos_el), 1e-3)
     fig.add_shape(
-        type="rect",
+        type="circle",
         xref="x",
         yref="y",
-        x0=current_location[0]-beam_width,
-        y0=current_location[1]-beam_width,
-        x1=current_location[0]+beam_width,
-        y1=current_location[1]+beam_width,
+        x0=current_location[0] - az_radius,
+        y0=current_location[1] - el_radius,
+        x1=current_location[0] + az_radius,
+        y1=current_location[1] + el_radius,
         fillcolor="lightgrey",
+        line=dict(color="rgba(120,120,120,0.9)", width=1),
         layer="below",
-        label=dict(text="Beamwidth", textposition="top center",
-                   font=dict(color="White"))
     )
 
     fig.update_layout(
@@ -385,24 +441,21 @@ def generate_az_time_graph(
 
     # Markers for celestial objects
 
-    for name in points_time_dict['0']:
+    # Only plot for time keys > 0 (skip '0' or 0)
+    time_keys = [k for k in points_time_dict.keys() if str(k) != '0' and float(k) != 0.0]
+    if not time_keys:
+        return fig
+    for name in points_time_dict.get('0', {}):
         fig.add_trace(
             go.Scatter(
-                x=[float(time) for time in points_time_dict],
-
-                y=[points_time_dict[time][name][0]
-                    for time in points_time_dict],
-
+                x=[float(time) for time in time_keys],
+                y=[points_time_dict[time][name][0] for time in time_keys],
                 text=str(name),
-
-                hovertext=['(Azimuth: %s, Elevation: %s)' % (round(points_time_dict[time][name][0], 2), round(points_time_dict[time][name][1], 2))
-                           for time in points_time_dict],
-
+                hovertext=['(Azimuth: %s, Elevation: %s)' % (round(points_time_dict[time][name][0], 2), round(points_time_dict[time][name][1], 2)) for time in time_keys],
                 name=str(name),
                 mode="markers+text",
                 showlegend=False,
                 textposition="top right",
-                # marker_color=["rgba(152, 0, 0, .8)" for _ in points_time_dict],
             )
         )
 
@@ -498,24 +551,21 @@ def generate_el_time_graph(
 
     # Markers for celestial objects
 
-    for name in points_time_dict['0']:
+    # Only plot for time keys > 0 (skip '0' or 0)
+    time_keys = [k for k in points_time_dict.keys() if str(k) != '0' and float(k) != 0.0]
+    if not time_keys:
+        return fig
+    for name in points_time_dict.get('0', {}):
         fig.add_trace(
             go.Scatter(
-                x=[float(time) for time in points_time_dict],
-
-                y=[points_time_dict[time][name][1]
-                    for time in points_time_dict],
-
+                x=[float(time) for time in time_keys],
+                y=[points_time_dict[time][name][1] for time in time_keys],
                 text=str(name),
-
-                hovertext=['(Azimuth: %s, Elevation: %s)' % (round(points_time_dict[time][name][0], 2), round(points_time_dict[time][name][1], 2))
-                           for time in points_time_dict],
-
+                hovertext=['(Azimuth: %s, Elevation: %s)' % (round(points_time_dict[time][name][0], 2), round(points_time_dict[time][name][1], 2)) for time in time_keys],
                 name=str(name),
                 mode="markers+text",
                 showlegend=False,
                 textposition="top right",
-                # marker_color=["rgba(152, 0, 0, .8)" for _ in points_time_dict],
             )
         )
 
@@ -690,6 +740,84 @@ def generate_spectrum_graph(bandwidth, cf, spectrum, is_spec_cal):
     return fig
 
 
+def _spectrum_x_scale_and_label(x_units: str) -> tuple[float, str]:
+    units = str(x_units or "").strip().lower()
+    if units == "hz":
+        return 1.0, "Frequency (Hz)"
+    if units == "khz":
+        return 1e3, "Frequency (kHz)"
+    if units == "ghz":
+        return 1e9, "Frequency (GHz)"
+    return 1e6, "Frequency (MHz)"
+
+
+def _apply_spectrum_yaxis(fig, y_dbm: np.ndarray, config) -> None:
+    mode = str(getattr(config, "y_axis_mode", "auto")).lower()
+
+    if y_dbm.size == 0:
+        return
+
+    if mode == "auto":
+        ymin = float(np.nanmin(y_dbm))
+        ymax = float(np.nanmax(y_dbm))
+        margin = max(1.0, 0.05 * abs(ymax - ymin))
+        fig.update_yaxes(range=[ymin - margin, ymax + margin])
+        return
+
+    if mode == "fixed_limits":
+        y_lim = getattr(config, "y_lim_dbm", (-120.0, -30.0))
+        fig.update_yaxes(range=[float(y_lim[0]), float(y_lim[1])])
+        return
+
+    if mode == "db_per_div":
+        y_top = float(getattr(config, "ref_level_dbm", -30.0))
+        y_db_per_div = float(getattr(config, "y_db_per_div", 10.0))
+        y_num_divs = float(getattr(config, "y_num_divs", 10))
+        y_bottom = y_top - y_db_per_div * y_num_divs
+        fig.update_yaxes(range=[y_bottom, y_top], dtick=y_db_per_div)
+        return
+
+    fig.update_yaxes(range=[np.nanmin(y_dbm), np.nanmax(y_dbm)])
+
+
+def build_spectrum_figure(freq_hz, power_dbm, config, sweep_index=0, avg_count=0, title_extra: str = ""):
+    """Build a live spectrum plotly figure using SpectrumConfig display settings."""
+    if freq_hz is None or power_dbm is None or len(freq_hz) == 0:
+        return empty_spectrum_figure()
+
+    freq_hz = np.asarray(freq_hz, dtype=float)
+    power_dbm = np.asarray(power_dbm, dtype=float)
+
+    scale, xlabel = _spectrum_x_scale_and_label(getattr(config, "x_units", "MHz"))
+    title = f"Live Spectrum | sweep {sweep_index} | avg {avg_count} {title_extra}".strip()
+
+    fig = go.Figure(
+        data=[
+            go.Scatter(
+                x=freq_hz / scale,
+                y=power_dbm,
+                mode="lines",
+                name="Spectrum",
+            )
+        ],
+        layout={
+            "title": title,
+            "xaxis_title": xlabel,
+            "yaxis_title": "Power (dBm)",
+            "height": 400,
+            "margin": dict(l=30, r=30, b=30, t=50, pad=4),
+            "uirevision": True,
+        },
+    )
+
+    _apply_spectrum_yaxis(fig, power_dbm, config)
+    return fig
+
+
+def empty_spectrum_figure():
+    return emptygraph("Frequency", "Power (dBm)", "Live Spectrum")
+
+
 def emptygraph(xlabel, ylabel, title):
     """Creates an empty figure.
 
@@ -712,6 +840,90 @@ def emptygraph(xlabel, ylabel, title):
         layout={"title": title, "xaxis_title": xlabel, "yaxis_title": ylabel}
     )
 
+    return fig
+
+
+def generate_pointing_error_graph(error_history, timerange, axisstatus=None):
+    """Generates a time-series graph for az/el pointing errors in millidegrees.
+    
+    Always displays both Az and El on the same plot.
+    Y-axis is clamped to ±1000 mdeg.
+    axisstatus parameter is ignored (kept for backward compatibility).
+    """
+    if not timerange:
+        timerange = 5
+
+    if not error_history:
+        error_history = [
+            {"time": 0.0, "azerr_mdeg": 0.0, "elerr_mdeg": 0.0},
+            {"time": float(timerange) * 60.0, "azerr_mdeg": 0.0, "elerr_mdeg": 0.0},
+        ]
+
+    times_raw = [
+        pt.get("time")
+        for pt in error_history
+        if isinstance(pt, dict)
+        and isinstance(pt.get("time"), (int, float))
+    ]
+    if not times_raw:
+        times_raw = [0.0]
+
+    newest_t = max(times_raw)
+    cutoff = newest_t - 60.0 * float(timerange)
+    filtered = [
+        pt for pt in error_history
+        if isinstance(pt, dict)
+        and isinstance(pt.get("time"), (int, float))
+        and pt["time"] >= cutoff
+    ]
+    if not filtered:
+        filtered = error_history
+
+    xvals = [
+        (pt["time"] - newest_t)
+        if isinstance(pt, dict)
+        and isinstance(pt.get("time"), (int, float))
+        else None
+        for pt in filtered
+    ]
+    azvals = [pt.get("azerr_mdeg", np.nan) for pt in filtered]
+    elvals = [pt.get("elerr_mdeg", np.nan) for pt in filtered]
+
+    fig = go.Figure()
+    
+    # Always show both Az and El
+    fig.add_trace(
+        go.Scatter(
+            x=xvals,
+            y=azvals,
+            mode="lines",
+            name="Az Err (mdeg)",
+            line=dict(color="royalblue", width=2),
+        )
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=xvals,
+            y=elvals,
+            mode="lines",
+            name="El Err (mdeg)",
+            line=dict(color="firebrick", width=2),
+        )
+    )
+
+    fig.update_layout(
+        # title="Pointing Error vs Time",
+        xaxis_title="Seconds",
+        yaxis_title="Error (mdeg)",
+        uirevision=True,
+        margin=dict(l=20, r=20, b=20, t=50, pad=4),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    
+    # Clamp y-axis to ±1000 mdeg
+    fig.update_yaxes(range=[-1000, 1000])
+    
     return fig
 
 

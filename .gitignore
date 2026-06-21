@@ -1,3 +1,5 @@
+*.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -108,3 +110,6 @@ venv.bak/
 
 # Rever
 rever/
+
+# DS store files anywhere
+.DS_Store

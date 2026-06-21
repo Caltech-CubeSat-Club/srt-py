@@ -1,0 +1,24 @@
+name: srt-dev
+channels:
+  - conda-forge
+dependencies:
+  - waitress
+  - plotly
+  - yamale
+  - scipy
+  - pandas
+  - soapysdr
+  - pip
+  - dash
+  - dash-bootstrap-components
+  - astroplan
+  - python=3.10
+  - digital_rf
+  - pyserial
+  - rtl-sdr
+  - gnuradio
+  - numpy
+  - astropy
+  - parse
+  - pyzmq
+prefix: /Users/guutz/mambaforge/envs/srt-dev

@@ -1,4 +1,3 @@
-SOFTWARE: Small Radio Telescope
 STATION:
   latitude: 34.140
   longitude: -118.124
@@ -17,7 +16,7 @@ STOW_LOCATION:
   azimuth: 179
   elevation: 81
 CAL_LOCATION:
-  azimuth: 270.0
+  azimuth: 90.0
   elevation: 16.0
 HORIZON_POINTS:
   - azimuth: 0
@@ -28,22 +27,86 @@ HORIZON_POINTS:
     elevation: 15
   - azimuth: 360
     elevation: 15
-MOTOR_TYPE: CALTECH6M
+MOTOR_TYPE: NONE
 MOTOR_PORT: COM1
 MOTOR_BAUDRATE: 115200
-RADIO_CF: 1420000000
-RADIO_SF: 2400000
-RADIO_FREQ_CORR: -50000
-RADIO_NUM_BINS: 256
-RADIO_INTEG_CYCLES: 100000
-RADIO_AUTOSTART: Yes
 NUM_BEAMSWITCHES: 25
-BEAMWIDTH: 7.0
-TSYS: 171
-TCAL: 290
+BEAMWIDTH: 3  # degrees
+OBSERVATION_DWELL_TIME: 5
+SCAN_SETTLE_TIME: 1.0
+ROTOR_MOVE_TIMEOUT: 180
+TRACKING_COMMAND_DEADBAND_MDEG: 150
+END_OBSERVATION_ON_OOB: true
+STOW_ON_OOB: false
+POINTING_ERROR_THRESHOLD_MDEG: 150
+POINTING_ERROR_STABLE_CYCLES: 4
 SAVE_DIRECTORY: ~/SRT-Saves
 RUN_HEADLESS: No
 DASHBOARD_PORT: 8080
 DASHBOARD_HOST: 0.0.0.0
 DASHBOARD_DOWNLOADS: Yes
 DASHBOARD_REFRESH_MS: 500
+DASHBOARD_REQUIRE_AUTH: true
+DASHBOARD_USERNAME: dsa
+DASHBOARD_PASSWORD: not2000
+WEBCAM_ENABLE: false
+WEBCAM_DEVICE_INDEX: 0
+WEBCAM_TARGET_FPS: 10
+WEBCAM_JPEG_QUALITY: 70
+WEBCAM_MAX_WIDTH: 960
+SPECTRUM_ANALYZER:
+  instrument_serial: "SSA3PCED7R1040"
+  freq_mode: "start_stop"
+  start_hz: 1000000000
+  stop_hz: 1900000000
+  rbw_hz: 1000000
+  vbw_hz: 100000
+  ref_level_dbm: -30
+  y_axis_mode: "db_per_div"
+  y_db_per_div: 10
+  y_num_divs: 10
+  y_lim_dbm: [-120, -30]
+  atten_auto: false
+  atten_db: 0
+  preamp_on: true
+  trace_type: "clear_write"
+  num_averages: 300
+  x_units: "MHz"
+MOTOR_LPR_PARAMS:
+  pAzKo:    0.4
+  pElKo:    0.4
+  pAzKv:    2.0
+  pElKv:    2.0
+  pAze:     0.01
+  pEle:     0.01
+  pAzAmax:  1.5
+  pElAmax:  1.0
+  pAzVmax:  2.5
+  pElVmax:  1.0
+  pAzImax:  1.0
+  pElImax:  5.0
+  pAzKpp:   2.0
+  pElKpp:   1.2
+  pAzKpi:   1.0
+  pElKpi:   1.0
+  pAzKvp:   0.8
+  pElKvp:   1.5
+  pAzKvi:   0.0
+  pElKvi:   0.0
+  pAzKff:   1.0
+  pElKff:   1.0
+  pAzTmax:  800.0
+  pElTmax:  1200.0
+  pAzTmin:  -800.0
+  pElTmin:  -1300.0
+  pAzTsgn:  1.0
+  pElTsgn:  1.0
+  pAzTbias: 150.0
+  pAzEcr:   144000.0
+  pElEcr:   144000.0
+  pAzMEcr:  20000.0
+  pElMEcr:  20000.0
+  pAzEpo:   -301.087
+  pElEpo:   118.5
+  pAzAr:    1522.5
+  pElAr:    19749.0

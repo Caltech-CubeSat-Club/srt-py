@@ -3,10 +3,12 @@
 Functions to Generate Sidebar
 
 """
+import importlib
+
 try:
     from dash import html
-except:
-    import dash_html_components as html
+except Exception:
+    html = importlib.import_module("dash_html_components")
 
 import dash_bootstrap_components as dbc
 

@@ -51,33 +51,6 @@ def azel_within_range(actual_azel, desired_azel, bounds=(0.5, 0.5)):
     )
 
 
-def get_spectrum(port=5561):
-    """Quickly opens a zmq socket and gets a spectrum
-
-    Parameters
-    ----------
-    port : int
-        Number that the spectrum data is broadcast on.
-
-    Returns
-    -------
-    var : array_like
-        Spectrum array as numpy array
-
-    """
-    context = zmq.Context()
-    socket = context.socket(zmq.SUB)
-    socket.connect("tcp://localhost:%s" % port)
-    socket.subscribe("")
-    try:
-        rec = socket.recv()
-        var = np.frombuffer(rec, dtype="float32")
-    except:
-        return None
-
-    return var
-
-
 def sinc_interp2d(x, y, values, dx, dy, xout, yout):
     """Perform a sinc interpolation
 

@@ -1,0 +1,4995 @@
+OGL_FILE
+Main2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure DoubleClickLeft;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+*87{the following is necessry in order to ROM the program}
+  try
+    ResetWatchdog
+  recover
+    begin
+    end;
+LastCommandTime := 0;
+WDTimer := 0;
+WDActive := 0;
+NumberOfErrors := 0;
+UpdateAll := 0;
+TestMode := 0;
+CmdAz := 0;
+CmdEl := 0;
+CppAz = 0;
+CppEl := 0;
+CmdVelAz := 0;
+CmdVelEl := 0;
+Paz := 0;
+Pel := 0;
+AzPosErr := 0;
+ElPosErr := 0;
+AzPosIntErr := 0;
+ElPosIntErr := 0;
+AzPosPGain := 8;
+AzPosIGain := 8;
+AzVelPGain := 1.2;
+AzVelIGain := 0;
+AzFFGain := 1.0;
+ElPosPGain := 8;
+ElPosIGain := 8;
+ElVelPGain := 1.2;
+ElVelIGain := 0;
+ElFFGain := 1.0;
+AzVelErr := 0;
+ElVelErr := 0;
+AzVelIntErr := 0;
+ElVelIntErr := 0;
+ErrAzA := 0;
+ErrElA := 0;
+AzTheta := 0;
+ElTheta := 0;
+Vaz := 0;
+Vaz2 := 0;
+Vel := 0;
+deltaVaz :=0;
+CmdTorqueAz := 0;
+CmdTorqueEl := 0;
+  BufferPntr := 0;
+  Trace := 0;
+  AzNext := 0;
+    AzNow := 0;
+    AzOld := 0;
+ElNext := 0;
+ElNow := 0;
+ElOld := 0;
+    TimeNext := 0;
+    TimeNow := 0;
+    TimeOld := 0;
+SampleCounter := 0;
+    CmdProc.setup;
+    CmdTorque := 0;
+    AzIndexPos := 0;
+    ElIndexPos := 0;
+ElIndexPosOld := 0;
+AzIndexPosOld := 0;
+ElIndexDelta := 0;
+AzIndexDelta := 0;
+AzTheta := 0;
+ElTheta := 0;
+RecEl := 0;
+RecAz := 0;
+VelOffAz := 0;
+VelOffEl := 0;
+IntVelOffAz := 0;
+IntVelOffEl := 0;
+PosOffAz := 0;
+PosOffEl := 0;
+db1 := 0;
+db2 := 0;
+db3 := 0;
+pAzKo := 0;
+pElKo := 0;
+pAzKv := 0;
+pElKv := 0;
+pAze := 0;
+pEle := 0;
+pAzAmax := 0;
+pElAmax := 0;
+pAzVmax := 0;
+pElVmax := 0;
+pAzImax := 0;
+pElImax := 0;
+pAzKpp := 0;
+pElKpp := 0;
+pAzKpi := 0;
+pElKpi := 0;
+pAzKvp := 0;
+pElKvp := 0;
+pAzKvi := 0;
+pElKvi := 0;
+pAzKff := 0;
+pElKff := 0;
+pAzTmax := 0;
+pElTmax := 0;
+pAzTmin := 0;
+pElTmin := 0;
+pAzTbias := 0;
+pAzTsgn := 0;
+pElTsgn := 0;
+pAzEcr := 0;
+pElEcr := 0;
+pAzMEcr := 0;
+pElMEcr := 0;
+pAzEpo := 0;
+pElEpo := 0;
+pAzAr := 0;
+pElAr := 0;
+LogDataCount := 0;
+LogDataCountRate := 1;
+CalComplete := 0;
+    RunningTask := 0;
+*!     XAxis.SetCommandedTorque(0);
+*!     YAxis.SetCommandedTorque(0);
+*!     ZAxis.SetCommandedTorque(0);
+    CmdProc.Setup;
+*21    ScheduleTask(TaskAddr(TaskUpdateDisplay),20);
+*.-   { BeginTask(TaskAddr(TaskSafetyMonitor));}
+  end; {Setup}
+function  CanClose:boolean;
+  begin
+  {your code goes here}
+  end;
+Servo Controller)'
+MsbFlashManager2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure DoubleClickLeft;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+*ih{------------------------------------------------------------------------------------------------------}
+*ih{ Persistent Data Management                                                                           }
+*ih{                                                                                                      }
+*ih{ This function uses a 256 byte SST sector to "intelligently" remember a value. It finds the next data }
+*ih{ location available by walking a list of "jumps". A Blank sector has all FFs. The byte is interpreted }
+*ih{ with the top bit=1 being a "data follows" and a top bit=0 being "jump based on data type".           }
+*ih{______________________________________________________________________________________________________}
+  begin
+  Initialize;
+  State:=0;
+  Address:=0;
+  StringAtPut(crlf,0,13);
+  StringAtPut(crlf,1,10);
+  StringAtPut(crlf,2,0);
+*#"  ProductCodeString[0]:='Unknown';
+*"!  ProductCodeString[1]:='MSB-T8';
+*$#  ProductCodeString[2]:='MSB-V2T8';
+*$#  ProductCodeString[3]:='MSB-V4T8';
+*"!  ProductCodeString[4]:='MSB-T2';
+*"!  ProductCodeString[5]:='MSB-T4';
+*"!  ProductCodeString[6]:='MSB-T6';
+*$#  ProductCodeString[7]:='MSB-V2T2';
+*$#  ProductCodeString[8]:='MSB-V2T4';
+*$#  ProductCodeString[9]:='MSB-V2T6';
+*%$  ProductCodeString[10]:='MSB-V4T2';
+*%$  ProductCodeString[11]:='MSB-V4T4';
+*%$  ProductCodeString[12]:='MSB-V4T6';
+*%$  ProductCodeString[13]:='MSB-V6T2';
+*%$  ProductCodeString[14]:='MSB-V6T4';
+*&%  ProductCodeString[15]:='expansion';
+*&%  ProductCodeString[16]:='expansion';
+*#"  ProductCodeString[17]:='MSB-V2';
+*#"  ProductCodeString[18]:='MSB-V4';
+*#"  ProductCodeString[19]:='MSB-V6';
+*#"  ProductCodeString[20]:='MSB-T2';
+*#"  ProductCodeString[21]:='MSB-T4';
+*#"  ProductCodeString[22]:='MSB-T6';
+*%$  ProductCodeString[23]:='MSB-V2T2';
+*%$  ProductCodeString[24]:='MSB-V2T4';
+*%$  ProductCodeString[25]:='MSB-V2T6';
+*%$  ProductCodeString[26]:='MSB-V4T2';
+*%$  ProductCodeString[27]:='MSB-V4T4';
+*%$  ProductCodeString[28]:='MSB-V4T6';
+*%$  ProductCodeString[29]:='MSB-V6T2';
+*%$  ProductCodeString[30]:='MSB-V6T4';
+*&%  ProductCodeString[31]:='expansion';
+  UpdateStatus;
+  end;
+function  CanClose:boolean;
+  begin
+  {your code goes here}
+  end;
+*&%MSB Flash Memory Manager Version 2.03)'9
+FirmwarePanel2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure DoubleClickLeft;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+  {your code goes here}
+  end;
+function  CanClose:boolean;
+  begin
+  CanClose:=true;
+  UpdateStatus;
+  end;
+Firmware Controls)'
+AskYesNo2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure DoubleClickLeft;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+**)  MessageDisplay.writeln(MessageContent);
+  end;
+function  CanClose:boolean;
+  begin
+  Busy:=false;
+  CanClose:=true;
+  end;
+Firmware Confirmation)')
+bump2
+bump2
+MessageDisplay2
+bump2
+Button18042
+procedure Click;
+  begin
+  Close;
+  end;
+Button18052
+procedure Click;
+  begin
+  Answer:=true;
+  Close;
+  end;
+*,+Function IsYes(var Message:string):boolean;
+  begin
+  MessageContent:=Message;
+  PopUp;
+  busy:=true;
+  Answer:=false;
+  while busy do
+    yield;
+  IsYes:=Answer;
+  end;
+BusynWOW
+Boolean
+ var HeaderOffseL
+eader:=Server.MemReadByte($B000,HeaderOf
+set);WOW
+AnswerOW
+Boolean
+*+*Function IsNo(var Message:string):boolean;
+  begin
+  IsNo:=not IsYes(Message);
+  end;
+MessageContent
+String[127]!$
+!WOW
+ HighByte:=Serve
+MemReadByte($B000,HeaderOffset+2) and $F
+;WOW
+bump2
+bump2
+Button17992
+procedure Click;
+  var scanner:integer;
+  var Successful:boolean;
+  begin
+*!   if UpdatedFirmwarePresent then
+    begin
+*LK    if not AskYesNo.IsYes('Replace active firmware with new version?') then
+      exit;
+    end;
+*&%  Thermometer.SetMaximumLevel(4096); 
+  scanner:=0;
+  Successful:=false;
+  while not Successful do
+    begin
+    scanner:=scanner+1;   
+    status.clear;    
+*-,    status.writeln('Attempt: ',scanner);    
+    delay(1000);
+    try
+      begin
+      State:=0;
+*10      ScheduleTask(TaskAddr(UpdateDisplay),100);
+      SetSampleRate(500);      
+      UpdateFirmware;
+**)      AbortTask(TaskAddr(UpdateDisplay));
+      delay(50);
+      Status.Clear;
+      Status.writeln('done');
+*"!      Thermometer.SetLevel(4096);
+      Successful:=true;
+      end
+    recover
+      begin
+*CB      {Prompter.writeln('Update Firmware Escape: ',EscapeCode);  }
+      Status.Clear;
+      end;
+    delay(2000);
+*('    AbortTask(TaskAddr(UpdateDisplay));
+    end;
+  end;
+Update Firmware
+Button18002
+procedure Click;
+  begin
+*CB  if AskYesNo.IsYes('No autostart without update. Continue?') then
+    begin
+    ProgramByte($E000,0,$0);
+    ProgramByte($E000,1,$0);
+    ProgramByte($E000,2,$0);
+    ProgramByte($E000,3,$0);
+    end;
+  UpdateStatus;
+  end;
+Configure for Backup Mode
+bump2
+Button18012
+procedure Click;
+  begin
+  Close;
+  end;
+Close
+AskYesNo2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure DoubleClickLeft;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+**)  MessageDisplay.writeln(MessageContent);
+  end;
+function  CanClose:boolean;
+  begin
+  Busy:=false;
+  CanClose:=true;
+  end;
+Confirm)')
+bump2
+bump2
+MessageDisplay2
+bump2
+Button18042
+procedure Click;
+  begin
+  Close;
+  end;
+Button18052
+procedure Click;
+  begin
+  Answer:=true;
+  Close;
+  end;
+*,+Function IsYes(var Message:string):boolean;
+  begin
+  MessageContent:=Message;
+  PopUp;
+  busy:=true;
+  Answer:=false;
+  while busy do
+    yield;
+  IsYes:=Answer;
+  end;
+Busy  els
+Boolean
+utton1805OW
+AnswerOW
+eginWOW
+Boolean
+       File.writeln('2 ',Persi
+tentInteger(scanner),' (',scanner,' cont
+*+*Function IsNo(var Message:string):boolean;
+  begin
+  IsNo:=not IsYes(Message);
+  end;
+MessageContent
+String[127] T
+bump2
+bump2
+Status2
+Button7182
+procedure Click;
+  var scanner:integer;
+  var Successful:boolean;
+  begin
+  Thermometer.Clear;
+*%$  if not UpdatedFirmwarePresent then
+    begin
+    Status.Clear;
+*BA    Status.write('Updated Firmware Required for Autostart',crlf);
+*,+    Status.write('Use Firmware... button');
+    delay(3000);
+    end
+  else
+    begin
+*$#    if AutostartProgramPresent then
+      begin
+*IH      if not AskYesNo.IsYes('Overwrite Current Autostart Program?') then
+        begin
+        UpdateStatus;
+        exit;
+        end;
+      end;
+    SetSampleRate(1000);
+    State:=0;
+*+*    Thermometer.SetMaximumLevel($10000*4);
+*.-    ScheduleTask(TaskAddr(UpdateDisplay),20);
+    SaveProgram;
+    delay(500);
+*('    AbortTask(TaskAddr(UpdateDisplay));
+    end;
+  UpdateStatus;
+  end;
+Save Program
+Button7192
+procedure Click;
+  begin
+*BA  if AskYesNo.IsYes('Prevent controller from autostarting?') then
+    begin
+    ProgramByte($8000,0,$0);
+    ProgramByte($8000,1,$0);
+    ProgramByte($8000,2,$0);
+    ProgramByte($8000,3,$0);
+    end;
+  UpdateStatus;
+  Thermometer.Clear;
+  Thermometer.Update;
+  end;
+Turn Off Autostart
+Thermometer2
+procedure BeginDrag;
+  begin
+  SetLevel(MousePosition.X);
+  end;
+procedure Drag;
+  begin
+  SetLevel(MousePosition.X);
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+  SetMaximumLevel(100);
+  SetBodyColor(red);
+  SetLineColor(red);
+  end;
+function  CanClose:boolean;
+  begin
+  {your code goes here}
+  end;
+version 1.01)'q
+*$#Procedure SetLevel(aLevel:longint);
+  begin
+  Clear;
+  Level:=aLevel;
+  if Level > MaxLevel then
+    Level:=MaxLevel
+  else if aLevel < 0 then
+    Level:=0;
+  DrawRectangle(0,0,Level,100);
+  Update;
+  end;
+*+*Procedure SetMaximumLevel(aLevel:longint);
+  begin
+  MaxLevel:=aLevel;
+*&%  SetCoordinateFrame(0,0,aLevel,100);
+  end;
+MaxLevel!
+Longint!,
+w!WOW
+rocedure BeginDrag;
+ if Lo
+gintValue < 0 thenOW
+LevelWOW
+ Close;
+Longint
+ busy:=true;WOW
+bump2
+Button17952
+procedure Click;
+  begin
+  FirmwarePanel.PopUp;
+  end;
+Firmware...
+Diagnostic2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure DoubleClickLeft;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+  {your code goes here}
+  end;
+function  CanClose:boolean;
+  begin
+  {your code goes here}
+  end;
+a Title)'cB
+bump2
+Button1502
+procedure Click;
+  begin
+  Panel.PopUp;
+  end;
+Diagnose
+Panel2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure DoubleClickLeft;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+  {your code goes here}
+  end;
+function  CanClose:boolean;
+  begin
+  {your code goes here}
+  end;
+Diagnose)'];
+Button1522
+procedure Click;
+  var Anchor:longint;
+  begin
+*87  SetPersistentBoolean(IndexEditor.ReadlnLongint,true);
+*CB  DebugList.writeln(PersistentBoolean(IndexEditor.ReadlnLongint));
+  end;
+True
+DebugList2
+procedure DoubleClick;
+  begin
+  {your code goes here}
+  end;g
+Button1542
+procedure Click;
+  var Anchor:longint;
+  begin
+  SSTEraseAMDSector(3);
+  Debuglist.writeln('done');
+  end;
+Erase
+Button1552
+procedure Click;
+  var Anchor:longint;
+  begin
+*98  SetPersistentBoolean(IndexEditor.ReadlnLongint,false);
+*CB  DebugList.writeln(PersistentBoolean(IndexEditor.ReadlnLongint));
+  end;
+False
+Button1562
+procedure Click;
+  begin
+  DebugList.Clear;
+  end;
+Clear
+Button1572
+procedure Click;
+  var scanner:integer;
+  var Sector:integer;
+  begin
+  IndexEditor.readln(Sector);
+  Sector:=(Sector-1)*$100;
+  for scanner:=0 to 20 do
+*CB    DebugList.writeln(Server.MemReadByte($B000,scanner+Sector));  
+  end;
+Display
+Button1582
+procedure Click;
+  var Anchor:longint;
+  var scanner:integer;
+  begin
+  for scanner:=1 to 500 do
+    begin
+    yield;
+*"!    SetPersistentBoolean(1,true);
+*%$    if not PersistentBoolean(1) then
+*$#      DebugList.writeln('Problem');
+*#"    SetPersistentBoolean(1,false);
+*!     if PersistentBoolean(1) then
+*$#      DebugList.writeln('Problem');
+    end;
+*"!  DebugList.writeln('Test okay');
+  end;
+Read
+Button1592
+procedure Click;
+  var scanner:integer;
+  begin
+*/.  Diagnostic.Panel.Debuglist.writeln('Start');
+  for scanner:=1 to 256 do
+    begin
+    yield;
+    if (scanner and 1) = 0 then
+**)      SetPersistentBoolean(scanner,false)
+    else
+**)      SetPersistentBoolean(scanner,true);
+    end;
+  for scanner:=1 to 256 do
+    begin
+    yield;
+    if (scanner and 1) = 0 then
+      begin
+*)(      if PersistentBoolean(scanner) then
+*76        Diagnostic.Panel.Debuglist.writeln('Problem');
+      end
+    else
+      begin
+*-,      if not PersistentBoolean(scanner) then
+*76        Diagnostic.Panel.Debuglist.writeln('Problem');
+      end;
+    end;
+*.-  Diagnostic.Panel.Debuglist.writeln('Done');
+  end;
+Test Booleans
+Button1612
+procedure Click;
+  var scanner:integer;
+  begin
+*32  Diagnostic.Panel.Debuglist.writeln('Read Test');
+  for scanner:=1 to 256 do
+    begin
+    if (scanner and 1) = 0 then
+      begin
+*)(      if PersistentBoolean(scanner) then
+*@?        Diagnostic.Panel.Debuglist.writeln('Problem ',scanner);
+      end
+    else
+      begin
+*-,      if not PersistentBoolean(scanner) then
+*?>        Diagnostic.Panel.Debuglist.writeln('Problem',scanner);
+      end;
+    end;
+*.-  Diagnostic.Panel.Debuglist.writeln('Done');
+  end;
+Read Booleans
+IndexEditor2
+procedure EnterKeyPushed;
+  begin
+  {your code goes here}
+  end;
+Button1642
+procedure Click;
+  begin
+*CB  DebugList.writeln(PersistentBoolean(IndexEditor.ReadlnLongint));
+  end;
+Read Boolean
+Button1732
+procedure Click;
+  begin
+*CB  DebugList.writeln(PersistentInteger(IndexEditor.ReadlnLongint));
+  end;
+Read Integer
+NumberEditor2
+procedure EnterKeyPushed;
+  begin
+*NM  SetPersistentInteger(IndexEditor.ReadlnLongint,NumberEditor.ReadlnLongint);
+  end;
+Button1752
+procedure Click;
+  var scanner:integer;
+  begin
+*/.  Diagnostic.Panel.Debuglist.writeln('Start');
+  for scanner:=1 to 256 do
+    begin
+    yield;
+*-,    SetPersistentInteger(scanner,scanner*7);
+    end;
+  for scanner:=1 to 256 do
+    begin
+    yield;
+*65    if PersistentInteger(scanner) <> (scanner*7) then
+*lk      Diagnostic.Panel.Debuglist.writeln('Problem: ',scanner,' ',PersistentInteger(scanner),' ',scanner*7);
+    end;
+*.-  Diagnostic.Panel.Debuglist.writeln('Done');
+  end;
+Test Integers
+Button13352
+procedure Click;
+  begin
+*CB  DebugList.writeln(PersistentLongint(IndexEditor.ReadlnLongint));
+  end;
+Read Longint
+LongintNumberEditor2
+procedure EnterKeyPushed;
+  begin
+*UT  SetPersistentLongint(IndexEditor.ReadlnLongint,LongintNumberEditor.ReadlnLongint);
+  end;
+Button13372
+procedure Click;
+  var scanner:longint;
+  begin
+*/.  Diagnostic.Panel.Debuglist.writeln('Start');
+  for scanner:=1 to 256 do
+    begin
+    yield;    
+*10    SetPersistentLongint(scanner,scanner*10000);
+    end;
+  DebugList.writeln('compare');
+  for scanner:=1 to 256 do
+    begin
+    yield;
+*:9    if PersistentLongint(scanner) <> (scanner*10000) then
+*lk      Diagnostic.Panel.Debuglist.writeln('Problem: ',scanner,' ',PersistentInteger(scanner),' ',scanner*7);
+    end;
+*.-  Diagnostic.Panel.Debuglist.writeln('Done');
+  end;
+Test Longints
+Button13382
+procedure Click;
+  var scanner:longint;
+  begin
+*/.  Diagnostic.Panel.Debuglist.writeln('Start');
+  for scanner:=1 to 256 do
+    begin
+    yield;    
+*87    SetPersistentSingle(scanner,scanner*10000/3.16736);
+    end;
+  DebugList.writeln('compare');
+  for scanner:=1 to 256 do
+    begin
+    yield;
+*ML    if abs(PersistentSingle(scanner) - (scanner*10000/3.16736)) > 0.001 then
+*lk      Diagnostic.Panel.Debuglist.writeln('Problem: ',scanner,' ',PersistentInteger(scanner),' ',scanner*7);
+    end;
+*.-  Diagnostic.Panel.Debuglist.writeln('Done');
+  end;
+Test Singles
+Button13392
+procedure Click;
+  begin
+*BA  DebugList.writeln(PersistentSingle(IndexEditor.ReadlnLongint));
+  end;
+Read Single
+SingleNumberEditor2
+procedure EnterKeyPushed;
+  var S:Single;
+  begin
+  SingleNumberEditor.Readln(S);
+*43  SetPersistentSingle(IndexEditor.ReadlnLongint,S);
+  end;
+Button1792
+procedure Click;
+  var Filename:string[127];
+  begin
+  Filename:='*.per';
+*$#  if GetOpenFilename(Filename) then
+    begin
+*$#    DebugList.writeln('Saving...');
+*HG    SavePersistentDataToFile(Filename,FileCountEditor.ReadlnLongint);  
+*('    DebugList.writeln('Save Complete');
+    end;
+  end;
+Save to File
+FileCountEditor2
+procedure EnterKeyPushed;
+  begin
+  {your code goes here}
+  end;
+*?>procedure ProgramByte(Seg:longint; Ofs:longint; Data:longint);
+  var scanner:integer;
+  var Readback:integer;
+  var Anchor:longint;
+  var LastRead:integer;
+  var CurrentRead:integer;
+  begin    
+  Data:=Data and $FF;
+  if AMDFlash then
+    begin
+    Command29F($A0);
+*'&    Server.MemWriteByte(Seg,Ofs,Data);
+    Anchor:=SampleCounter;
+    repeat
+*54      Readback:=Server.MemReadByte(Seg,Ofs) and $FF;
+*10      if ((Readback and $80) <> (Data and $80)) 
+*)(      and ((Readback and $20) =$20) then
+        begin
+*21        {Prompter.writeln('Readback: ',readback);
+*YX        Prompter.writeln('Unable to program Flash Memory byte: ',Seg,' ',Ofs,' ',Data);}
+*'&        Escape(ec_ProgramByteFailure);
+*#"        end; {pending "real" chip}
+*&%      if TimeRemaining < MinTime then
+        yield;
+*,+      if (SampleCounter-Anchor) > 4000 then
+        begin
+*IH        Prompter.writeln('Program Byte Timeout: ',seg,' ',ofs,' ',data);
+*'&        Escape(ec_ProgramByteFailure);
+        end;
+    until Readback = Data;
+    end
+  else if SSTFlash then
+    begin
+    UnprotectSSTFlash;
+*&%    Server.MemWriteByte(Seg,Ofs,$10);
+*'&    Server.MemWriteByte(Seg,Ofs,Data);
+*.-    CurrentRead:=Server.MemReadByte(Seg,Ofs);
+    Anchor:=SampleCounter;
+    repeat  
+*&%      if TimeRemaining < MinTime then
+        yield;
+*,+      if (SampleCounter-Anchor) > 4000 then
+        begin
+*IH        Prompter.writeln('Program Byte Timeout: ',seg,' ',ofs,' ',data);
+*'&        Escape(ec_ProgramByteFailure);
+        end;
+      LastRead:=CurrentRead;
+*21      CurrentRead:=Server.MemReadByte(Seg,Ofs);  
+*65    until (LastRead and $40) = (CurrentRead and $40);
+*!     Server.MemReadByte(Seg,Ofs);
+*:9    if (Server.MemReadByte(Seg,Ofs) and $FF) <> Data then
+*%$      Escape(ec_ProgramByteFailure);
+    end
+  else
+*LK    Prompter.writeln('ProgramByte attempted on unidentified Flash device');
+  end;
+*54Procedure MicrosecondPauseAtLeast(Duration:longint);
+  var Anchor:longint;
+  begin
+  Anchor:=TimeRemaining;
+  if Anchor < 400 then
+    yield
+  else
+    begin
+*/.    while (Anchor-TimeRemaining) < Duration do
+      begin
+*BA      {very unusual to loop without yield - sub sample operation}
+      end;
+    end;
+  end;
+Procedure Erase;
+  var scanner:longint;
+  var plscnt:longint;
+  var problem:boolean;
+  var Address:longint;
+  var Value:integer;
+  begin
+  if IsErased then
+    exit;
+  Command29F($80);
+  Command29F($10);
+  delay(5);
+  repeat
+    yield;
+*('    Value:=Server.MemReadByte($8000,0);
+*<;    if ((Value and $80) = 0) and ((Value and $20)=$20) then
+      begin
+*<;      Prompter.writeln('29F Flash Memory failed to erase');
+      Escape(ec_EraseFailure);
+      end;
+  until (Value and $80)=$80;
+  FlashReset;
+  end;
+Procedure FlashReset;
+  begin
+  if AMDFlash then
+    begin
+    Command29F($F0);
+*#"    Server.MemReadByte($8000,0);  
+    end
+  else if SSTFlash then
+*%$    Server.MemWriteByte($8000,0,$FF)
+  else
+*<;    Prompter.writeln('Flash chip has not been identified');
+  end;
+Procedure UpdateFirmware;
+  var scanner:longint;
+*$#  var Filename:string[127]; static;
+  var File:TFile;
+**)  var DataByteString:string[127]; static;
+  var AddressCounter:longint;
+  var DataByte:integer;
+  var PacketScanner:longint;
+  var VersionLocation:integer;
+  begin 
+  State:=0;
+  Filename:='*.oct';
+*('  if not GetOpenFilename(Filename) then
+    exit;
+*'&  VersionLocation:=length(Filename)-5;
+*-,  if ReadbackIDBit(7) then {E code required}
+*:9    StringAtPut(Filename,VersionLocation,StringAt('e',0))
+  else
+*;:    StringatPut(Filename,VersionLocation,StringAt('d',0));
+  File.Assign(Filename);
+  try
+    File.Reset
+  recover
+    begin
+*]\    Prompter.writeln('File ',Filename,' was required (due to board version) but not found');
+    exit;
+    end;
+  File.Readln(DataByteString);
+*CB  if DataByteString <> 'Motion Server Block Object Code Text' then
+    begin
+*<;    Prompter.writeln('Not a Motion Server Block OCT File');
+    Escape(9005);
+    end;
+*21  File.Readln(DataByteString); {copyright string}
+  State:=1;
+  EraseSector(5);
+  EraseSector(6);
+  FlashReset; 
+  State:=7;
+  AddressCounter:=0;
+  for scanner:=0 to 2047 do
+    begin
+    Address:=scanner;
+*!     File.Readln(DataByteString);
+*"!    for Packetscanner:=0 to 31 do
+      begin
+*KJ      DataByte:=(AsciiToHex(StringAt(DataByteString,PacketScanner*2))*$10)
+*CB        +AsciiToHex(StringAt(DataByteString,(PacketScanner*2)+1));
+*65      ProgramByte($D000,AddressCounter,DataByte);    
+*.-      AddressCounter:=AddressCounter+1;      
+      end;
+    end;
+  AddressCounter:=0;
+  for scanner:=2048 to 4095 do
+    begin
+    Address:=scanner;
+*!     File.Readln(DataByteString);
+*"!    for PacketScanner:=0 to 31 do
+      begin
+*KJ      DataByte:=(AsciiToHex(StringAt(DataByteString,PacketScanner*2))*$10)
+*CB        +AsciiToHex(StringAt(DataByteString,(PacketScanner*2)+1));
+*65      ProgramByte($E000,AddressCounter,DataByte);    
+*('      AddressCounter:=AddressCounter+1;
+      end;
+    end;
+*+*  {now indicate valid update in segment E}
+  ProgramByte($E000,0,$55);
+  ProgramByte($E000,1,$AA);
+  ProgramByte($E000,2,$AA);
+  ProgramByte($E000,3,$55);
+*GF  ProgramByte($8000,0,0); {invalidate now-mislinked autostart program}
+  ProgramByte($8000,1,0);
+  ProgramByte($8000,2,0);
+  ProgramByte($8000,3,0);
+  File.Close;
+  FlashReset;
+  end;
+Function IsErased:boolean;
+  var scanner:longint;
+  begin
+  IsErased:=false;
+  FlashReset;
+  for scanner:=0 to $FFFF do
+    begin
+*$#    if TimeRemaining < MinTime then
+      yield;
+*,+    if FlashRead($8000,scanner) <> $FF then
+      exit;
+*,+    if FlashRead($9000,scanner) <> $FF then
+      exit;
+*,+    if FlashRead($A000,scanner) <> $FF then
+      exit;
+*,+    if FlashRead($B000,scanner) <> $FF then
+      exit;
+*,+    if FlashRead($C000,scanner) <> $FF then
+      exit;
+*,+    if FlashRead($D000,scanner) <> $FF then
+      exit;
+*,+    if FlashRead($E000,scanner) <> $FF then
+      exit;
+*,+    if FlashRead($F000,scanner) <> $FF then
+      exit;
+    end;
+  IsErased:=true;
+  end;
+*98Function FlashRead(Seg:longint; Offset:longint):integer;
+  begin
+  Command29F($F0)
+*54  FlashRead:=Server.MemReadByte(Seg,Offset) and $FF;
+  end;
+MinTimerompter.writeln('29F Flash Memory
+100led to erase');o/8
+o/Do/H
+Procedure InvalidateFlash;
+  begin
+  ProgramByte($8000,0,0);
+  end;
+FirstIdW
+Integer
+ if LastHeaderOffset >= 
+thenW
+SecondId
+Integer
+ end;OW
+   ProgramByte(
+*%$Procedure Command29F(Value:integer);
+  begin
+*'&  Server.MemWriteByte($8000,$555,$AA);
+*'&  Server.MemWriteByte($8000,$2AA,$55);
+*)(  Server.MemWriteByte($8000,$555,Value);
+  end;
+ec_EraseFailureW
+9001WOW
+ec_ProgramByteFailureWOW
+9000SendString(NumberString);OW
+   e
+StateWOW
+Integer
+ var Las
+eader:integer;WOW
+AddressW
+Longint
+ else if SSTFlash thenW
+Procedure UpdateDisplay;
+  begin
+  if State=0 then
+    Status.Clear
+  else if State=1 then
+    begin
+    Status.writeln('Erasing')
+*#"    Thermometer.SetLevel(Address);
+    end
+  else if State=2 then
+*('    Status.writeln('Storing Header...')
+  else if State=3 then
+    begin
+    Status.writeln('Code 1')
+**)    Thermometer.SetLevel(Address+$10000);
+    end
+  else if State=4 then
+    begin
+    Status.writeln('Code 2');
+**)    Thermometer.SetLevel(Address+$20000);
+    end
+  else if State=5 then
+    begin
+    Status.writeln('Data')
+**)    Thermometer.SetLevel(Address+$30000);
+    end
+  else if State=6 then
+    begin
+*$#    Status.writeln('Program Saved')
+*"!    Thermometer.SetLevel($40000);
+    end
+  else if State=7 then
+    begin
+*+*    Status.writeln('Storing Firmware...');
+*#"    Thermometer.SetLevel(Address);
+    end
+  else if State=8 then
+    begin
+*('    Status.writeln('Firmware Updated');
+    Thermometer.SetLevel(4096);
+    end
+  else
+    Status.clear;
+  end;
+*('Function AsciiToHex(C:integer):longint;
+  begin
+*"!  if (C >= 48) and (C <= 57) then
+    AsciiToHex:=C-48
+  else
+    AsciiToHex:=C-55;
+  end;
+*32Procedure AMDEraseAMDSector(SectorNumber:longint);
+*98{------------------------------------------------------}
+*98{ Sector Number given as 0 to 7 range                  }
+*98{______________________________________________________}
+  var Value:integer;
+  var SectorEraseDone:boolean;
+  var Anchor:longint;
+  var SegmentToErase:longint;
+  begin
+  Command29F($80);
+*('  Server.MemWriteByte($8000,$5555,$AA);
+*('  Server.MemWriteByte($8000,$2AAA,$55);
+**)  SegmentToErase:=(SectorNumber+8)*$1000;
+*,+  Server.MemWriteByte(SegmentToErase,0,$30)
+  Anchor:=SampleCounter;
+  repeat
+    yield;
+*-,    if abs(SampleCounter-Anchor) > 5000 then
+      Escape(4003);  
+*87    Value:=Server.MemReadByte(SegmentToErase,0);       
+  until (Value and $80)=$80;  
+  end;
+    
+Procedure SaveProgram;
+  var scanner:longint;
+  var AutostartAddress:longint;
+  begin    
+*21  AutostartAddress:=TaskAddrAtName('Main.Setup');
+  if AutostartAddress=0 then
+    begin
+*;:    Prompter.writeln('Unable to find Main.Setup routine');
+    Escape(9002);
+    end;
+  try
+    begin
+    State:=1;
+    Address:=0;
+    EraseSector(0);
+    Address:=$10000 div 3;
+    EraseSector(1);
+    Address:=$20000 div 3;
+    EraseSector(2);
+    {store header}
+    State:=2;
+    FlashReset; 
+    ProgramByte($8000,0,$5A);  
+    ProgramByte($8000,1,$5A);
+    ProgramByte($8000,2,$A5);  
+    ProgramByte($8000,3,$A5);
+    {Store content format}
+*A@    ProgramByte($8000,4,5); {2 code segments and a data segment}
+    FlashReset;
+    State:=3;
+*!     for scanner:=$20 to $FFFF do
+      begin
+      Address:=scanner;
+*HG      ProgramByte($8000,scanner,Server.MemReadByte($2000,scanner));    
+      end;
+    State:=4;
+    for scanner:=$0 to $FFFF do
+      begin
+      Address:=scanner;
+*HG      ProgramByte($9000,scanner,Server.MemReadByte($3000,scanner));    
+      end;
+    State:=5;
+    for scanner:=$0 to $FFFF do
+      begin
+      Address:=scanner;
+*DC      ProgramByte($A000,scanner,Server.MemReadByte($1000,scanner));
+      end;
+    {store autostart address}
+*43    ProgramByte($8000,$8,AutostartAddress and $FF);
+*A@    ProgramByte($8000,$9,(AutostartAddress and $FF00) div $100);
+*ED    ProgramByte($8000,$A,(AutostartAddress and $FF0000) div $10000);
+*IH    ProgramByte($8000,$B,(AutostartAddress and $FF000000) div $1000000);
+    State:=6;
+    end
+  recover
+    begin
+    try
+*DC      InvalidateFlash  {invalidate header to insure autostart does}
+*DC                       {not try to execute partially programmed   }
+*DC                       {flash memory                              }
+    recover
+      begin
+      end;    
+    end;
+  FlashReset;
+  if SSTFlash then
+    ProtectSSTFlash;
+  end;
+MaxNumberOfLongsln('Code 2');WOW
+**)Function HighWord(Value:longint):Longint;
+  begin
+**)  HighWord:=(Value div $10000) and $FFFF;
+  end;
+*)(Function LowWord(Value:longint):Longint;
+  begin
+  LowWord:=Value and $FFFF;
+  end;
+Procedure LoadFlashLongints;
+  var scanner:integer;
+  var Byte3:integer;
+  var Byte2:integer;
+  var Byte1:integer;
+  var Byte0:integer;
+  begin
+  FlashReset;
+*('  for scanner:=1 to MaxNumberOfLongs do
+    begin
+*43    Byte0:=Server.MemReadByte($B000,(scanner-1)*4);
+*65    Byte1:=Server.MemReadByte($B000,(scanner-1)*4+1);
+*65    Byte2:=Server.MemReadByte($B000,(scanner-1)*4+2);
+*65    Byte3:=Server.MemReadByte($B000,(scanner-1)*4+3);
+    
+    FlashLongint[scanner]:=
+*&%      MakeLongintFromHighandLowWords(
+*54        ((Byte3*$100) and $FF00) or (Byte2 and $FF),
+*65        ((Byte1*$100) and $FF00) or (Byte0 and $FF));
+    end;        
+  end;
+Procedure SaveFlashLongints;
+  var scanner:integer;
+  var Byte3:longint;
+  var Byte2:longint;
+  var Byte1:longint;
+  var Byte0:longint;
+  begin
+  EraseSector(3); 
+*('  for scanner:=1 to MaxNumberOfLongs do
+    begin
+*?>    Byte3:=(HighWord(FlashLongint[scanner]) div $100) and $FF;
+*43    Byte2:=HighWord(FlashLongint[scanner]) and $FF;
+*?>    Byte1:=(LowWord(FlashLongint[scanner])  div $100) and $FF;
+*32    Byte0:=LowWord(FlashLongint[scanner]) and $FF;
+    
+*,+    ProgramByte($B000,(scanner-1)*4,Byte0);
+*.-    ProgramByte($B000,(scanner-1)*4+1,Byte1);
+*.-    ProgramByte($B000,(scanner-1)*4+2,Byte2);
+*.-    ProgramByte($B000,(scanner-1)*4+3,Byte3);
+    end;
+  FlashReset;
+  if SSTFlash then
+    ProtectSSTFlash;
+  end;
++FlashLongint
+Longint
+MaxNumberOfLongs;
+1WOW
+Procedure UpdateStatus;
+  begin
+  Status.Clear;
+  if not ValidId then
+*65    Status.write('MSB Product Code not present',crlf)
+  else
+*SR    Status.write('Controller identified as ',ProductCodeString[ProductCode],crlf);
+*"!  if FirmwareSelection=0 then    
+    begin
+*A@    Status.write('MSB currently operating in Backup Mode',crlf);
+*#"    if UpdatedFirmwarePresent then
+      begin
+*IH      Status.write('Restarted controller will run in Active Mode',crlf);
+*&%      if AutostartProgramPresent then
+*GF        Status.write('Autostart program is present and will run',crlf)
+      else
+*<;        Status.write('Autostart program not present',crlf);
+      end
+    else
+*TS      Status.write('Updated Firmware required for Active Mode and Autostart',crlf);
+    end
+  else
+    begin
+*A@    Status.write('MSB currently operating in Active Mode',crlf);
+*#"    if UpdatedFirmwarePresent then
+      begin
+*HG      Status.write('Restarted controller will run in Active Mode',crlf)
+*&%      if AutostartProgramPresent then
+*GF        Status.write('Autostart program is present and will run',crlf)
+      else
+*<;        Status.write('Autostart program not present',crlf);
+      end
+    else
+      begin
+*IH      Status.write('Restarted controller will run in Backup Mode',crlf);
+*TS      Status.write('Updated Firmware required for Active Mode and Autostart',crlf);
+      end;
+    end;
+  end;
+crlf
+StringW
+     end;OW
+  scanner:=scanner+1;WOW
+*)(Function UpdatedFirmwarePresent:boolean;
+  begin
+*!   UpdatedFirmwarePresent:=false;
+  FirmwareCode:=1;
+*-,  if server.MemReadByte($E000,0) <> $55 then
+    exit;
+  FirmwareCode:=2;
+*76  if (server.MemReadByte($E000,1) and $FF) <> $AA then
+    exit;
+  FirmwareCode:=3;
+*76  if (server.MemReadByte($E000,2) and $FF) <> $AA then
+    exit;
+  FirmwareCode:=4;
+*-,  if server.MemReadByte($E000,3) <> $55 then
+    exit;
+  FirmwareCode:=5;
+  UpdatedFirmwarePresent:=true
+  end;
+**)Function AutostartProgramPresent:boolean;
+  begin
+*"!  AutostartProgramPresent:=false;
+  AutostartCode:=0;
+*%$  if not UpdatedFirmwarePresent then
+    exit;
+  AutostartCode:=1;
+*/.  if server.MemReadWord($8000,0) <> $5A5A then
+    exit;
+  AutostartCode:=2;
+*;:  if (server.MemReadWord($8000,2) and $FFFF) <> $A5A5 then
+    exit;
+  AutostartCode:=3;
+*+*  if server.MemReadByte($8000,4) <> 5 then
+    exit;
+  AutostartCode:=4;
+*)(  if server.MemReadWord($8000,8) =0 then
+    exit;
+  AutostartCode:=5;
+*,+  if server.MemReadWord($8000,8)=$FFFF then
+    exit; 
+  AutostartCode:=6;
+**)  if server.MemReadWord($8000,$A) =0 then
+    exit;
+  AutostartCode:=7;
+*-,  if server.MemReadWord($8000,$A)=$FFFF then
+    exit; 
+  AutostartCode:=8;
+*!   AutostartProgramPresent:=true;
+  end;
+AutostartCode;OW
+Integer
+our code goes here}W
+ end;OW
+Function ValidId: boolean;
+*?>{------------------------------------------------------------}
+*?>{ Bit 7 doesn't effect validity since it can be 0 for 160 or }
+*?>{ 1 for 208.                                                 }
+*?>{____________________________________________________________}
+  begin
+  if (ReadbackIDBit(6)=0)
+  and (ReadbackIdBit(5)=1) then
+    begin
+    ValidId:=true;
+*#"    Prompter.writeln('P Version');
+    end
+  else if (ReadbackIDBit(6)=1)
+  and (ReadbackIDBit(5)=0) then
+    ValidID:=true
+  else if (ReadbackIDBit(6)=1)
+  and (ReadbackIDBit(5)=1) then
+    begin
+**)    Prompter.writeln('Hanna Controller');
+    ValidID:=true;
+    end
+  else
+    begin
+*'&    Prompter.writeln('Id not valid: ',
+*CB      ReadbackIDBit(7),' ',ReadbackIDBit(6),' ',ReadbackIDBIt(5));
+    ValidId:=false;
+    end;
+  end;
+ProductCodeStringp
+String Byte3:=(HighWord(FlashLongint[sca
+31]) div $100) and $FF;
++FirmwareCode/
+Integer/D
+ElTmax := 0;
+   Byte2:=HighWord(FlashLon
+AMDFlash]) and $FF;
+Boolean#
+SSTFlash$l
+AzKpp := 0;
+Boolean
+   Byte1:=(LowWord(F
+shLongint[scanner])  div $100) and $FF;O
+Procedure IdentifyDevice;
+  var ManufacturerCode:integer;
+  var DeviceCode:integer;
+  begin
+  AMDFlash:=false;
+  SSTFlash:=false;
+*<;  Server.MemWriteByte($8000,0,$FF); {speculative SST Reset}
+*?>  Server.MemWriteByte($8000,0,$90); {speculative SST ID Query}
+*98  ManufacturerCode:=Server.MemReadByte($8000,0) and $FF;
+*32  DeviceCode:=Server.MemReadByte($8000,1) and $FF;
+*43  if (ManufacturerCode=191) and (DeviceCode=4) then
+    SSTFlash:=true
+  else
+    AMDFlash:=true;
+  FlashReset;
+  end;
+*32Procedure SSTEraseAMDSector(SectorNumber:longint);
+*98{------------------------------------------------------}
+*98{ Sector Number given as 0 to 7 range applies to Flash }
+*98{ memory segments $8000 to $F000                       }
+*98{                                                      }
+*98{ An AMD Sector is 64K. The SST Sector size is 256     }
+*98{ bytes. Accordingly we need to perform 256 SST Sector }
+*98{ erases to achieve and AMD sector erase.              }
+*98{______________________________________________________}
+  var scanner:integer;
+  var EraseSegment:longint;
+  begin
+*/.  if (SectorNumber=4) or (SectorNumber=7) then
+    begin
+*ED    Prompter.writeln('Attempting to Erase Locked Sectors in Flash');
+    Escape(3000);
+    end;
+*,+  EraseSegment:=(SectorNumber*$1000)+$8000;
+  for scanner:=0 to $FF do
+*98    SSTEraseSSTSegmentOffset(EraseSegment,scanner*$100);
+  end;
+    
+*-,Procedure EraseSector(SectorNumber:longint);
+*98{------------------------------------------------------}
+*98{ Sector Number given as 0 to 7 range                  }
+*98{______________________________________________________}
+  begin
+  if AMDFlash then
+*$#    AMDEraseAMDSector(SectorNumber)
+  else if SSTFlash then
+*$#    SSTEraseAMDSector(SectorNumber)
+  else
+*<;    Prompter.writeln('EraseSector reports unknown device');
+  end;
+    
+*NMProcedure SSTEraseSSTSegmentOffset(EraseSegment:integer; ByteOffset:integer);
+*98{------------------------------------------------------}
+*98{ Sector Number given as 0 to 7 range applies to Flash }
+*98{ memory segments $8000 to $F000                       }
+*98{                                                      }
+*98{ An AMD Sector is 64K. The SST Sector size is 256     }
+*98{ bytes. Accordingly we need to perform 256 SST Sector }
+*98{ erases to achieve and AMD sector erase.              }
+*98{______________________________________________________}
+  var LastRead:integer;  
+  var CurrentRead:integer;
+  var Anchor:longint;
+  begin
+  UnprotectSSTFlash;
+*43  Server.MemWriteByte(EraseSegment,ByteOffset,$20);
+*43  Server.MemWriteByte(EraseSegment,ByteOffset,$D0);
+*<;  CurrentRead:=Server.MemReadByte(EraseSegment,ByteOffset);
+  Anchor:=SampleCounter;
+  repeat
+    LastRead:=CurrentRead;
+*@?    CurrentRead:=Server.MemReadByte(EraseSegment,ByteOffset);  
+*$#    if TimeRemaining < MinTime then
+      yield;
+**)    if (SampleCounter-Anchor) > 4000 then
+      Escape(ec_EraseFailure);
+*43  until (LastRead and $40) = (CurrentRead and $40);
+  end;
+Procedure UnprotectSSTFlash;
+  begin
+  if SSTFlashUnprotected then
+    exit;
+*#"  Server.MemReadByte($8000,$1823);
+*#"  Server.MemReadByte($8000,$1820);
+*#"  Server.MemReadByte($8000,$1822);
+*#"  Server.MemReadByte($8000,$0418);
+*#"  Server.MemReadByte($8000,$041B);
+*#"  Server.MemReadByte($8000,$0419);
+*#"  Server.MemReadByte($8000,$041A);
+  SSTFlashUnprotected:=true;
+  end;
+SSTFlashUnprotectedW
+Boolean
+Procedure Initialize;
+  begin
+  SSTFlashUnprotected:=false;
+  IdentifyDevice;
+  JumpTable[1]:=2; {byte}
+  JumpTable[2]:=3; {integer}
+  JumpTable[3]:=5; {longint}
+  JumpTable[4]:=5; {single}
+*+*  {additional data types for vectors etc.}
+  end;
+Procedure ProtectSSTFlash;
+  begin
+*#"  Server.MemReadByte($8000,$1823);
+*#"  Server.MemReadByte($8000,$1820);
+*#"  Server.MemReadByte($8000,$1822);
+*#"  Server.MemReadByte($8000,$0418);
+*#"  Server.MemReadByte($8000,$041B);
+*#"  Server.MemReadByte($8000,$0419);
+*#"  Server.MemReadByte($8000,$040A);
+  SSTFlashUnprotected:=false;
+  end;
+Procedure UploadFirmware;
+  var scanner:longint;
+*$#  var Filename:string[127]; static;
+  var File:TFile;
+**)  var DataByteString:string[127]; static;
+  var AddressCounter:longint;
+  var DataByte:integer;
+  var PacketScanner:longint;
+  begin 
+  State:=0;
+  Filename:='c:\upload.oct';
+  File.Assign(Filename);
+  File.Rewrite;
+*87  File.writeln('Motion Server Block Object Code Text');
+*:9  File.writeln('Copyright 2001, Douloi Automation Inc.');
+  State:=1;
+  AddressCounter:=0;
+  for scanner:=0 to 2047 do
+    begin
+    Address:=scanner;
+*"!    for Packetscanner:=0 to 31 do
+      begin
+*:9      DataByte:=Server.MemReadByte($D000,AddressCounter);
+*ZY      StringAtPut(DataByteString,PacketScanner*2,NumberToHex((DataByte div $10) and $F));
+*RQ      StringAtPut(DataByteString,PacketScanner*2+1,NumberToHex(DataByte and $F));
+*76      StringAtPut(DataByteString,PacketScanner*2+2,0);
+*('      AddressCounter:=AddressCounter+1;
+      end;
+*"!    File.Writeln(DataByteString);
+    Status.writeln(scanner);
+    end;
+  AddressCounter:=0;
+  for scanner:=2048 to 4095 do
+    begin
+    Address:=scanner;
+*"!    for Packetscanner:=0 to 31 do
+      begin
+*:9      DataByte:=Server.MemReadByte($E000,AddressCounter);
+*ZY      StringAtPut(DataByteString,PacketScanner*2,NumberToHex((DataByte div $10) and $F));
+*RQ      StringAtPut(DataByteString,PacketScanner*2+1,NumberToHex(DataByte and $F));
+*76      StringAtPut(DataByteString,PacketScanner*2+2,0);
+*('      AddressCounter:=AddressCounter+1;
+      end;
+*"!    File.Writeln(DataByteString);
+    Status.writeln(scanner);
+    end;
+  File.Close;
+  end;
+*.-Function NumberToHex(Number:integer):integer;
+  begin
+*)(  if (Number>=0) and (Number <=9) then  
+    NumberToHex:=Number+48
+  else
+    NumberToHex:=Number-10+65;
+  end;
+*%$Procedure UploadFirmwareWithoutFPGA;
+  var scanner:longint;
+*$#  var Filename:string[127]; static;
+  var File:TFile;
+**)  var DataByteString:string[127]; static;
+  var AddressCounter:longint;
+  var DataByte:integer;
+  var PacketScanner:longint;
+  begin 
+  State:=0;
+  Filename:='c:\upload.oct';
+  File.Assign(Filename);
+  File.Rewrite;
+*87  File.writeln('Motion Server Block Object Code Text');
+*:9  File.writeln('Copyright 2001, Douloi Automation Inc.');
+  State:=1;
+  AddressCounter:=0;
+  for scanner:=2048 to 4095 do
+    begin
+    Address:=scanner;
+*"!    for Packetscanner:=0 to 31 do
+      begin
+*:9      DataByte:=Server.MemReadByte($E000,AddressCounter);
+*ZY      StringAtPut(DataByteString,PacketScanner*2,NumberToHex((DataByte div $10) and $F));
+*RQ      StringAtPut(DataByteString,PacketScanner*2+1,NumberToHex(DataByte and $F));
+*76      StringAtPut(DataByteString,PacketScanner*2+2,0);
+*('      AddressCounter:=AddressCounter+1;
+      end;
+*"!    File.Writeln(DataByteString);
+    Status.writeln(scanner);
+    end;
+  File.Close;
+  end;
+*%$Procedure UpdateFirmwareWithoutFPGA;
+  var scanner:longint;
+*$#  var Filename:string[127]; static;
+  var File:TFile;
+**)  var DataByteString:string[127]; static;
+  var AddressCounter:longint;
+  var DataByte:integer;
+  var PacketScanner:longint;
+  begin 
+  State:=0;
+  Filename:='*.oct';
+*('  if not GetOpenFilename(Filename) then
+    exit;
+  File.Assign(Filename);
+  File.Reset;
+  File.Readln(DataByteString);
+*CB  if DataByteString <> 'Motion Server Block Object Code Text' then
+    begin
+*<;    Prompter.writeln('Not a Motion Server Block OCT File');
+    Escape(9005);
+    end;
+*21  File.Readln(DataByteString); {copyright string}
+  State:=1;
+  EraseSector(6);
+  FlashReset; 
+  State:=7;
+  AddressCounter:=0;
+  for scanner:=2048 to 4095 do
+    begin
+    Address:=scanner;
+*!     File.Readln(DataByteString);
+*"!    for PacketScanner:=0 to 31 do
+      begin
+*KJ      DataByte:=(AsciiToHex(StringAt(DataByteString,PacketScanner*2))*$10)
+*CB        +AsciiToHex(StringAt(DataByteString,(PacketScanner*2)+1));
+*65      ProgramByte($E000,AddressCounter,DataByte);    
+*('      AddressCounter:=AddressCounter+1;
+      end;
+    end;
+*+*  {now indicate valid update in segment E}
+  ProgramByte($E000,0,$55);
+  ProgramByte($E000,1,$AA);
+  ProgramByte($E000,2,$AA);
+  ProgramByte($E000,3,$55);
+*GF  ProgramByte($8000,0,0); {invalidate now-mislinked autostart program}
+  ProgramByte($8000,1,0);
+  ProgramByte($8000,2,0);
+  ProgramByte($8000,3,0);
+  File.Close;
+  FlashReset;
+  end;
+*>=Procedure SetPersistentBoolean(Index:integer; Value:Boolean);
+*kj{------------------------------------------------------------------------------------------------------}  
+*ih{ Data Type Code for boolean is "0"                                                                    }
+*ih{______________________________________________________________________________________________________}
+  var Offset:integer;
+  var CurrentValue:boolean;
+  var SectorBase:integer;
+*#"  var ValueAlreadyPresent:boolean;
+  var LastHeaderOffset:integer;
+  const DataSize=1;
+  begin
+  if Value then
+*"!    Value:=true; {normalize true}
+  ValueAlreadyPresent:=false;
+  try
+    begin
+*,+    CurrentValue:=PersistentBoolean(Index);
+*!     if CurrentValue = Value then
+*!       ValueAlreadyPresent:=true;
+    end
+  recover
+    begin
+**)    {no current value - that is fine....}
+    end;
+  If ValueAlreadyPresent then
+*76    exit; {can't exit from within a try recover block}
+  SectorBase:=(Index-1)*$100;
+*[Z  if not PersistentOffsetAvailableForDataSize(Offset,Index,DataSize,LastHeaderOffset) then
+    begin
+*0/    SSTEraseSSTSegmentOffset($B000,SectorBase);
+*]\    if not PersistentOffsetAvailableForDataSize(Offset,Index,DataSize,LastHeaderOffset) then
+*('      Escape(ec_PersistentSectorErase);
+    end;
+  if Value then
+    begin
+*+*    {just leave default FF there for true}
+    end
+  else
+*.-    ProgramByte($B000,Offset+1+SectorBase,0);
+*ba  ProgramByte($B000,Offset+SectorBase,$81); {high bit means data valid, low 7 bits means boolean}
+  if LastHeaderOffset >= 0 then
+*rq    ProgramByte($B000,LastHeaderOffset+SectorBase,Server.MemReadByte($B000,LastHeaderOffset+SectorBase) and $7F);
+  end;
+*"!Procedure LoadPersistentLongints;
+  begin
+  Escape(40000);
+  end;
+JumpTable
+ end; {Exp}
+Integer
+ar Eluold:single; stat
+Function PersistentOffsetAvailableForDataSize(var Offset:integer; Index:integer; Size:integer; var LastHeader:integer):boolean;
+  var HeaderByte:integer;
+  var SectorBase:integer;
+  begin
+  Offset:=0;
+  LastHeader:=-1;
+  SectorBase:=(Index-1)*$100;
+  repeat
+*ED    HeaderByte:=Server.MemReadByte($B000,SectorBase+Offset) and $FF;
+    if (HeaderByte=$FF) then
+      begin
+*('      if (Offset+Size) < 256 then      
+*32        PersistentOffsetAvailableForDataSize:=true
+      else
+*54        PersistentOffsetAvailableForDataSize:=false;
+      exit
+      end
+    else
+      begin
+      LastHeader:=Offset;
+*43      Offset:=Offset+JumpTable[HeaderByte and $7F];
+      end;
+  until Offset > 255;
+*/.  PersistentOffsetAvailableForDataSize:=false;
+  end;
+*32Function PersistentBoolean(Index:integer):boolean;
+*kj{------------------------------------------------------------------------------------------------------}  
+*ih{ Data Type Code for boolean is "1"                                                                    }
+*ih{______________________________________________________________________________________________________}
+  var HeaderOffset:integer;
+  var Header:integer;
+  var SectorBase:integer;
+  begin
+  SectorBase:=(Index-1)*$100;
+*CB  HeaderOffset:=OffsetOfLastValidHeaderForIndex(Index)+SectorBase;
+*21  Header:=Server.MemReadByte($B000,HeaderOffset);
+  if (Header and $7F) <> 1 then
+*=<    Escape(ec_PersistentDatatypeError); {data type mismatch}
+*A@  if (Server.MemReadByte($B000,HeaderOffset+1) and $FF) > 0 then
+    PersistentBoolean:=true
+  else
+    PersistentBoolean:=false;
+  end;
+*A@Function OffsetOfLastValidHeaderForIndex(Index:integer):integer;
+  var Offset:integer;
+  var Value:integer;
+  var SectorBase:integer;
+  begin
+  Offset:=0;
+  SectorBase:=(Index-1)*$100;
+  while Offset < 255 do
+    begin
+*@?    Value:=Server.MemReadByte($B000,SectorBase+Offset) and $FF;
+    if (Value and $80) > 0 then
+      begin
+      if Value <> $FF then
+        begin
+*98        OffsetOfLastValidHeaderForIndex:=Offset;        
+        exit;
+        end
+      else
+        Escape(6001);
+      end
+    else
+*/.      Offset:=Offset+JumpTable[Value and $7F];
+    end;
+  Escape(6001);
+  end;
+*32Function PersistentInteger(Index:integer):integer;
+*kj{------------------------------------------------------------------------------------------------------}  
+*ih{ Data Type Code for integer is "2"                                                                    }
+*ih{______________________________________________________________________________________________________}
+  var HeaderOffset:integer;
+  var Header:integer;
+  var SectorBase:integer;
+  var HighByte:longint;
+  var LowByte:longint;
+  begin
+  SectorBase:=(Index-1)*$100;
+*CB  HeaderOffset:=OffsetOfLastValidHeaderForIndex(Index)+SectorBase;
+*21  Header:=Server.MemReadByte($B000,HeaderOffset);
+  if (Header and $7F) <> 2 then
+*=<    Escape(ec_PersistentDatatypeError); {data type mismatch}
+*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+1) and $FF;
+*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+2) and $FF;
+*/.  PersistentInteger:=HighByte*$100 or LowByte;
+  end;
+ec_PersistentSectorErase
+9002
+ec_PersistentDatatypeError
+9003P
+*>=Procedure SetPersistentInteger(Index:integer; Value:Integer);
+*kj{------------------------------------------------------------------------------------------------------}  
+*ih{ Data Type Code for boolean is "0"                                                                    }
+*ih{______________________________________________________________________________________________________}
+  var Offset:integer;
+  var CurrentValue:Integer;
+  var SectorBase:integer;
+*#"  var ValueAlreadyPresent:boolean;
+  var LastHeaderOffset:integer;
+  const DataSize=2;
+  begin
+  ValueAlreadyPresent:=false;
+  try
+    begin
+*,+    CurrentValue:=PersistentInteger(Index);
+*!     if CurrentValue = Value then
+*!       ValueAlreadyPresent:=true;
+    end
+  recover
+    begin
+**)    {no current value - that is fine....}
+    end;
+  If ValueAlreadyPresent then
+*76    exit; {can't exit from within a try recover block}
+  SectorBase:=(Index-1)*$100;
+*[Z  if not PersistentOffsetAvailableForDataSize(Offset,Index,DataSize,LastHeaderOffset) then
+    begin
+*0/    SSTEraseSSTSegmentOffset($B000,SectorBase);
+*]\    if not PersistentOffsetAvailableForDataSize(Offset,Index,DataSize,LastHeaderOffset) then
+*('      Escape(ec_PersistentSectorErase);
+    end;
+*87  ProgramByte($B000,Offset+1+SectorBase,Value and $FF);
+*98  ProgramByte($B000,Offset+2+SectorBase,Value div $100);
+*ba  ProgramByte($B000,Offset+SectorBase,$82); {high bit means data valid, low 7 bits means boolean}
+  if LastHeaderOffset >= 0 then
+*ut    ProgramByte($B000,LastHeaderOffset+SectorBase,Server.MemReadByte($B000,LastHeaderOffset+SectorBase) and $7F);   
+  end;
+*>=Procedure SetPersistentLongint(Index:integer; Value:Longint);
+*kj{------------------------------------------------------------------------------------------------------}  
+*ih{ Data Type Code for boolean is "0"                                                                    }
+*ih{______________________________________________________________________________________________________}
+  var Offset:integer;
+  var CurrentValue:Integer;
+  var SectorBase:integer;
+*#"  var ValueAlreadyPresent:boolean;
+  var LastHeaderOffset:integer;
+  const DataSize=4;
+  begin
+  ValueAlreadyPresent:=false;
+  try
+    begin
+*,+    CurrentValue:=PersistentLongint(Index);
+*!     if CurrentValue = Value then
+*!       ValueAlreadyPresent:=true;
+    end
+  recover
+    begin
+**)    {no current value - that is fine....}
+    end;
+  If ValueAlreadyPresent then
+*76    exit; {can't exit from within a try recover block}
+  SectorBase:=(Index-1)*$100;
+*[Z  if not PersistentOffsetAvailableForDataSize(Offset,Index,DataSize,LastHeaderOffset) then
+    begin
+*0/    SSTEraseSSTSegmentOffset($B000,SectorBase);
+*]\    if not PersistentOffsetAvailableForDataSize(Offset,Index,DataSize,LastHeaderOffset) then
+*('      Escape(ec_PersistentSectorErase);
+    end;
+*87  ProgramByte($B000,Offset+1+SectorBase,Value and $FF);
+*98  ProgramByte($B000,Offset+2+SectorBase,Value div $100);
+*;:  ProgramByte($B000,Offset+3+SectorBase,Value div $10000);
+*=<  ProgramByte($B000,Offset+4+SectorBase,Value div $1000000);
+*ba  ProgramByte($B000,Offset+SectorBase,$83); {high bit means data valid, low 7 bits means boolean}
+  if LastHeaderOffset >= 0 then
+*ut    ProgramByte($B000,LastHeaderOffset+SectorBase,Server.MemReadByte($B000,LastHeaderOffset+SectorBase) and $7F);   
+  end;
+*32Function PersistentLongint(Index:integer):Longint;
+*kj{------------------------------------------------------------------------------------------------------}  
+*ih{ Data Type Code for integer is "3"                                                                    }
+*ih{______________________________________________________________________________________________________}
+  var HeaderOffset:integer;
+  var Header:integer;
+  var SectorBase:integer;
+  var HighByte:longint;
+  var LowByte:longint;
+  var LowWord:longint;
+  var HighWord:longint;
+  begin
+  SectorBase:=(Index-1)*$100;
+*CB  HeaderOffset:=OffsetOfLastValidHeaderForIndex(Index)+SectorBase;
+*21  Header:=Server.MemReadByte($B000,HeaderOffset);
+  if (Header and $7F) <> 3 then
+*=<    Escape(ec_PersistentDatatypeError); {data type mismatch}
+*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+1) and $FF;
+*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+2) and $FF;
+*%$  LowWord:=HighByte*$100 or LowByte;
+*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+3) and $FF;
+*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+4) and $FF;
+*&%  HighWord:=HighByte*$100 or LowByte;
+*GF  PersistentLongint:=MakeLongintFromHighAndLowWords(HighWord,LowWord);
+  end;
+*<;Procedure SetPersistentSingle(Index:integer; Value:Single);
+*kj{------------------------------------------------------------------------------------------------------}  
+*ih{ Data Type Code for boolean is "0"                                                                    }
+*ih{______________________________________________________________________________________________________}
+  var Offset:integer;
+  var CurrentValue:Single;
+  var SectorBase:integer;
+*#"  var ValueAlreadyPresent:boolean;
+  var LastHeaderOffset:integer;
+  var LValue:longint;
+  const DataSize=4;
+  begin
+  ValueAlreadyPresent:=false;
+  try
+    begin
+*+*    CurrentValue:=PersistentSingle(Index);
+*-,    if abs(CurrentValue-Value) < 0.0001 then
+*!       ValueAlreadyPresent:=true;
+    end
+  recover
+    begin
+**)    {no current value - that is fine....}
+    end;
+  If ValueAlreadyPresent then
+*76    exit; {can't exit from within a try recover block}
+  SectorBase:=(Index-1)*$100;
+*[Z  if not PersistentOffsetAvailableForDataSize(Offset,Index,DataSize,LastHeaderOffset) then
+    begin
+*0/    SSTEraseSSTSegmentOffset($B000,SectorBase);
+*]\    if not PersistentOffsetAvailableForDataSize(Offset,Index,DataSize,LastHeaderOffset) then
+*('      Escape(ec_PersistentSectorErase);
+    end;
+  LValue:=Longint(Value);
+*98  ProgramByte($B000,Offset+1+SectorBase,LValue and $FF);
+*:9  ProgramByte($B000,Offset+2+SectorBase,LValue div $100);
+*<;  ProgramByte($B000,Offset+3+SectorBase,LValue div $10000);
+*>=  ProgramByte($B000,Offset+4+SectorBase,LValue div $1000000);
+*ba  ProgramByte($B000,Offset+SectorBase,$84); {high bit means data valid, low 7 bits means boolean}
+  if LastHeaderOffset >= 0 then
+*ut    ProgramByte($B000,LastHeaderOffset+SectorBase,Server.MemReadByte($B000,LastHeaderOffset+SectorBase) and $7F);   
+  end;
+*HGProcedure SavePersistentDataToFile(var Filename:string; Count:integer);
+  var File:TFile;
+  var HeaderOffset:integer;
+  var scanner:integer;
+  var LastHeader:integer;
+  begin 
+  File.Assign(Filename);
+  File.Rewrite;
+*('  File.writeln('Persistent Data File');
+*&%  File.writeln('1 (Version Number)');
+*-,  File.writeln(Count,' (Data Point Count)');
+  if Count > 256 then
+    Count:=256;
+  for scanner:=1 to Count do
+    begin
+    try
+      begin
+*QP      HeaderOffset:=OffsetOfLastValidHeaderForIndex(scanner)+((scanner-1)*$100);
+*BA      LastHeader:=Server.MemReadByte($B000,HeaderOffset) and $FF;
+      if LastHeader = $80 then
+        begin
+*+*        if PersistentBoolean(scanner) then
+*=<          File.writeln('1 1 (',scanner,' contains Boolean)')
+        else
+*>=          File.writeln('1 0 (',scanner,' contains Boolean)');
+        end
+*"!      else if LastHeader=$82 then
+*XW        File.writeln('2 ',PersistentInteger(scanner),' (',scanner,' contains Integer)')
+*"!      else if LastHeader=$83 then
+*XW        File.writeln('3 ',PersistentLongint(scanner),' (',scanner,' contains Longint)')
+*"!      else if LastHeader=$84 then
+*VU        File.writeln('4 ',PersistentSingle(scanner),' (',scanner,' contains Single)')
+      end
+    Recover
+*43      File.writeln('0 (',scanner,' is available)');
+    end;
+  File.Close;
+  end;
+*10Function PersistentSingle(Index:integer):Single;
+*=<{--------------------------------------------------------}  
+*;:{ Data type is 4                                         }
+*;:{________________________________________________________}
+  var HeaderOffset:integer;
+  var Header:integer;
+  var SectorBase:integer;
+  var HighByte:longint;
+  var LowByte:longint;
+  var LowWord:longint;
+  var HighWord:longint;
+  begin
+  SectorBase:=(Index-1)*$100;
+*CB  HeaderOffset:=OffsetOfLastValidHeaderForIndex(Index)+SectorBase;
+*21  Header:=Server.MemReadByte($B000,HeaderOffset);
+  if (Header and $7F) <> 4 then
+*=<    Escape(ec_PersistentDatatypeError); {data type mismatch}
+*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+1) and $FF;
+*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+2) and $FF;
+*%$  LowWord:=HighByte*$100 or LowByte;
+*=<  LowByte:=Server.MemReadByte($B000,HeaderOffset+3) and $FF;
+*>=  HighByte:=Server.MemReadByte($B000,HeaderOffset+4) and $FF;
+*&%  HighWord:=HighByte*$100 or LowByte;
+*ED  PersistentSingle:=MakeSingleFromHighAndLowWords(HighWord,LowWord);
+  end;
+*;:Procedure LoadPersistentDataFromFile(var Filename:string);
+  var File:TFile;
+  var scanner:integer;
+  var DataType:integer;
+  var UnusedString:string[127];
+  var Count:integer;
+  var LastHeader:integer;
+  begin 
+  File.Assign(Filename);
+  File.Reset;
+*43  File.Readln(UnusedString); {Persistent Data File}
+*21  File.Readln(UnusedString); {1 (Version Number)}
+  File.Readln(Count);
+  for scanner:=1 to Count do
+    begin
+    try
+      begin
+      
+      if LastHeader = $80 then
+        begin
+*+*        if PersistentBoolean(scanner) then
+*=<          File.writeln('1 1 (',scanner,' contains Boolean)')
+        else
+*>=          File.writeln('1 0 (',scanner,' contains Boolean)');
+        end
+*"!      else if LastHeader=$82 then
+*XW        File.writeln('2 ',PersistentInteger(scanner),' (',scanner,' contains Integer)')
+*"!      else if LastHeader=$83 then
+*XW        File.writeln('3 ',PersistentLongint(scanner),' (',scanner,' contains Longint)')
+*"!      else if LastHeader=$84 then
+*VU        File.writeln('4 ',PersistentSingle(scanner),' (',scanner,' contains Single)')
+      end
+    Recover
+*43      File.writeln('0 (',scanner,' is available)');
+    end;
+  File.Close;
+  end;
+*32Function ReadbackIDBit(BitNumber:integer):integer;
+  begin
+*+*  server.portwritebyte($B000+BitNumber,0);
+*-,  if (server.PortReadByte(7) and 1) > 0 then
+    ReadbackIDBit:=1
+  else
+    ReadbackIDBit:=0;
+  end;
+Function ProductCode:integer;
+  begin
+  ProductCode:=
+    ReadbackIdBit(0)
+    +(ReadbackIdBit(1)*2)
+    +(ReadbackIDBit(2)*4)
+    +(ReadbackIdBit(3)*8)
+    +(ReadbackIdBit(4)*16);
+  end;
+txtAz2
+Azimuth
+txtEl2
+Elevation
+txtTime2
+Time
+txtNow2
+txtPrev2
+txtAzNow2
+txtAzNow
+txtElNow2
+txtElNow
+txtTimeStart2
+txtTimeStart
+txtAzStart2
+txtAzStart
+txtElStart2
+txtElStart
+txtTimeNow2
+txtTimeNow
+txtStart2
+Start
+labEnc2
+Position
+txtAzFin2
+txtAzFin
+txtElFin2
+txtElFin
+txtTimeFin2
+txtTimeFin
+txtAzEnc2
+txtAzEnc
+txtElEnc2
+txtElEnc
+txtVel2
+txtVel
+txtVaz2
+txtVaz
+txtVaz22
+txtVaz2
+cmdZeroEl2
+procedure Click;
+var x:longint;
+  begin
+  inElEnc.readln(x);
+  WAxis.SetActualPosition(x);
+  end;
+Set El Enc
+cmdZeroAz2
+procedure Click;
+var x:longint;
+  begin
+    inAzEnc.readln(x)
+    VAxis.SetActualPosition(x);
+end;
+Set Az Enc
+txtElIndexPos2
+txtElIndexPos
+txtAzIndexPos2
+txtAzIndexPos
+txtErrorAz2
+txtErrorAz
+txtErrorEl2
+txtErrorEl
+Static2842
+CppErr (mdeg)
+txtCmdTorqueAz2
+txtCmdTorqueAz
+txtCmdTorqueEl2
+txtCmdTorqueEl
+Static287x2
+CmdTorque
+Static2892
+Trace
+txtTrace2
+txtTrace
+Static2912
+Velocity
+Static2942
+Buff Len
+txtBL2
+txtBL
+txtElIndexDelta2
+txtElIndexDelta
+txtAzIndexDelta2
+txtAzIndexDelta
+txtPID2
+txtPID
+Static3262
+Pos Prop Gain
+Static3272
+Pos Int Gain
+Static3342
+Vel Prop Gain
+Static3352
+Vel Int Gain
+Static3302
+ErrInt
+txtAzPosIntErr2
+txtAzPosIntErr
+txtElPosIntErr2
+txtElPosIntErr
+txtEncState2
+txtEncState
+txtAzTheta2
+txtAzTheta
+txtElTheta2
+txtElTheta
+Static3552
+1st Ind
+Static3562
+2nd Ind
+Static3572
+Delta
+txtElIndexPosOld2
+txtElIndexPosOld
+txtAzIndexPosOld2
+txtAzIndexPosOld
+Static3602
+Theta
+Static3612
+Static3622
+Static3642
+RT enc cnt
+txtRtElEC2
+txtRtElEC
+txtRtAzEC2
+txtRtAzEC
+inElEnc2
+procedure EnterKeyPushed;
+  begin
+  {your code goes here}
+  end;
+inAzEnc2
+procedure EnterKeyPushed;
+  begin
+  {your code goes here}
+  end;
+Static3732
+Recommended
+txtRecEl2
+txtRecEl
+txtRecAz2
+txtRecAz
+Static3932
+CmdVelAz
+txtCmdVelAz2
+txtCmdVelAz
+txtCmdVelEl2
+txtCmdVelEl
+txtAzVelErr2
+txtAzVelErr
+txtElVelErr2
+txtElVelErr
+Static3982
+VelErr
+Static3992
+Vel Int
+txtAzVelIntErr2
+txtAzVelIntErr
+txtElVelIntErr2
+txtElVelIntErr
+Button4182
+procedure Click;
+  begin
+  MSBFlashManager.PopUP;
+  end;
+Save program to EEPROM
+Static4242
+Cal State
+Static4452
+txtdb12
+txtdb1
+Static4472
+Static4482
+txtdb22
+txtdb2
+txtdb32
+txtdb3
+tbAzKpi2
+tbAzKpi
+tbElKpi2
+tbElKpi
+tbAzKvp2
+tbAzKvp
+tbElKvp2
+tbElKvp
+tbAzKvi2
+tbAzKvi
+tbElKvi2
+tbElKvi
+tbAzKff2
+tbAzKff
+tbElKff2
+tbElKff
+Static4612
+CppCmd
+txtCppAz2
+txtCppAz
+txtCppEl2
+txtCppEl
+Static4702
+Trq Max
+tbAzTmax2
+tbAzTmax
+tbElTmax2
+tbElTmax
+txtErrAzA2
+txtErrAzA
+txtErrElA2
+txtErrElA
+Static4782
+Err (mdeg)
+Inp12
+Inp1
+Inp22
+Inp2
+Inp32
+Inp3
+Inp42
+Inp4
+Inp52
+Inp5
+Inp62
+Inp6
+Inp72
+Inp7
+Inp82
+Inp8
+Inp92
+Inp9
+Out12
+Out1
+Out22
+Out2
+Static6192
+Inp 1
+Static6202
+Inp 2
+Static6212
+Inp 3
+Static6222
+Inp 4
+Static6232
+Inp 5
+Static6242
+Inp 6
+Static6252
+Inp 7
+Static6262
+Inp 8
+Static6272
+Inp 9
+Static6282
+Out 1
+Static6292
+Out 2
+tbAzVoltage2
+tbAzVoltage
+tbElVoltage2
+tbElVoltage
+tbTestMode2
+tbTestMode
+Static5422
+TstMode
+tbUtest2
+tbUtest
+Static5432
+Trq Sign
+Static5442
+Trq Bias
+Static5452
+Axis Cnts/Rev
+Static5462
+Mtr Cnts/Rev
+Static5472
+Enc PosOff
+Static5492
+Trq Min
+tbAzTmin2
+tbAzTmin
+tbElTmin2
+tbElTmin
+tbAzTsgn2
+tbAzTsgn
+tbElTsgn2
+tbElTsgn
+tbAzTbias2
+tbAzTbias
+tbAzEcr2
+tbAzEcr
+tbElEcr2
+tbElEcr
+tbAzMEcr2
+tbAzMEcr
+tbElMEcr2
+tbElMEcr
+tbAzEpo2
+tbAzEpo
+tbElEpo2
+tbElEpo
+Static5662
+K Feed Fwd
+Static5672
+Imax
+Static5682
+Vmax
+Static5692
+Amax
+Static5702
+CPP e
+Static5712
+CPP Kv
+Static5722
+CPP Ko
+tbAzKo2
+tbAzKo
+tbAzImax2
+tbAzImax
+tbAzVmax2
+tbAzVmax
+tbAzAmax2
+tbAzAmax
+tbAze2
+tbAze
+tbAzKv2
+tbAzKv
+tbElImax2
+tbElImax
+tbElVmax2
+tbElVmax
+tbElAmax2
+tbElAmax
+tbEle2
+tbEle
+tbElKv2
+tbElKv
+tbElKo2
+tbElKo
+tbAzKpp2
+tbAzKpp
+tbElKpp2
+tbElKpp
+tbAzAr2
+tbAzAr
+tbElAr2
+tbElAr
+Static5922
+Axis Ratio
+txtdeltaVaz2
+txtdeltaVaz
+CmdProc2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure DoubleClickLeft;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+    comm.uartsetup
+*.-    BeginTask(TaskAddr(TaskMonitorCommPort));
+  end;
+function  CanClose:boolean;
+  begin
+  {your code goes here}
+  end;
+Command Processor)'
+Comm2
+procedure BeginDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Drag;
+  begin
+  {your code goes here}
+  end;
+procedure EndDrag;
+  begin
+  {your code goes here}
+  end;
+procedure Setup;
+  begin
+  {your code goes here}
+  end;
+function  CanClose:boolean;
+  begin
+  {your code goes here}
+  end;
+version 1.00)'q
+ModemControlRegister!
+   i
+DtrBitCounter > TimeoutValue thenr;  
+ModemStatusRegister
+6  if TimeoutCounter > TimeoutValue then
+DsrBit
+*#"Function CharacterPresent:boolean;
+  begin  
+*RQ  if (Server.PortReadByte(PortAddress+LineStatusRegister) and rxrdy) = rxrdy then
+    CharacterPresent:=true
+  else
+    CharacterPresent:=false;
+  end; {CharacterPresent}
+*('Procedure SendCharacter(aChar:integer);
+  var TimeoutCounter:longint;
+  begin
+  {set dtr and rts}
+*:9{  Server.PortWriteByte(PortAddress+ModemControlRegister,
+*;:    Server.PortReadByte(PortAddress+ModemControlRegister) 
+    or DtrBit
+    or RtsBit);}
+  {check dtr and rts}
+{  TimeoutCounter:=0;
+*TS  while Server.PortReadByte(PortAddress+ModemStatusRegister) and (DsrBit or CtsBit)
+  <> (DsrBit or CtsBit) do
+    begin
+    yield;
+*&%    TimeoutCounter:=TimeoutCounter+1;
+**)    if TimeoutCounter > TimeoutValue then
+*('      Escape(SerialTransmitEscapeCode);
+    end;}
+  {check for transmit ready}
+  TimeoutCounter:=0;
+*NM  {only check status if we have put fifo-capacity characters into the buffer}
+*%$  if SubmittedCharacterCount=16 then
+    begin
+*VU    while (Server.PortReadByte(PortAddress+LineStatusRegister) and txrdy) <> txrdy do
+      begin
+      yield;
+*('      TimeoutCounter:=TimeoutCounter+1;
+*,+      if TimeoutCounter > TimeoutValue then
+**)        Escape(SerialTransmitEscapeCode);
+      end;
+    SubmittedCharacterCount:=0;
+    end;
+*@?  Server.PortWriteByte(PortAddress+TransmitDataRegister,aChar);
+*65  SubmittedCharacterCount:=SubmittedCharacterCount+1;
+  end; {Sendcharacter}
+TransmitDataRegister0<
+rxrdy,
+LineStatusRegister
+Function GetCharacter:integer;
+  var TimeoutCounter:longint;
+  begin
+*:9{  Server.PortWriteByte(PortAddress+ModemControlRegister,
+*GF    Server.PortReadByte(PortAddress+ModemControlRegister) or DtrBit);}
+  {check DSR signal}
+{  TimeoutCounter:=0;
+*WV  while (Server.PortReadByte(PortAddress+ModemStatusRegister) and DsrBit) <> DsrBit do
+    begin
+    yield;
+*&%    TimeoutCounter:=TimeoutCounter+1;
+**)    if TimeoutCounter > TimeoutValue then
+*'&      Escape(SerialReceiveEscapeCode);
+    end;}
+  {check for data ready}
+  TimeoutCounter:=0;
+*TS  while (Server.PortReadByte(PortAddress+LineStatusRegister) and rxrdy) <> rxrdy do
+    begin
+    yield;
+*&%    TimeoutCounter:=TimeoutCounter+1;
+**)    if TimeoutCounter > TimeoutValue then
+*'&      Escape(SerialReceiveEscapeCode);
+    end;
+*FE  GetCharacter:=Server.PortReadByte(PortAddress+ReceiveDataRegister);
+  end; {Getcharacter}
+ReceiveDataRegisterT
+ineControlRegister
+PortAddress
+ivisorLSBRegister
+Integer
+ivisorMSBRegister
+RtsBit
+ifoControlRegister
+CtsBit
+rocedure PackageMark
++TimeoutValue
+Longint
+SerialTransmitEscapeCode
+ beginv
+txrdy
+SerialReceiveEscapeCode
+**)Procedure SendString(var aString:string);
+  var scanner:integer;
+  var Character:integer;  
+  begin
+  scanner:=0;
+  repeat
+**)    Character:=StringAt(aString,scanner);
+*54    if Character <> 0 then SendCharacter(Character);
+    scanner:=scanner+1;
+  until Character=0;      
+  end; {SendString}
+*)(Procedure GetString(var aString:string);
+  var scanner:integer;
+  var IncomingChar:integer;
+  begin
+  scanner:=0;
+  repeat
+    IncomingChar:=GetCharacter;
+*/.    StringAtPut(aString,scanner,IncomingChar);
+    scanner:=scanner+1;
+  until IncomingChar=0;
+  end; {GetString}
+Procedure UartSetup;
+*.-{-------------------------------------------}
+  begin
+  PortAddress:=$6000;
+  TimeoutValue:=1000;  
+  SubmittedCharacterCount:=0;
+*=<  Server.PortWriteByte(PortAddress+LineControlRegister,$80);
+*ji  Server.PortWriteByte(PortAddress+DivisorLSBRegister,4); {48 = 9600 baud, 24=19.2kBaud, 12=38.4K 4=115K}
+*:9  Server.PortWriteByte(PortAddress+DivisorMSBRegister,0);
+*WV  Server.PortWriteByte(PortAddress+LineControlRegister,3); {no parity, 8 bits, 1 stop}
+*WV  Server.PortWriteByte(PortAddress+FifoControlRegister,15);{fifos enabled and cleared}
+*^]  Server.PortWriteByte(PortAddress+ModemControlRegister,$0B); {set hardware handshake levels}
+  end; {USART Setup}
+LineControlRegister
+_-\)
+DivisorLSBRegister
+DivisorMSBRegister
+FifoControlRegister
+Procedure PackageMarker;
+  begin
+*+*  Prompter.writeln('end of comm package');
+  end; {PackageMarker}
+SubmittedCharacterCounth
+ThinHatch
+Pebbl
+Integerbble
+Brick
+Type OrdinalCode=object
+  end;
+var Error:Object
+  const Grammar=1001;
+*%$  const GroupNumberOutOfBounds=2000;
+  const IllegalDimension=2001;
+*"!  const GroupNotInitialized=2002;
+*'&  const CoordinatedGroupRequired=2003;
+  const TooManyParameters=2004;
+  const TooFewParameters=2005;
+  const Assertion=2006;
+*#"  const ParameterOutOfBounds=2007;
+*!   const UnassignedUserTask=2008;
+  const OutOfCurveBuffers=2009;
+*)(  const UnableToFindNamedProcedure=2010;
+  const UnableToLink=2011;
+  end;
+var AsciiCode:Object
+    const BigA=65;
+    const BigB=66;
+    const BigC=67;
+    const BigD=68;
+    const BigE=69;
+    const BigF=70;
+    const BigG=71;
+    const BigH=72;
+    const BigI=73;
+    const BigJ=74;
+    const BigK=75;
+    const BigL=76;
+    const BigM=77;
+    const BigN=78;
+    const BigO=79;
+    const BigP=80;
+    const BigQ=81;
+    const BigR=82;
+    const BigS=83;
+    const BigT=84;
+    const BigU=85;
+    const BigV=86;
+    const BigW=87;
+    const BigX=88;
+    const BigY=89;
+    const BigZ=90;
+    const MinusSign=45;
+    const PlusSign=43;
+    const MultiplySign=42;
+    const LeftParen=40;
+    const RightParen=41;
+    const Period=46;
+    const Zero=48;
+    const Nine=57;
+    const SmallA=97;
+    const SmallZ=122;
+*"!    const SmallAToBigAOffset=-32;
+    const Colon=58;
+    const LessThanSign=60;
+    const EqualsSign=61;
+*"!    const GreaterThanSign=62;    
+    end;
+var GlobalColumn:integer;
+*"!const tk_nil                 = 0;
+*VUconst tk_word                = 1; {general alpha that's not a predefined object type}
+*43const tk_T1Axis              = 2; {an isolated "A"}
+*43const tk_TNAxis              = 3; {an isolated "G"}
+*"!const tk_Assignment          = 4;
+*"!const tk_Literal             = 5;
+*"!const tk_LessThanOrEqualTo   = 6;
+*"!const tk_NotEqualTo          = 7;
+*"!const tk_LessThan            = 8;
+*"!const tk_GreaterThanOrEqualTo= 9;
+*"!const tk_GreaterThan         =10;
+*"!const tk_PlusOp              =11;
+*"!const tk_MultiplyOp          =12;
+*"!const tk_LeftParen           =13;
+*"!const tk_RightParen          =14;
+*"!const tk_Period              =15;
+Type TToken=object
+  Value:String[127];
+  Kind:integer;    
+*$#  function IsAMathOperator:boolean;
+    begin
+    IsAMathOperator:=false;
+    if Kind=tk_PlusOp then
+      IsAMathOperator:=true
+*$#    else if Kind=tk_MultiplyOp then
+      IsAMathOperator:=true;
+    end;
+  end;
+*$#const ScanningErrorEscapeCode=1000;
+*SR{--------------------------------------------------------------------------------}
+*)(Procedure ScanningError(column:integer);
+*SR{--------------------------------------------------------------------------------}
+  begin
+  GlobalColumn:=column;
+*#"  Escape(ScanningErrorEscapeCode);
+  end;
+*SR{--------------------------------------------------------------------------------}
+*FEProcedure SkipOverWhiteSpace(var Source:string; var scanner:integer);
+*SR{--------------------------------------------------------------------------------}
+  var ScanDone:boolean;
+  var NextChar:integer;
+  begin
+  ScanDone:=false;
+  repeat
+*('    NextChar:=StringAt(Source,scanner);
+    if (NextChar=32)
+    or (NextChar=44) then
+      scanner:=scanner+1
+    else
+      ScanDone:=true;
+  until ScanDone;  
+  end;
+*SR{--------------------------------------------------------------------------------}
+*32Function IsPartOfANumber(CharOrd:integer):boolean;
+*SR{--------------------------------------------------------------------------------}
+  begin
+  IsPartOfANumber:=true;
+*&%  if CharOrd=AsciiCode.MinusSign then
+    exit; 
+*#"  if CharOrd=AsciiCode.Period then
+    exit;
+*!   if (CharOrd >= AsciiCode.Zero)
+*'&  and (CharOrd <= AsciiCode.Nine) then
+    exit;
+  IsPartOfANumber:=false;
+  end;
+*SR{--------------------------------------------------------------------------------}
+*LKFunction IsPartOfAWord(CharOrd:integer; var UpperCaseChar:integer):boolean;
+*SR{--------------------------------------------------------------------------------}
+  begin
+  IsPartOfAWord:=true;
+  UpperCaseChar:=CharOrd;
+*#"  if (CharOrd >= AsciiCode.SmallA)
+*)(  and (CharOrd <= AsciiCode.SmallZ) then
+    begin
+*98    UpperCaseChar:=CharOrd+AsciiCode.SmallAToBigAOffset;
+    exit;
+    end;
+*!   if (CharOrd >= AsciiCode.BigA)
+*'&  and (CharOrd <= AsciiCode.BigZ) then
+    exit;
+  IsPartOfAWord:=false;
+  end;
+var InspectToken:TToken;
+*SR{--------------------------------------------------------------------------------}
+*@?Procedure GetNextToken(var Source:string; var scanner:integer);
+*SR{--------------------------------------------------------------------------------}
+*SR{ This routine seperates tokens in the command line and identifies multiple      }
+*SR{ character groups into abstract tokens                                          }
+*SR{________________________________________________________________________________}
+  var TokenScanner:integer;
+  var NextChar:integer;
+  var ScanDone:boolean;
+  var UpperChar:integer;
+  begin
+*&%  SkipOverWhiteSpace(Source,scanner);
+*)(  NextChar:=StringAt(source,scanner);   
+*&%  if NextChar=AsciiCode.PlusSign then
+    begin
+*"!    InspectToken.Kind:=tk_PlusOp;
+    scanner:=scanner+1;
+    exit;
+    end;
+**)  if NextChar=AsciiCode.MultiplySign then
+    begin
+*&%    InspectToken.Kind:=tk_MultiplyOp;
+    scanner:=scanner+1;
+    exit;
+    end;
+*$#  if IsPartOfANumber(NextChar) then
+    begin
+    TokenScanner:=0;
+*'&    While IsPartOfANumber(NextChar) do
+      begin
+*=<      StringAtPut(InspectToken.Value,TokenScanner,NextChar);
+      scanner:=scanner+1;
+*$#      TokenScanner:=TokenScanner+1;
+**)      NextChar:=StringAt(Source,scanner);
+      end;
+*43    StringAtPut(InspectToken.Value,TokenScanner,0);
+*#"    InspectToken.Kind:=tk_Literal;
+    exit;    
+    end
+*#"  if NextChar=AsciiCode.Colon then
+    begin
+    scanner:=scanner+1;
+*('    NextChar:=StringAt(Source,scanner);
+**)    if NextChar=AsciiCode.EqualsSign then
+      begin
+      scanner:=scanner+1;
+*('      InspectToken.Kind:=tk_Assignment;
+      exit;
+      end
+    else
+      ScanningError(scanner);
+    end;
+      
+**)  if NextChar=AsciiCode.LessThanSign then
+    begin
+    scanner:=scanner+1;
+*('    NextChar:=StringAt(Source,scanner);
+**)    if NextChar=AsciiCode.EqualsSign then
+      begin
+      scanner:=scanner+1;
+*/.      InspectToken.Kind:=tk_LessThanOrEqualTo;
+      exit;
+      end
+*43    else if NextChar=AsciiCode.GreaterThanSign then
+      begin
+      scanner:=scanner+1;
+*('      InspectToken.Kind:=tk_NotEqualTo;
+      exit;
+      end
+    else
+      begin
+*&%      InspectToken.Kind:=tk_LessThan;
+      exit;
+      end;
+    end;
+*-,  if NextChar=AsciiCode.GreaterThanSign then
+    begin
+    scanner:=scanner+1;
+*('    NextChar:=StringAt(Source,scanner);
+**)    if NextChar=AsciiCode.EqualsSign then
+      begin
+      scanner:=scanner+1;
+*21      InspectToken.Kind:=tk_GreaterThanOrEqualTo;
+      exit;
+      end
+    else
+      begin
+*)(      InspectToken.Kind:=tk_GreaterThan;
+      exit;
+      end;
+    end;
+*,+  if IsPartOfAWord(NextChar,UpperChar) then
+    begin    
+    TokenScanner:=0;    
+*+*    InspectToken.Kind:=tk_Word; {possibly}
+*54    While IsPartOfAWord(NextChar,UpperChar) do      
+      begin
+*>=      StringAtPut(InspectToken.Value,TokenScanner,UpperChar);
+      if TokenScanner=0 then
+        begin
+*)(        if UpperChar=AsciiCode.BigA then
+*21          InspectToken.Kind:=tk_T1Axis {possibly}
+*.-        else if UpperChar=AsciiCode.BigC then
+*('          InspectToken.Kind:=tk_TNAxis;
+        end;
+*$#      TokenScanner:=TokenScanner+1;
+      scanner:=scanner+1;
+**)      NextChar:=StringAt(Source,scanner);
+      end;
+*87    StringAtPut(InspectToken.Value,TokenScanner,0);    
+    if TokenScanner <> 1 then
+*"!      InspectToken.Kind:=tk_Word;
+    exit;
+    end;
+*'&  if NextChar=AsciiCode.LeftParen then
+    begin
+    scanner:=scanner+1;
+*%$    InspectToken.Kind:=tk_LeftParen;
+    exit;
+    end;
+*('  if NextChar=AsciiCode.RightParen then
+    begin
+    scanner:=scanner+1;
+*&%    InspectToken.Kind:=tk_RightParen;
+    exit;
+    end;
+  if NextChar=0 then
+    begin
+    InspectToken.Kind:=tk_nil;
+    exit;
+    end;
+*$#  if NextChar=AsciiCode.Period then
+    begin
+*"!    InspectToken.Kind:=tk_Period;
+    exit;
+    end;
+  ScanningError(scanner);  
+  end;
+var CommandString:string[255];
+var CommandIndex:integer;
+*/.procedure CommandInit(var ParamString:string);
+  begin
+  CommandIndex:=0;
+  CommandString:=ParamString;
+*,+  GetNextToken(CommandString,CommandIndex);
+  end;
+*%$procedure Match(aTokenKind:Integer);
+  begin
+**)  if aTokenKind <> InspectToken.Kind then
+    Escape(5000);
+*,+  GetNextToken(CommandString,CommandIndex);
+  end;
+*&%procedure Permit(aTokenKind:Integer);
+  begin
+*-,  if aTokenKind = InspectToken.Kind then    
+*.-    GetNextToken(CommandString,CommandIndex);
+  end;
+*SR{--------------------------------------------------------------------------------}
+Type TDRef=object
+*SR{--------------------------------------------------------------------------------}
+  AxisTokenKind:integer;
+  AxisNumber:integer;
+  Value:double;
+  procedure Init;
+    begin
+    AxisTokenKind:=tk_Word;
+    AxisNumber:=1;    
+    Value:=0;
+    end;
+  end;
+var ht_DRef:TDRef;
+{$T-}
+procedure TaskMonitorCommPort;
+*'&  var Accumulator:string[100]; static;
+  var Index:integer;
+  var C:integer;
+  begin
+    Index:=0;
+      while true do
+        begin
+        yield;
+*'&        while Comm.CharacterPresent do
+          begin
+*"!            C:=Comm.GetCharacter;
+*GF            if C=10 then C:= Comm.GetCharacter {ignore lf wait for cr}
+            if C=13 then
+              begin
+*21                StringAtPut(Accumulator,Index,0);
+                Index := 0;  
+*! {prompter.writeln(Accumulator);}
+*/.                InterpretCommand(Accumulator);
+              end
+            else
+              begin
+*21                StringAtPut(Accumulator,Index,C);
+                Index:=Index+1;
+              end;
+          end;
+      end;
+  end; {TaskMonitorCommPort}
+*0/procedure InterpretCommand(var Command:string);
+ var azvx :  longint;
+ var elvx :  longint; 
+  begin
+LastCommandTime := 0;
+    CommandIndex:=0;
+    CommandString:= Command;
+*.-    GetNextToken(CommandString,CommandIndex);
+*&%{txtdb1.writeln(InspectToken.value);}
+*ed    if InspectToken.value = 'AZEL' then begin CmdAZEL; SendAck('AZEL'); end ; {Commanded Az,El,time}
+*]\    if InspectToken.value = 'AZL' then begin CmdAZL; SendAck('AZL'); end ; {Commanded Az,El}
+*CB    if InspectToken.Value = 'GAE' then CmdGAE; {Request for Az,El}
+*?>    if InspectToken.Value = 'GET' then CmdGET; {Download data}
+*`_    if InspectToken.Value = 'ZPN' then begin CmdZPN; SendAck('ZPN'); end; {Zero buffer pointer}
+    if InspectToken.Value = 'TON' then begin BeginTask(TaskAddr(TaskPositionLoop)); SendAck('TON'); UpdateAll := 1; end; {Start position loop}
+*po    if InspectToken.Value = 'LPR' then begin cmdLPR; SendAck('LPR'); UpdateAll := 1; end; {Load new parameters}
+    if InspectToken.Value = 'CLE' then begin BeginTask(TaskAddr(TaskCalEncoders)); SendAck('CLE'); end;  {Cal position encoders}
+     
+*ed    if InspectToken.Value = 'SPA' then begin StopAll; SendAck('SPA'); end; {Stop all tasks but comm}
+*[Z    if InspectToken.Value = 'CLO' then begin CmdCLO; SendAck('CLO'); end;  {Clear offsets}
+*a`    if InspectToken.Value = 'POF' then begin CmdPOF; SendAck('POF'); end;  {Set position offset}
+*_^    if InspectToken.Value = 'VOF' then begin CmdVOF; SendAck('VOF'); end; {SetVelocity offset}
+*@?    if InspectToken.Value = 'STS' then CmdSTS; {Status request}
+*>=  if InspectToken.Value = 'STX' then CmdSTX; {Status request}
+*HG    if InspectToken.Value = 'ERR' then CmdERR; {Position error request}
+*_^    if InspectToken.Value = 'SEN' then begin CmdSEN; SendAck('SEN'); end; {Set encoder values}
+*ZY    if InspectToken.Value = 'TMD' then begin CmdTMD; SendAck('TMD'); end; {Set test mode}
+*ji   if InspectToken.Value = 'EBN' then begin IsoIo.SetOutputBit(2,off); SendAck('EBN'); end; {El brake ON}
+*ji   if InspectToken.Value = 'EBF' then begin IsoIo.SetOutputBit(2,on); SendAck('EBF'); end; {El brake OFF}
+*kj   if InspectToken.Value = 'ABN' then begin IsoIo.SetOutputBit(1,off); SendAck('ABN'); end;  {Az brake ON}
+*ji   if InspectToken.Value = 'ABF' then begin IsoIo.SetOutputBit(1,on); SendAck('ABF'); end; {Az brake OFF}
+    
+*43   if InspectToken.Value = 'AZV' then {Set Az DACs}
+      begin
+*21        GetNextToken(CommandString,CommandIndex);
+*43        azvx = LongintInString(InspectToken.Value);
+*%$        {tbAzVoltage.writeln(azvx);}
+*('        Yaxis.SetCommandedTorque(azvx);
+*('        Zaxis.SetCommandedTorque(azvx);
+        SendAck('AZV');
+      end;
+    
+*43    if InspectToken.Value = 'ELV' then {Set EL DAC}
+      begin
+*21        GetNextToken(CommandString,CommandIndex);
+*43        elvx = LongintInString(InspectToken.Value);
+*%$      {  tbElVoltage.writeln(elvx);}
+*)(        Xaxis.SetCommandedTorque(elvx); 
+        SendAck('ELV');
+      end;
+*'&    if InspectToken.Value = 'VER' then
+      begin
+    comm.SendString(VerConst);
+    comm.SendCharacter(13);
+    comm.SendCharacter(10);
+      end;
+*43   if InspectToken.Value = 'AVS' then {Set Az DACs}
+      begin
+*21        GetNextToken(CommandString,CommandIndex);
+*43        azvx = LongintInString(InspectToken.Value);
+*('        Yaxis.SetCommandedTorque(azvx);
+*21        GetNextToken(CommandString,CommandIndex);
+*43        azvx = LongintInString(InspectToken.Value);
+*('        Zaxis.SetCommandedTorque(azvx);
+        SendAck('AZS');
+      end;
+*?>   if InspectToken.Value = 'ENC' then {REad az motor encoders}
+      begin
+    comm.SendString('ENC,');
+*10    LongIntToNumberString(Yaxis.ActualPosition);
+*#"    comm.SendString(NumberString);
+*$#    comm.SendCharacter(44); {comma}
+*10    LongIntToNumberString(Zaxis.Actualposition);
+*#"    comm.SendString(NumberString);
+    comm.SendCharacter(13);
+    comm.SendCharacter(10);
+      end;
+*ON   if InspectToken.Value = 'NER' then {report number of errors in taskposloop}
+      begin
+*!         comm.SendString('NER,');
+*/.        LongIntToNumberString(NumberOfErrors);
+*'&        comm.SendString(NumberString);
+        comm.SendCharacter(13);
+        comm.SendCharacter(10);
+      end;
+    end; {InterpretCommand}
+Procedure CmdGAE; {Get Az, El }
+  begin
+ {GetData;}
+*\[  Paz := (VAxis.ActualPosition/400); {az position in degrees. 1 deg =  400 encoder counts }
+*%$  Pel := (WAxis.ActualPosition/400);
+    comm.SendString('AZEL,');
+*('    DoubleToString(Paz,4,NumberString);
+*#"    comm.SendString(NumberString);
+*$#    comm.SendCharacter(44); {comma}
+*('    DoubleToString(Pel,4,NumberString);
+*#"    comm.SendString(NumberString);
+    comm.SendCharacter(13);
+   { comm.SendCharacter(10);}
+  end; {CmdGAE}
+*21procedure LongintToNumberString(aNumber:longint);
+*\[{-----------------------------------------------------------------------------------------}
+  var Digit:longint;
+  var Index:integer;    
+  const MinusSign=45;
+*!   var DigitHasBeenFound:boolean;
+  var Divisor:longint;
+  begin
+  Index:=0; 
+  if aNumber < 0 then
+    begin    
+    aNumber:=abs(aNumber);
+*/.    StringAtPut(NumberString,Index,MinusSign);
+    Index:=Index+1;
+    end 
+  Divisor:=1000000000;
+  DigitHasBeenFound:=false;
+  repeat
+    Divisor:=Divisor div 10;
+    Digit:=aNumber div Divisor
+*<;    if (Digit > 0) or (Divisor=1) or DigitHasBeenFound then
+      begin    
+*0/      StringAtPut(NumberString,Index,Digit+48);
+      Index:=Index+1;
+*,+      aNumber:=aNumber-(Digit*Divisor);    
+      DigitHasBeenFound:=true;
+      end;
+  until Divisor=1;
+*%$  StringAtPut(NumberString,Index,0);
+  end; {LongIntToNumber}
++NumberString
+String[63]T
+*98Function DoubleInString(var NumberString:string):double;
+*=<{----------------------------------------------------------}
+  var scanner:longint;
+  var accumulator:double;
+  var IsNegative:boolean;
+  var NewPart:longint;
+  var Divisor:longint;
+*!   var DecimalPointFound:boolean;
+  var s:single;
+  begin
+  DecimalPointFound:=false;
+  scanner:=0;
+*54  while StringAt(NumberString,scanner)=32 {space} do
+    scanner:=scanner+1;
+*98  if StringAt(NumberString,scanner)=45 {minus sign} then
+    begin
+    IsNegative:=true
+    scanner:=scanner+1;
+    end
+  else
+    IsNegative:=false;
+  Accumulator:=0;
+  Divisor:=1;
+*/.  while StringAt(NumberString,scanner) <> 0 do
+    begin
+*.-    if StringAt(NumberString,scanner)=46 then
+      begin
+      DecimalPointFound:=true;
+      scanner:=scanner+1;
+      end
+    else
+      begin
+*DC      NewPart:=StringAt(NumberString,scanner)-48; {ascii code zero}
+      yield;
+      FInit;
+      PushDouble(Accumulator);
+*$#      if not DecimalPointFound then
+        begin
+        PushLongint(10);
+        FMul;
+        PushLongint(NewPart);
+        FAdd;
+        end
+      else
+        begin
+        Divisor:=Divisor*10;
+        PushLongint(NewPart);
+        PushLongint(Divisor);
+        FDiv;
+        FAdd;
+        end;
+      scanner:=scanner+1;
+      Accumulator:=PopDouble;
+      s:=Accumulator;
+      end;  
+    end;
+  if IsNegative then
+    begin
+    PushDouble(Accumulator);
+    FChs;
+    Accumulator:=PopDouble;
+    end;
+  DoubleInString:=Accumulator;
+  end; {Double In String}
+*;:Function LongintInString(var NumberString:string):longint;
+*=<{----------------------------------------------------------}
+  var scanner:longint;
+  var accumulator:longint;
+  var IsNegative:boolean;
+  begin
+*76  if StringAt(NumberString,0)=AsciiCode.MinusSign then
+    begin
+    IsNegative:=true;
+    scanner:=1;
+    end
+  else
+    begin
+    IsNegative:=false;
+    scanner:=0;  
+    end;
+  Accumulator:=0;
+*/.  while StringAt(NumberString,scanner) <> 0 do
+    begin
+*TS    Accumulator:=Accumulator*10+StringAt(NumberString,scanner)-AsciiCode.Zero;     
+    scanner:=scanner+1;
+    end;  
+  if IsNegative then
+*"!    LongintInString:=-Accumulator
+  else
+*"!    LongintInString:=Accumulator;
+  end; {LongIntInString}
+*_^Procedure DoubleToStringV1(Value:single; NumberOfDecimalPlaces:integer; var OutString:string);
+  var Shifter:single;
+  var Counter:integer;
+  var Scanner:integer;
+  var Digit:longint;
+  var StringIndex:integer;
+  var s:single;
+  var d:single;
+  begin
+  Shifter:=1;
+  Counter:=0;
+  StringIndex:=0;
+  if Value < 0 then
+    begin
+*10    StringAtPut(OutString,StringIndex,45);      
+    StringIndex:=StringIndex+1;
+    end;
+  Value:=abs(Value);
+  FInit;
+  while Shifter < Value do
+    begin
+    Pushsingle(Shifter);
+    PushLongint(10);
+    FMul;
+    Shifter:=Popsingle;
+    Counter:=Counter+1;
+    end;
+  Pushsingle(Shifter);
+  PushLongint(10);
+  FDiv;
+  Shifter:=Popsingle;
+  if Counter=0 then
+    begin
+*+*    StringAtPut(OutString,StringIndex,48);
+    StringIndex:=StringIndex+1;
+    end;
+  FInit;
+*$#  for scanner:=Counter downto 1  do
+    begin
+    Pushsingle(Value);
+    Pushsingle(Shifter);
+    Fdiv;
+*!     Digit:=Trunc(Popsingle);    
+*10    StringAtPut(OutString,StringIndex,Digit+48);
+    StringIndex:=StringIndex+1;
+   { yield;}
+    FInit;
+    Pushsingle(Value);
+    PushLongint(Digit);
+    Pushsingle(Shifter);
+    FMul;
+    FChs;
+    FAdd;
+    Value:=Popsingle;
+    Pushsingle(Shifter);
+    PushLongint(10);
+    FDiv;
+    Shifter:=Popsingle;
+    end;
+*"!  if NumberOfDecimalPlaces=0 then
+    begin
+*.-    StringAtPut(OutString,StringIndex,0);    
+    exit;
+    end;
+*;:  StringAtPut(OutString,StringIndex,46);   {decimal point}
+  StringIndex:=StringIndex+1;
+{  yield;}
+  FInit;
+*-,  for scanner:=1 to NumberOfDecimalPlaces do
+    begin
+    FInit;
+    Pushsingle(Value);
+    Pushsingle(Shifter);
+    Fdiv;
+    d:=Popsingle;
+    s:=d;
+    Digit:=Trunc(d);    
+*10    StringAtPut(OutString,StringIndex,Digit+48);
+    StringIndex:=StringIndex+1;
+  {  yield;}
+    FInit;
+    Pushsingle(Value);
+    PushLongint(Digit);
+    Pushsingle(Shifter);
+    FMul;
+    FChs;
+    FAdd;
+    Value:=Popsingle;
+    Pushsingle(Shifter);
+    PushLongint(10);
+    FDiv;
+    Shifter:=Popsingle;
+    end;
+*('  StringAtPut(OutString,StringIndex,0);
+  end; {DoubleToString}
+*$#Procedure CmdGET; {Get buffer data}
+var i:integer;
+  begin
+    
+*%$for i := 1 to WriteBufferPntr - 1 do
+begin
+*32    DoubleToString(DataBufferA[i],4,NumberString);
+*#"    comm.SendString(NumberString);
+*#"   comm.SendCharacter(44); {comma}
+Delay(2);
+*32    DoubleToString(DataBufferB[i],4,NumberString);
+*#"    comm.SendString(NumberString);
+    comm.SendCharacter(13);
+Delay(2);
+   { comm.SendCharacter(10);}
+end;
+  end; {CmdGET}
+*('Procedure cmdZPN; {Zero Buffer Pointer}
+  begin
+*.-    GetNextToken(CommandString,CommandIndex);
+*=<    LogDataCountRate := LongintInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*43    LogValA := LongintInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*43    LogValB := LongintInString(InspectToken.Value);
+    WriteBufferPntr := 0;
+   end; {CmdZPN}
+*21*************************************************
+*FECmdLPR accepts a command in the form LPR,p1,p2,p3,p4,p5,p6,p7,p8 <cr>
+*98*******************************************************}
+  begin
+*.-    GetNextToken(CommandString,CommandIndex);
+*54    AzPosPGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*54    AzPosIGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*54    AzVelPGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*54    AzVelIGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*32    AzFFGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*54    ElPosPGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*54    ElPosIGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*54    ElVelPGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*54    ElVelIGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*32    ElFFGain:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*21    pAzTmax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*21    pElTmax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*21    pAzTmin:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*21    pElTmin:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*32    pAzTbias:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10    pAzMrd:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10    pElMrd:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10    pAzMcr:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10    pElMcr:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10    pAzEpo:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10    pElEpo:= DoubleInString(InspectToken.Value);
+  end; {CmdLPR}
+*)(Procedure CmdVOF; {Set velocity offset }
+  begin
+*$#    VelocityStart := SampleCounter;
+*.-    GetNextToken(CommandString,CommandIndex);
+*43    VelOffAz := DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*43    VelOffEl := DoubleInString(InspectToken.Value);
+  end; {CmdVOF}
+*"!Procedure CmdCLO; {Clear offsets}
+  begin
+    VelOffAz := 0;
+    VelOffEl := 0;
+    IntVelOffAz := 0;
+    IntVelOffEl := 0;
+    PosOffAz := 0;
+    PosOffEl := 0;
+  end; {CmdCLO}
+*,+Procedure CmdPOF; {Position Offset az, el }
+  begin
+*.-    GetNextToken(CommandString,CommandIndex);
+*43    PosOffAz := DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*43    PosOffEl := DoubleInString(InspectToken.Value);
+  end; {CmdPOF}
+Procedure CmdSTS; {Get Status }
+  begin
+    comm.SendString('STS,');
+*('    DoubleToString(Paz,3,NumberString);
+*#"    comm.SendString(NumberString);
+    comm.SendCharacter(44); 
+*('    DoubleToString(Pel,3,NumberString);
+*#"    comm.SendString(NumberString);
+*76if RunningTask = 0 then comm.SendString('0'); {halted}
+*98if RunningTask = 1 then comm.SendString('1'); {tracking}
+*21if IsoIo.InputBit(1) = true then {el up prelimit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*43if IsoIo.InputBit(2) = true then {el down prelimit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*54if IsoIo.InputBit(3) = true then {el up final limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*76if IsoIo.InputBit(4) = true then {el down final limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*32if IsoIo.InputBit(5) = true then {az cw pre limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*43if IsoIo.InputBit(6) = true then {az ccw pre limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*54if IsoIo.InputBit(7) = true then {az cw final limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*76if IsoIo.InputBit(8) = true then { az ccw final limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*.-if IsoIo.InputBit(9) = true then { az < 180 }
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*65if IsoIo.OutputBitIsOn(1) = true then { az brake on }
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*43if IsoIo.OutPutBitIsOn(2) = true then {el brake on}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*65if IsoIo.InputBit(10) = true then {emergency stop on}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*CBif CalComplete = 0 then comm.SendString('0'); {not calibrated = 0}
+*DCif CalComplete = 1 then comm.SendString('1'); {cal in progress = 1}
+*CBif CalComplete = 2 then comm.SendString('2'); {cal complete = 2}  
+*54if IsoIo.InputBit(16) = true then {is the simulator}
+  comm.SendString('T')
+else
+  comm.SendString('F');
+    comm.SendCharacter(13);
+ {   comm.SendCharacter(10);}
+  end; {CmdSTS}
+*#"Procedure CmdErr; {pointing error}
+  begin
+      comm.SendString('ERR,');
+*21    DoubleToString(1000 * ErrAzA,1,NumberString);
+*#"    comm.SendString(NumberString);
+*$#    comm.SendCharacter(44); {comma}
+*32    DoubleToString( 1000 * ErrElA,1,NumberString);
+*#"    comm.SendString(NumberString);
+    comm.SendCharacter(13);
+  {  comm.SendCharacter(10);}
+    {comm.SendString(crlf);}
+  end; {CmdErr}
+*! Procedure cmdSEN; {Set encoders}
+var xaz :  single;
+var xel : single ;
+  begin
+*.-    GetNextToken(CommandString,CommandIndex);
+*.-    xaz = DoubleInString(InspectToken.value);
+*GF    {'VAxis.SetActualPosition( LongintInString(InspectToken.Value) );}
+*<;     VAxis.SetActualPosition( round(144000 * xaz / 360.0));
+*.-    GetNextToken(CommandString,CommandIndex);
+*.-    xel = DoubleInString(InspectToken.value);
+*<;    WAxis.SetActualPosition(round ( 144000 * xel / 360.0));
+*ED   { 'WAxis.SetActualPosition(LongintInString(InspectToken.Value));}
+  end; {CmdSEN}
+*'&Procedure CmdTMD; {Set test mode flag}
+  begin
+*0/      GetNextToken(CommandString,CommandIndex);
+*43    TestMode:= LongintInString(InspectToken.Value);
+  end; {CmdTMD}
+*,+Procedure SendAck(var m:string); {ACK msg }
+  begin
+    comm.SendString(m);
+    comm.SendCharacter(13);
+    {comm.SendCharacter(10);}
+  end; {Send Ack}
+**)Procedure cmdLPR; {Load loop parameters }
+*87{******************************************************
+*FECmdLPR accepts a command in the form LPR,p1,p2,p3,p4,p5,p6,p7,p8 <cr>
+*98*******************************************************}
+  begin
+*.-    GetNextToken(CommandString,CommandIndex);
+*/.   pAzKo:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*/.   pElKo:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*/.   pAzKv:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*/.   pElKv:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*.-   pAze:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*.-   pEle:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pAzAmax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pElAmax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pAzVmax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pElVmax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pAzImax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pElImax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pAzKpp:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pElKpp:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pAzKpi:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pElKpi:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pAzKvp:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pElKvp:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pAzKvi:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pElKvi:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pAzKff:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pElKff:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pAzTmax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pElTmax:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pAzTmin:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pElTmin:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pAzTsgn:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pElTsgn:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*21   pAzTbias:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pAzEcr:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pElEcr:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pAzMEcr:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*10   pElMEcr:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pAzEpo:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*0/   pElEpo:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*/.   pAzAr:= DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+*/.   pElAr:= DoubleInString(InspectToken.Value);
+  end;
+*\[Procedure DoubleToStringV2(Value:single; NumberOfDecimalPlaces:integer; var Result:string);
+{version 2, July 27}
+  var OffsetFactor:longint;
+  var Digit:longint;
+  var Index:integer;    
+  const MinusSign=45;
+  const DecimalPoint=46;
+*!   var DigitHasBeenFound:boolean;
+  var Divisor:longint;
+  var LongintValue:longint;
+  var scanner:integer;
+  var Anchor:longint;
+  begin
+{  Anchor:=TimeRemaining;}
+  OffsetFactor:=1;
+*-,  for scanner:=1 to NumberOfDecimalPlaces do
+*#"    OffsetFactor:=OffsetFactor*10;
+  FInit;
+  PushLongint(OffsetFactor);
+  PushSingle(Value);
+  FMul;
+  LongintValue:=PopLongint;
+  Index:=0; 
+  if LongintValue < 0 then
+    begin    
+*%$    LongintValue:=abs(LongintValue);
+*)(    StringAtPut(Result,Index,MinusSign);
+    Index:=Index+1;
+    end 
+  Divisor:=10;
+*#"  while Divisor <= LongintValue do
+    Divisor:=Divisor*100;
+  DigitHasBeenFound:=false;
+  repeat
+    Divisor:=Divisor div 10;
+*$#    Digit:=LongintValue div Divisor
+*<;    if (Digit > 0) or (Divisor=1) or DigitHasBeenFound then
+      begin    
+**)      StringAtPut(Result,Index,Digit+48);
+      Index:=Index+1;
+*65      LongintValue:=LongintValue-(Digit*Divisor);    
+      DigitHasBeenFound:=true;
+      end;
+*!     if Divisor=OffsetFactor then
+      begin
+*.-      StringatPut(Result,Index,DecimalPoint);
+      Index:=Index+1;
+      end;
+  until Divisor=1;
+  StringAtPut(Result,Index,0);
+*,+{  Prompter.writeln(Anchor-TimeRemaining);}
+  end;
+*ZYProcedure DoubleToString(Value:single; NumberOfDecimalPlaces:integer; var Result:string);
+{version 3 , July 28}
+  var OffsetFactor:longint;
+  var Digit:longint;
+  var Index:integer;    
+  const MinusSign=45;
+  const DecimalPoint=46;
+*!   var DigitHasBeenFound:boolean;
+  var Divisor:longint;
+  var LongintValue:longint;
+  var scanner:integer;
+  var Anchor:longint;
+  begin
+{  Anchor:=TimeRemaining;}
+  OffsetFactor:=1;
+*-,  for scanner:=1 to NumberOfDecimalPlaces do
+*#"    OffsetFactor:=OffsetFactor*10;
+  FInit;
+  PushLongint(OffsetFactor);
+  PushSingle(Value);
+  FMul;
+  LongintValue:=PopLongint;
+  Index:=0; 
+  if LongintValue < 0 then
+    begin    
+*%$    LongintValue:=abs(LongintValue);
+*)(    StringAtPut(Result,Index,MinusSign);
+    Index:=Index+1;
+    end 
+  DigitHasBeenFound:=false;
+  if abs(Value) < 1 then
+    begin
+    Divisor:=OffsetFactor*10;
+    DigitHasBeenFound:=true
+    end
+  else
+    begin
+    Divisor:=10;
+*%$    while Divisor <= LongintValue do
+      Divisor:=Divisor*100;
+    end;
+  repeat
+    Divisor:=Divisor div 10;
+*$#    Digit:=LongintValue div Divisor
+*<;    if (Digit > 0) or (Divisor=1) or DigitHasBeenFound then
+      begin    
+**)      StringAtPut(Result,Index,Digit+48);
+      Index:=Index+1;
+*65      LongintValue:=LongintValue-(Digit*Divisor);    
+      DigitHasBeenFound:=true;
+      end;
+*!     if Divisor=OffsetFactor then
+      begin
+*.-      StringatPut(Result,Index,DecimalPoint);
+      Index:=Index+1;
+      end;
+  until Divisor=1;
+  StringAtPut(Result,Index,0);
+*,+{  Prompter.writeln(Anchor-TimeRemaining);}
+  end;
+Procedure Proc1;
+  begin
+  {your code goes here}
+  end;
+Procedure CmdSTX;
+  begin
+{GetData;}
+*_^    Paz := (VAxis.ActualPosition/400) ; {az position in degrees. 1 deg =  400 encoder counts }
+*('    Pel := (WAxis.ActualPosition/400) ;
+*('    DoubleToString(Paz,4,NumberString);
+*#"    comm.SendString(NumberString);
+*$#    comm.SendCharacter(44); {comma}
+*('    DoubleToString(Pel,4,NumberString);
+*#"    comm.SendString(NumberString);
+*$#    comm.SendCharacter(44); {comma}
+*21    DoubleToString(1000 * ErrAzA,1,NumberString);
+*#"    comm.SendString(NumberString);
+*$#    comm.SendCharacter(44); {comma}
+*32    DoubleToString( 1000 * ErrElA,1,NumberString);
+*#"    comm.SendString(NumberString);
+*$#    comm.SendCharacter(44); {comma}
+*76if RunningTask = 0 then comm.SendString('0'); {halted}
+*98if RunningTask = 1 then comm.SendString('1'); {tracking}
+*21if IsoIo.InputBit(1) = true then {el up prelimit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*43if IsoIo.InputBit(2) = true then {el down prelimit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*54if IsoIo.InputBit(3) = true then {el up final limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*76if IsoIo.InputBit(4) = true then {el down final limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*32if IsoIo.InputBit(5) = true then {az cw pre limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*43if IsoIo.InputBit(6) = true then {az ccw pre limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*54if IsoIo.InputBit(7) = true then {az cw final limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*76if IsoIo.InputBit(8) = true then { az ccw final limit}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*.-if IsoIo.InputBit(9) = true then { az < 180 }
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*65if IsoIo.OutputBitIsOn(1) = true then { az brake on }
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*43if IsoIo.OutPutBitIsOn(2) = true then {el brake on}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*65if IsoIo.InputBit(10) = true then {emergency stop on}
+  comm.SendString('F')
+else
+  comm.SendString('T');
+*CBif CalComplete = 0 then comm.SendString('0'); {not calibrated = 0}
+*DCif CalComplete = 1 then comm.SendString('1'); {cal in progress = 1}
+*CBif CalComplete = 2 then comm.SendString('2'); {cal complete = 2}  
+*54if IsoIo.InputBit(16) = true then {is the simulator}
+  comm.SendString('T')
+else
+  comm.SendString('F');
+    comm.SendCharacter(13);
+ {   comm.SendCharacter(10);}
+  end;
+*%$Procedure CmdAZEL; {Send Az,El,time}
+*87{******************************************************
+*A@CmdAZEL accepts a command in the form "AZEL,Az,El,TV" where AZEL
+*CBis the command that is swallowed by the InterpretCommand routine, 
+*IHAz is the azimuth in degrees at time TV, El is the elevation at time TV.
+*LKTV is a time value in milliseconds.  The refernece for TV is not necessary.
+*98*******************************************************}
+  var Az: single;
+  var El: single;
+  var TC: LongInt;
+  begin
+    Tok1 := InspectToken.Value;
+*.-    GetNextToken(CommandString,CommandIndex);
+    Tok2 := InspectToken.Value;
+*.-    Az := DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+    Tok3 := InspectToken.Value
+*.-    El := DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+    Tok4 := InspectToken.Value
+*/.    TC := LongIntInString(InspectToken.Value);
+*87if TimeNow = TimeNext then {* this is the first time *}
+  begin
+     TimeNext = SampleCounter;
+  end;
+    {*SampleCounter := TC; *}
+    AzNow := AzNext;
+    ElNow := ElNext;
+    TimeNow := TimeNext;
+    AzNext := Az;
+    ElNext := El;
+*$#    TimeNext := SampleCounter + TC;
+  end; {CmdAZEL}
+Procedure CmdAZL; {Send Az,El}
+*87{******************************************************
+*<;CmdAZL accepts a command in the form "AZEL,Az,El" where AZL
+*CBis the command that is swallowed by the InterpretCommand routine, 
+*43Az is the azimuth in degrees, El is the elevation .
+*98*******************************************************}
+  var Az: single;
+  var El: single;
+  var TC: LongInt;
+  begin
+    Tok1 := InspectToken.Value;
+*.-    GetNextToken(CommandString,CommandIndex);
+    Tok2 := InspectToken.Value;
+*.-    Az := DoubleInString(InspectToken.Value);
+*.-    GetNextToken(CommandString,CommandIndex);
+    Tok3 := InspectToken.Value
+*.-    El := DoubleInString(InspectToken.Value);
+    AzNext := Az;
+    ElNext := El;
+    TimeNext := 1000000;
+    AzNow := Az;
+    ElNow := El;
+    TimeNow := 1000000;
+  end; {CmdAZL}  
+TimeCountumulator;
+Longint
+AzNow4
+Single
+ CmdTorque := 0;tring}mits ********}W
+AzOld
+SingleW
+TimeNow
+Longint
+ar Elrfo
+:single; static;
+   ElIndexPos := 0;r:longint;
+TimeOld
+Longint
+CmdAzelEL > (CmdVelElold + 0.005 * pElAm
+Single<
+ampleCounter := 0;
+ElNow
+Single
+ElOld
+lIndexPosOl
+Singlew
+CmdEl
+AzKvi
+Single7$4
+SingleG$
+dexPosOld := 0;G$|
+CmdTorque
+ CppAz := CmdAz;$
+Longint$(O$,
+ar Elu:single; static;o
+tmpstring
+String[63] AzNow := 0;'
+ if CmdVelAz >  pA
+Vmax*pAzAr then CmdVelAz :=  pAzVmax*pAz
+Procedure TaskUpdateDisplay;
+*;:{*********************************************************
+*LKUpdateDisplay displays various parameters on the screen as a seperate task.
+*=<***********************************************************}
+  begin
+txtAzStart.writeln(AzNow);
+txtElStart.writeln(ElNow);
+txtAzNow.writeln(CmdAz);
+txtElNow.writeln(CmdEl);
+txtAzFin.writeln(AzNext);
+txtElFin.writeln(ElNext);
+txtTimeStart.writeln(TimeNow);
+*#"txtTimeNow.writeln(SampleCounter);
+txtTimeFin.writeln(TimeNext);
+txtCppAz.writeln(CppAz);
+txtCppEl.writeln(CppEl);
+txtAzEnc.writeln(Paz) ; 
+txtElEnc.writeln(Pel);
+*%$txtErrorAz.writeln(AzPosErr * 1000);
+*%$txtErrorEl.writeln(ElPosErr * 1000);
+*"!txtErrAzA.writeln(ErrAzA * 1000);
+*"!txtErrElA.writeln(ErrElA * 1000);
+if UpdateAll = 1 then
+begin
+UpdateAll := 0;
+txtVel.Writeln(Vel);
+txtVaz.writeln(Vaz);
+txtVaz2.writeln(Vaz2);
+txtCmdVelAz.writeln(CmdVelAz);
+txtCmdVelEl.writeln(CmdVelEl);
+txtAzVelErr.writeln(AzVelErr);
+txtElVelErr.writeln(ElVelErr);
+*%$txtAzVelIntErr.writeln(AzVelIntErr);
+*%$txtElVelIntErr.writeln(ElVelIntErr);
+*%$txtAzPosIntErr.writeln(AzPosIntErr);
+*%$txtElPosIntErr.writeln(ElPosIntErr);
+*%$txtCmdTorqueAz.writeln(CmdTorqueAz);
+*%$txtCmdTorqueEl.writeln(CmdTorqueEl);
+txtTrace.writeln(Trace);
+txtBL.writeln(WriteBufferPntr);
+if RunningTask = 0 then
+  txtPID.writeln('Tasks Off');
+if RunningTask = 1 then
+*"!  txtPID.writeln('TaskPosition');
+if RunningTask = 2 then
+*"!  txtPID.writeln('TaskPosLoop2');
+if RunningTask = 5 then
+*%$  txtPID.writeln('TaskCalEncoders');
+txtEncState.writeln(state);
+**)txtAzIndexPosOld.writeln(AzIndexPosOld); 
+**)txtElIndexPosOld.writeln(ElIndexPosOld); 
+*$#txtAzIndexPos.writeln(AzIndexPos); 
+*$#txtElIndexPos.writeln(ElIndexPos); 
+*'&txtAzIndexDelta.writeln(AzIndexDelta);
+*'&txtElIndexDelta.writeln(ElIndexDelta);
+txtAzTheta.writeln(AzTheta);
+txtElTheta.Writeln(ElTheta);
+*)(txtRtElEC.writeln(WAxis.ActualPosition);
+*)(txtRtAzEC.writeln(VAxis.ActualPosition);
+txtRecEl.writeln(RecEl);
+txtRecAz.writeln(RecAz);
+txtdb1.writeln(db1);
+txtdb2.writeln(db2);
+txtdb3.writeln(db3);
+tbUtest.writeln(utest);
+tbTestMode.writeln(TestMode);
+*! Inp1.writeln(IsoIo.InputBit(1));
+*! Inp2.writeln(IsoIo.InputBit(2));
+*! Inp3.writeln(IsoIo.InputBit(3));
+*! Inp4.writeln(IsoIo.InputBit(4));
+*! Inp5.writeln(IsoIo.InputBit(5));
+*! Inp6.writeln(IsoIo.InputBit(6));
+*! Inp7.writeln(IsoIo.InputBit(7));
+*! Inp8.writeln(IsoIo.InputBit(8));
+*! Inp9.writeln(IsoIo.InputBit(9));
+*&%Out1.writeln(IsoIo.OutputBitIsOn(1));
+*&%Out2.writeln(IsoIo.OutputBitIsOn(2));
+tbAzKo.writeln(pAzKo);
+tbElKo.writeln(pElKo);
+tbAzKv.writeln(pAzKv);
+tbElKv.writeln(pElKv);
+tbAze.writeln(pAze);
+tbEle.writeln(pEle);
+tbAzAmax.writeln(pAzAmax);
+tbElAmax.writeln(pElAmax);
+tbAzVmax.writeln(pAzVmax);
+tbElVmax.writeln(pElVmax);
+tbAzImax.writeln(pAzImax);
+tbElImax.writeln(pElImax);
+tbAzKpp.writeln(pAzKpp);
+tbElKpp.writeln(pElKpp);
+tbAzKpi.writeln(pAzKpi);
+tbElKpi.writeln(pElKpi);
+tbAzKvp.writeln(pAzKvp);
+tbElKvp.writeln(pElKvp);
+tbAzKvi.writeln(pAzKvi);
+tbElKvi.writeln(pElKvi);
+tbAzKff.writeln(pAzKff);
+tbElKff.writeln(pElKff);
+tbAzTmax.writeln(pAzTmax);
+tbElTmax.writeln(pElTmax);
+tbAzTmin.writeln(pAzTmin);
+tbElTmin.writeln(pElTmin);
+tbAzTsgn.writeln(pAzTsgn);
+tbElTsgn.writeln(pElTsgn);
+tbAzTbias.writeln(pAzTbias);
+tbAzEcr.writeln(pAzEcr);
+tbElEcr.writeln(pElEcr);
+tbAzMEcr.writeln(pAzMEcr);
+tbElMEcr.writeln(pElMEcr);
+tbAzEpo.writeln(pAzEpo);
+tbElEpo.writeln(pElEpo);
+tbAzAr.writeln(pAzAr);
+tbElAr.writeln(pElAr);
+txtdeltaVaz.writeln(deltaVaz);
+end;
+end; {Task Update Display}
++ElIndexFound
+Boolean
+RunningTask = 1 thenW
++AzIndexFound
+rocedure CmdPOF; {Position 
+Booleanz, el }W
+AzIndexPosID.writeln('TaskPosition');WOW
+Longint
+ beginW
+ElIndexPosOW
+Longint
+CmdTorqueXOW
+   GetNextT
+LongintmandString,CommandIndex);WOW
+CmdTorqueY 5 then|
+f RunningTask = 2 t
+Longint
+PosOffAz := DoubleInString(InspectToken.
+CmdTorqueZOW
+Longint
+eginWOW
+ txtPID.wr
+teln('TaskPosLoop2');WOW
+ErrorAzW
+Single GetNextToken(CommandString,Comman
+ndex);WOW
+ErrorElW
+ if WAxis.Captur|
+SingleenWOW
+   PosOffEl := DoubleInStri
+CmdTorqueEl.Value);W
+SingleW
+ beginW
+CmdTorqueAzW
+SingleW
+ end; {CmdPOF}W
+Tok1
+   ElIn
+String:=
+Tok2edure CmdSTS; {Get Status }W
+StringW
+ ElIndexDelta := (ElIndexPos - ElIndexPo
+Old) div 40;
+Tok3
+StringW
+f RunningTask = 5 thenW
+Tok4
+nd;$
+String
+Trace
+np3TRUE.
+Integer.
+DataBufferA
+Single
+4000W/H
+W/PW/T
+BufferPntr
+zTheta
+Integer
+ end;OW
++AzIndexDelta
+Longint
+xtEncState.writeln(state);W
+ if IsoIO.I
++ElIndexDeltase then state := 0; {el up p
+Longint
+AzIndexPosOld|
+Longint
+ElIndexPosOldWOW
+Longint
+xtAzIndexPosOl
+.writeln(AzIndexPosOld); WOW
+RunningTaskW
+Integer
+   DoubleToString(Paz,3
+Procedure TaskPositionLoop;
+*?>{*************************************************************
+*POThis is the main position loop task. On entry, the values of the loop constants
+*)(are read into the appropriate variables.
+*<;GetData is called to initialize the old values of velocity.
+The error integrals are zeroed.
+*EDUAxis.SetCommandedTorque is used to provide a analog test point that
+*10can be observed to insure the loop timing is OK.
+*@?**************************************************************}
+{const AzAccLim = 0.5;
+const AzVelLim = 0.35;
+const ElAccLim = 0.5;
+const ElVelLim = 0.5;
+const AzRatio = 1522.5;
+const ElRatio = 19749;}
+var t1:single;
+var t2:single;
+var seed:longint;
+*_^var nsample: integer; {samples to skip while white-noise testing, test_frquency=200Hz/nsample}
+var counter:integer;static;
+var icounter:integer;static;
+{**cpp variables **}
+var CmdVelAzold:single; static;
+var CmdVelElold:single; static;
+var Azr:single; static;
+var Azrold:single; static;
+var Azrfold:single; static;
+var Azuold:single; static;
+var Aze:single; static;
+var Azu:single; static;
+var Azkp:single; static;
+var Azrf:single; static;
+var Azeabs:single; static;
+var Elr:single; static;
+var Elrold:single; static;
+var Elrfold:single; static;
+var Eluold:single; static;
+var Ele:single; static;
+var Elu:single; static;
+var Elkp:single; static;
+var Elrf:single; static;
+var Eleabs:single; static;
+begin
+WDTimer := 0;
+WDActive := 1;
+  ReleaseBrakes;
+  RunningTask := 1;
+  utest := 0;  {rn2a(12);}
+  nsample := 5;
+  counter := 0;
+  icounter := 0;
+  AzPosIntErr := 0;
+  ElPosIntErr := 0;
+  AzVelIntErr := 0;
+  ElVelIntErr := 0;
+  IntVelOffEl := 0;
+  IntVelOffAz := 0;
+  CPPflag := 0;
+  GetData;
+  AzNow := Paz;
+  AzNext := Paz;
+  ElNow := Pel;
+  ElNext := Pel;
+  CmdVelAzold := 0;
+  CmdVelElold := 0;
+  Delay(5);
+*('while true do  {This is the main loop }
+  begin
+WDTimer := 0; 
+*ED        UAxis.SetCommandedTorque(1500); {set test output to 7.5 VDC}
+        GetData; 
+     
+        Interpolate;
+**){**** position and velocity offsets ****}
+*0/    IntVelOffAz := IntVelOffAz + VelOffAz/200; 
+*/.    IntVelOffEl := IntVelOffEl + VelOffEl/200;
+*-,    CmdAz := CmdAz + IntVelOffAz + PosOffAz;
+*-,    CmdEl := CmdEl + IntVelOffEl + PosOffEl;
+{********* CPP;*********** }
+if (1 = 1) then begin
+    if CPPflag = 0 then begin
+        Azrold := CmdAz;
+        Azrfold := CmdAz;
+        Azuold := 0;
+        Elrold := CmdEl;
+        Elrfold := CmdEl;
+        Eluold := 0;
+        CPPflag := 1
+        
+     end;
+    Azr := CmdAz;
+    Elr := CmdEl;
+    ErrAzA := CmdAz - Paz;
+    ErrElA := CmdEl - Pel;
+*$#    Azrdot:= (Azr - Azrold)/ 0.005;
+*$#    Elrdot:= (Elr - Elrold)/ 0.005;
+    Aze := Azrold - Azrfold;
+    Ele := Elrold - Elrfold;
+*76    if Aze < 0 then Azeabs := -Aze else Azeabs := Aze 
+*76    if Ele < 0 then Eleabs := -Ele else Eleabs := Ele;
+*=<    if Azeabs > pAze then AzKp := pAzKo else AzKp := pAzKv; 
+*<;    if Eleabs > pEle then ElKp := pElKo else ElKp := pElKv;
+    
+    Azu := AzKp * Aze + Azrdot;
+    Elu := ElKp * Ele + Elrdot;
+*WV    if Azu > (Azuold + 0.005 * pAzAmax*0.8) then  Azu := Azuold + 0.005 * pAzAmax*0.8;
+*WV    if Azu < (Azuold - 0.005 * pAzAmax*0.8) then  Azu := Azuold - 0.005 * pAzAmax*0.8;
+*WV    if Elu > (Eluold + 0.005 * pElAmax*0.8) then  Elu := Eluold + 0.005 * pElAmax*0.8;
+*WV    if Elu < (Eluold - 0.005 * pElAmax*0.8) then  Elu := Eluold - 0.005 * pElAmax*0.8;
+*43    if Azu >  pAzVmax*0.9 then Azu :=  pAzVmax*0.9;
+*43    if Azu < -pAzVmax*0.9 then Azu := -pAzVmax*0.9;
+*43    if Elu >  pElVmax*0.9 then Elu :=  pElVmax*0.9;
+*43    if Elu < -pElVmax*0.9 then Elu := -pElVmax*0.9;
+*"!    Azrf:= Azrfold + 0.005 * Azu;
+    Azrold := Azr;
+    Azrfold := Azrf;
+    Azuold := Azu;
+*"!    Elrf:= Elrfold + 0.005 * Elu;
+    Elrold := Elr;
+    Elrfold := Elrf;
+    Eluold := Elu;
+    CppAz := Azrf;
+    CppEl := Elrf;
+end 
+else begin
+  CppAz := CmdAz;
+  CppEl := CmdEl;
+  {CppAz := CmdAz;
+  CppEl := CmdEl;}
+*,+{* random number generator for the tests:*}
+*&%if counter = 0 then utest := rn2a(0);
+*YX{if counter = 0 then icounter := icounter+1;utest := Fsin(6.283*0.025*icounter*0.3);end}
+*KJ{6.283=2*pi;0.025=sampling time=1/40 Hz;0.3=frequency of the sinusoid, Hz}
+{******** PiPos;*********}
+*65    AzPosErr := CppAz - Paz; {ErrorAz is in degrees }
+*65    ElPosErr := CppEl - Pel; {ErrorEl is in degrees }
+{* closed-loop test: *}
+*76if TestMode = 3 then AzPosErr := 0.05*utest-Paz+CppAz;
+*76if TestMode = 4 then ElPosErr := 0.05*utest-Pel+CppEl;
+*32    AzPosIntErr := AzPosIntErr + 0.005 * AzPosErr;
+*32    ElPosIntErr := ElPosIntErr + 0.005 * ElPosErr;
+*:9    if AzPosIntErr > pAzImax then AzPosIntErr := pAzImax;
+*<;    if AzPosIntErr < -pAzImax then AzPosIntErr := -pAzImax;
+*:9    if ElPosIntErr > pElImax then ElPosIntErr := pElImax;
+*<;    if ElPosIntErr < -pElImax then ElPosIntErr := -pElImax;
+*ba    CmdVelAz := pAzKpp * AzPosErr + pAzKpi * AzPosIntErr + pAzKff*Azu; {azimuth in antenna deg/s}
+*dc    CmdVelEl := pElKpp * ElPosErr + pElKpi * ElPosIntErr + pElKff*Elu; {elevation in antenna deg/s}
+{* open-loop test: *}
+*0/if TestMode = 1 then CmdVelAz := 0.4*utest+0.0;
+*0/if TestMode = 2 then CmdVelEl := 0.2*utest+0.0;
+{* disturbance test: *}
+*76if TestMode = 3 then CmdVelAz := CmdVelAz + 0.5*utest;
+*76if TestMode = 4 then CmdVelEl := CmdVelEl + 0.5*utest;
+    xCmdVelAz := CmdVelAz;
+    xCmdVelEl := CmdVelEl;
+*65    CmdVelAz := CmdVelAz * pAzAr;    {in motor deg/s}
+*65    CmdVelEl := CmdVelEl * pElAr;    {in motor deg/s}
+    {CmdVelAz := 1500;
+    CmdVelEl := 0;}
+*('{********* Vel and Acc limits ********}
+*ml  if CmdVelAz > (CmdVelAzold + 0.005 * pAzAmax*pAzAr) then  CmdVelAz := CmdVelAzold + 0.005 * pAzAmax*pAzAr;
+*ml  if CmdVelAz < (CmdVelAzold - 0.005 * pAzAmax*pAzAr) then  CmdVelAz := CmdVelAzold - 0.005 * pAzAmax*pAzAr;
+*ml  if CmdVelEL > (CmdVelElold + 0.005 * pElAmax*pElAr) then  CmdVelEl := CmdVelElold + 0.005 * pElAmax*pElAr;
+*ml  if CmdVelEL < (CmdVelElold - 0.005 * pElAmax*pElAr) then  CmdVelEl := CmdVelElold - 0.005 * pElAmax*pElAr;
+*@?  if CmdVelAz >  pAzVmax*pAzAr then CmdVelAz :=  pAzVmax*pAzAr;
+*@?  if CmdVelAz < -pAzVmax*pAzAr then CmdVelAz := -pAzVmax*pAzAr;
+*@?  if CmdVelEl >  pElVmax*pElAr then CmdVelEl :=  pElVmax*pElAr;
+*@?  if CmdVelEl < -pElVmax*pElAr then CmdVelEl := -pElVmax*pElAr;
+  CmdVelAzold = CmdVelAz;
+  CmdVelElold = CmdVelEl;
+{********* PiVel; ********}
+    AzVelErr := CmdVelAz - Vaz;
+    ElVelErr := CmdVelEl - Vel;
+*32    AzVelIntErr := AzVelIntErr + 0.005 * AzVelErr;
+*32    ElVelIntErr := ElVelIntErr + 0.005 * ElVelErr;
+*=<    CmdTorqueAz := pAzKvp * AzVelErr + pAzKvi * AzVelIntErr;
+*=<    CmdTorqueEl := pElKvp * ElVelErr + pElKvi * ElVelIntErr;
+*%${****** Reverse torque sign *******}
+*"!   { CmdTorqueAz := -CmdTorqueAz;
+*&%     CmdTorqueEl := -CmdTorqueEl;}   
+*+*{************* Anti backlash ************}
+    SetTorque;
+ LogData;
+     Delay(1);
+*"!     UAxis.SetCommandedTorque(0);
+     Delay(4);
+  counter := counter + 1;
+**)  if counter = nsample then counter := 0;
+    end { end of main loop }
+recover
+  begin
+**)    NumberOfErrors := NumberOfErrors + 1;
+  end;
+*!     XAxis.SetCommandedTorque(0);
+*!     YAxis.SetCommandedTorque(0);
+*!     ZAxis.SetCommandedTorque(0);
+SetBrakes;
+end; {Task Position Loop}
+Procedure GetData;
+*:9{********************************************************
+*WVThis procedure reads the three motor velocity encoders and the 2 position encoders and
+*ONcomputes the motor velocity in deg/sec and the Az and El positions in degrees 
+*43Vel  :  single  elevation motor velocity in deg/sec
+*21Vaz  :  single  azimuth motor velocity in deg/sec
+*21Vaz2 :  single  azimuth motor velocity in deg/sec
+*65deltaVaz :  single  azimuth motor velocity in deg/sec
+*,+Paz  :  single  azimuth position in degrees
+*.-Pel  :  single  elevation position in degrees
+*POFor an axis encoder with 144000 counts per revolution, there will be 144000/360
+*bacounts per degree. Therefore, to get the position in degrees, we divide the encoder count by 400.
+*POFor an axis encoder with pAzEcr counts per revolution, there will be pAzEcr/360
+counts per degree. 
+*SRFor the 6 meter antenna and the simulator, there are 144000 counts per revolution.
+*0/Therefore to convert encoder count to degrees..
+P = C  X  (360/144000)
+P = C  X  (360/pAzEcr)
+*_^The velocity of a motor depends on the time between two encoder samples, Ts, and the number of
+*[Zencoder lines per revolution, pAzMcr, and the count difference between the two samples, C.
+*UTVelocity(deg/sec) = C(counts)/Ts(seconds)  X 1(rev)/pAzMcr(counts) X 360(deg)/1(rev)
+*dcFor the 6 meter antenna with 20000 counts per rev, a sample time of 0.005 sec, the velocity will be
+V = 3.6 * C
+*hgFor the simulator with 12000 counts per rev, and a sample time, Ts, of 0.005 sec, the velocity will be 
+V = 6.0 * C 
+C = C(n) - C(n-1)
+*XWNOTE: remember that the antenna axis velocity will be the motor velocity divided by the
+*QPaxis ratio.  For the simulator, the number is 2900 for azimuth and approximately
+2900 for elevation
+*UTFor the 6 meter antenna, the azimuth ratio is 1522 and the elevation ratio is 19749.
+*?>*************************************************************}
+  begin
+*#"  PxOld := Px; { Elevation motor }
+*#"  PyOld := Py; { Azimuth 1 motor }
+*#"  PzOld := Pz;  {Azimuth 2 motor }
+  Px := Xaxis.ActualPosition;
+  Py := YAxis.ActualPosition;
+  Pz := ZAxis.ActualPosition;
+*ON{az position in degrees. 1 deg =  400 encoder counts for 144000 line encoder }
+*0/  Paz := (VAxis.ActualPosition * 360/pAzEcr) ; 
+*/.  Pel := (WAxis.ActualPosition * 360/pElEcr) ;
+*KJ{Units are motor deg/sec,  yes its really old - now to make sign correct.}
+*98  Vel :=    (360 * (PxOld - Px))/(SampleTime * pElMEcr);
+*98  Vaz :=    (360 * (PyOld - Py))/(SampleTime * pAzMEcr);
+*ED  Vaz2 :=   (360 * (PzOld - Pz))/(SampleTime * pAzMEcr); {not used }
+  Vaz := (Vaz+Vaz2)*0.5;
+  deltaVaz := Vaz-Vaz2;
+  end;{GetData}
+Procedure Interpolate;
+*:9{********************************************************
+*GFInterpolate calculates Az and El positions for times between the times
+*KJthe Az-El commands are actually received. This routine expects the command
+*SRinterpreter for the AZEL command to set the AzNow, AzNext, ElNow, ElNext, TimeNow,
+and TimeNext values.
+*HGSampleCounter is an internal variable corresponding to the sample count
+*"! which changes at a 1000 Hz rate.
+*<;**********************************************************}
+  begin
+*!       if TimeNow = TimeNext then
+      begin
+        CmdAz = AzNow;
+        CmdEl = ElNow;
+      end
+    else
+      begin
+*]\        CmdAz := AzNow + ((AzNext - AzNow)/(TimeNext - TimeNow))* (SampleCounter - TimeNow);
+*]\        CmdEl := ElNow + ((ElNext - ElNow)/(TimeNext - TimeNow))* (SampleCounter - TimeNow);
+      end
+  end; {Interpolate}
+Procedure SetTorque;
+*RQ{**********Begin  Set Torque  ***************************************************
+*:9SetTorque accepts CmdTorqueAz and CmdTorqueEl from PiVel.
+*YXThese commands are limited to +-2000.CmdTorqueX ,Y, Z are rounded versions of The above.
+*+*Torque bias is also added at this stage.  
+*0/finally, the DACs are set to the proper values.
+*JIA value of 2047 for SetCommandedTorque corresponds to a 10 VDC DAC output
+*?>*************************************************************}
+  begin
+*:9    if CmdTorqueEl > pElTmax then CmdTorqueEl := pElTmax;
+*:9    if CmdTorqueEl < pElTmin then CmdTorqueEl := pElTmin;
+*:9    if CmdTorqueAz > pAzTmax then CmdTorqueAz := pAzTmax;
+*:9    if CmdTorqueAz < pAzTmin then CmdTorqueAz := pAzTmin;
+*&%    CmdTorqueX := round(CmdTorqueEl);
+*@?    CmdTorqueY := round(CmdTorqueAz + pAzTbias - deltaVaz*0.3);
+*@?    CmdTorqueZ := round(CmdTorqueAz - pAzTbias + deltaVaz*0.3);
+**)    Xaxis.SetCommandedTorque(CmdTorqueX);
+**)    YAxis.SetCommandedTorque(CmdTorqueY);
+**)    ZAxis.SetCommandedTorque(CmdTorqueZ);
+*('  end;{******* End Set Torque ********}
+PxltaVaz :  single  azimuth motor veloci
+Longintg/sech
+f IsoIo.InputBit(16) = true th
+n {is the simulator}
+Longint
+Pz  Tok1 := InspectToken.Value;
+LongintOW
+Hanna Cont
+PxOldWOW
+Longint
+az  :  single  azimuth positio
+ in degrees
+PyOldW
+0WOW
+Longint
+Valid
+PzOldWOW
+Longint$<
+el  :  single  elevation p
+sition in degrees
+SingleW
+Pel Tok2 := InspectToken.Value;W
+SingleW
+VelW
+Single
+or an axis encoder with 144000
+counts per revolution, there will be 144
+VazW
+Single
+ not valid: WOW
+CmdVelAz
+ounts per degree. There
+Singleo get the position in degrees, we 
+vide the encoder count by 400.WOW
+SSTERASEAMDSECT
+CmdVelEl
+gint
+SingleW
+AzVelErr
+SingleW
+SESEGMEN
+ElVelErr
+or an a
+Singleoder with pAzEcr counts per revolu
+on, there will be pAzEcr/360W
+AzVelIntErrW
+WRITESTRING
+Single
+WOWh
+ounts per degree. Token.Value
+ElVelIntErr
+SingleW
+tring dataW
+FLASHRESETOW
+AzPosPGain
+Single
+   El := DoubleInString(InspectT
+en.Value);
+PERFORMSTACKOVERFLOWESCAPE
+AzPosIGain
+Single
+or the 6 meter antenna 
+AzVelPGaintor, there are 144000 counts p
+Singlelution.
+AzVelIGain
+ERASESECTOR
+Single
+gint
+herefore to conv
+t encoder count to degrees..er
+ElPosPGain
+SingleWOW
+tatic62
+ElPosIGain
+Single
+ElVelPGain$P
+Single
+ElVelIGain
+Single
+ = C  X  (360/144000)
+AzPosIntErrongIntInString(InspectToken.V
+Single
+ FirmwareCode:=5;
+ElPosIntErr
+ = C  X  (360/pAzEcr)
+Single
+AzPosErr
+ UpdatedFirmwarePresent:=tr
+SingleW
+ElPosErr
+f TimeNow = TimeNext th
+Singlehis is the first time *}W
+ end;
+Procedure LogData;
+  begin
+*+*    if WriteBufferPntr < BufferLength then
+      Begin
+*.-      if LogDataCount = LogDataCountRate then
+        begin
+*FE        if LogValA = 1 then DataBufferA[WriteBufferPntr] := AzPosErr;
+*A@        if LogValA = 2 then DataBufferA[WriteBufferPntr] := Paz;
+*GF        if LogValA = 3 then DataBufferA[WriteBufferPntr] := xCmdVelAz;
+*CB        if LogValA = 4 then DataBufferA[WriteBufferPntr] := utest;
+*FE        if LogValB = 1 then DataBufferB[WriteBufferPntr] := ElPosErr;
+*A@        if LogValB = 2 then DataBufferB[WriteBufferPntr] := Pel;
+*GF        if LogValB = 3 then DataBufferB[WriteBufferPntr] := xCmdVelEl;
+*CB        if LogValB = 4 then DataBufferB[WriteBufferPntr] := utest;
+        
+*0/        WriteBufferPntr := WriteBufferPntr + 1;
+        LogDataCount := 1;
+        end
+*/.        else LogDataCount := LogDataCount + 1;
+      End;
+  end; {Log Data}
+Vaz2$
+Single
+?$D?$H
+Procedure TaskCalEncoders;
+*QPFor calibration purposes, we will move the antenna using the velocity loop only.
+*cbWe will set the parameters so the antenna will move at 1 deg/sec. This means that on the simulator
+*`_with an axis ratio of 2900, the motor must be commanded to move at 2900 deg/sec for the antenna
+to move at 1 deg/sec
+var FVAz : single;
+var FVel : single;
+begin
+*$#CalComplete := 1; {Starting to cal}
+ReleaseBrakes;
+    CmdVelEl := 0;
+    CmdVelAz := 0;
+    FVAz := 0;
+    FVEl := 0;
+    ElIndexDelta := 0;
+    AzIndexDelta := 0;
+    ElIndexPos := 0;
+    AzIndexPos := 0;
+    GetData;
+    Delay(5);
+*^]    state := 0; {initial state , only the velocity looop is running with velocities set to 0}
+    while state < 12 do
+      begin
+*TS         UAxis.SetCommandedTorque(1000); {this only sets the test DAC output}      
+yield;
+        GetData;  
+        {****** PiVel*******;}
+*10        FVAz := 0.995 * FVAz + 0.005 * CmdVelAz;
+*10        FVEl := 0.995 * FVEl + 0.005 * CmdVelEl;
+*HG        AzVelErr := FVAz - Vaz; {Vaz is for the motor, not the az axis}
+        ElVelErr := FVEl - Vel;
+*76 {      AzVelIntErr := AzVelIntErr + 0.005 * AzVelErr;
+*76        ElVelIntErr := ElVelIntErr + 0.005 * ElVelErr;
+*IH        CmdTorqueAz := AzVelPGain * AzVelErr + AzVelIGain * AzVelIntErr;
+*IH        CmdTorqueEl := ElVelPGain * ElVelErr + ElVelIGain * ElVelIntErr;
+*/.        CmdTorqueAz := AzVelPGain * AzVelErr ;
+*0/        CmdTorqueEl := ElVelPGain * ElVelErr ;}
+*+*        CmdTorqueAz := pAzKvp * AzVelErr ;
+*+*        CmdTorqueEl := pElKvp * ElVelErr ;
+       
+        {**end PiVel **}
+        SetTorque;
+*&%{Start moving the the elevation down}
+if state = 0 then
+begin
+  WAxis.SetCaptureTrip(True);
+  WAxis.ArmIndexCapture;
+*<;  state := 1; {armed, ready for first El index to trigger }
+*ba  CmdVelEl := - pElAr; {2900 deg/sec, or 483 rpm, for the motor is 1 deg/sec for the axis (sim) }
+*UT  if CmdVelEl > 10000 then CmdVelEl := 10000; {limit vel to 3000 deg/sec or 500 rpm}
+*A@  if IsoIO.InputBit(2) = False then state := 3; {el dn prelimit}
+end;
+if State = 1 then
+begin
+*$#    if WAxis.CaptureHasTripped then
+    begin
+*HG      ElIndexPosOld := WAxis.CapturePosition; {first El index position}
+      WAxis.ArmIndexCapture;
+      state := 2;
+    end
+*A@  if IsoIO.InputBit(2) = False then state := 3; {el dn prelimit}
+end;
+if State = 2 then
+begin
+*"!  if WAxis.CaptureHasTripped then
+  begin
+*DC    ElIndexPos := WAxis.CapturePosition { second El index position}
+*98    ElIndexDelta := (ElIndexPos - ElIndexPosOld) div 40;
+    CmdVelEl := 0;
+*CB    state := 6; {done with el down movement, go do az cw movement}
+  end;
+*A@  if IsoIO.InputBit(2) = False then state := 3; {el dn prelimit}
+end;
+{Start moving the elevation up}
+if state = 3 then
+begin
+  WAxis.SetCaptureTrip(True);
+  WAxis.ArmIndexCapture;
+*<;  state := 4; {armed, ready for first El index to trigger }
+*a`  CmdVelEl :=  pElAr; {2900 deg/sec, or 483 rpm, for the motor is 1 deg/sec for the axis (sim) }
+*UT  if CmdVelEl > 10000 then CmdVelEl := 10000; {limit vel to 3000 deg/sec or 500 rpm}
+*A@  if IsoIO.InputBit(1) = False then state := 0; {el up prelimit}
+end;
+if State = 4 then
+begin   
+*"!  if WAxis.CaptureHasTripped then
+  begin
+*FE    ElIndexPosOld := WAxis.CapturePosition; {first El index position}
+    WAxis.ArmIndexCapture;
+    state := 5;
+  end
+*A@  if IsoIO.InputBit(1) = False then state := 0; {el up prelimit}
+end;
+if State = 5 then
+begin
+*"!  if WAxis.CaptureHasTripped then
+  begin
+*DC    ElIndexPos := WAxis.CapturePosition { second El index position}
+*98    ElIndexDelta := (ElIndexPos - ElIndexPosOld) div 40;
+    CmdVelEl := 0;
+*A@    state := 6; {done with el up movement, go do az cw movement}
+  end;
+*A@  if IsoIO.InputBit(1) = False then state := 0; {el up prelimit}
+end;
+*$#{Start moving Az in a CW direction}
+if state = 6 then  
+begin
+  VAxis.SetCaptureTrip(True); 
+  VAxis.ArmIndexCapture;
+*<;  state := 7; {armed, ready for first Az index to trigger }
+  CmdVelAz := pAzAr; 
+*SR  if CmdVelAz > 3000 then CmdVelEl := 3000; {limit vel to 3000 deg/sec or 500 rpm}
+*A@  if IsoIO.InputBit(5) = False then state := 9; {az cw prelimit}
+end;
+if State = 7 then
+begin
+*"!  if VAxis.CaptureHasTripped then
+  begin
+*FE    AzIndexPosOld := VAxis.CapturePosition; {first Az index position}
+    VAxis.ArmIndexCapture;
+    state := 8;
+  end;
+*A@  if IsoIO.InputBit(5) = False then state := 9; {az cw prelimit}
+end;
+if State = 8 then
+begin
+*"!  if VAxis.CaptureHasTripped then
+  begin
+*DC    AzIndexPos := VAxis.CapturePosition { second Az index position}
+*98    AzIndexDelta := (AzIndexPos - AzIndexPosOld) div 40;
+    CmdVelAz := 0;
+*10    state := 12; { finished with AZ cw movement}
+  end;
+*A@  if IsoIO.InputBit(5) = False then state := 9; {az cw prelimit}
+end;
+*&%{Start moving Az in a CCW  direction}
+if state = 9 then  
+begin
+  VAxis.SetCaptureTrip(True); 
+  VAxis.ArmIndexCapture;
+*=<  state := 10; {armed, ready for first Az index to trigger }
+  CmdVelAz := -pAzAr; 
+*SR  if CmdVelAz > 3000 then CmdVelEl := 3000; {limit vel to 3000 deg/sec or 500 rpm}
+*BA  if IsoIO.InputBit(6) = False then state := 6; {az ccw prelimit}
+end;
+if State = 10 then
+begin
+*32  if VAxis.CaptureHasTripped and (state = 10) then
+  begin
+*FE    AzIndexPosOld := VAxis.CapturePosition; {first Az index position}
+    VAxis.ArmIndexCapture;
+    state := 11;
+  end;
+*BA  if IsoIO.InputBit(6) = False then state := 6; {az ccw prelimit}
+end;
+if state = 11 then
+begin
+*#"  if VAxis.CaptureHasTripped  then
+  begin
+*DC    AzIndexPos := VAxis.CapturePosition { second Az index position}
+*98    AzIndexDelta := (AzIndexPos - AzIndexPosOld) div 40;
+    CmdVelAz := 0;
+*10    state := 12; {finished with az ccw movement}
+  end;
+*BA  if IsoIO.InputBit(6) = False then state := 6; {az ccw prelimit}
+end;
+        
+        Delay(1);
+*%$        UAxis.SetCommandedTorque(0);
+        Delay(3);
+*"!      end; { end of main do loop}
+if (ElIndexDelta > 75) then
+*:9  ElTheta := 15 * ( ElIndexDelta - 76) + ElIndexDelta/10;
+*32if (ElIndexDelta > 0) and (ElIndexDelta < 75) then
+*('  ElTheta := 15 * (75 - ElIndexDelta );
+if  (ElIndexDelta < -75) then
+*)(  ElTheta := -15 * (76 + ElIndexDelta) ;
+*43if (ElIndexDelta < 0) and (ElIndexDelta > -75) then
+*;:  ElTheta := 15 * ( 75 + ElIndexDelta ) + ElIndexDelta/10;
+if (AzIndexDelta > 75) then
+*:9  AzTheta := 15 * ( AzIndexDelta - 76) + AzIndexDelta/10;
+*32if (AzIndexDelta > 0) and (AzIndexDelta < 75) then
+*('  AzTheta := 15 * (75 - AzIndexDelta );
+if  (AzIndexDelta < -75) then
+*)(  AzTheta := -15 * (76 + AzIndexDelta) ;
+*43if (AzIndexDelta < 0) and (AzIndexDelta > -75) then
+*;:  AzTheta := 15 * ( 75 + AzIndexDelta ) + AzIndexDelta/10;
+*QPRecEl := round( 400 * (ElTheta - pElEpo))  + Waxis.ActualPosition - ElIndexPos ;
+*ONRecAz := round( 400 * (AzTheta - pAzEpo)) + Vaxis.ActualPosition - AzIndexPos;
+*+*if RecEl < 0 then RecEl := 144000 + RecEl;
+*+*if RecAz < 0 then RecAz := 144000 + RecAz;
+*10if RecEl > 144000 then RecEl := -144000 + RecEl;
+*10if RecAz > 144000 then RecAz := -144000 + RecAz;
+Waxis.SetActualPosition(RecEl);
+Vaxis.SetActualPosition(RecAz);
+XAxis.SetCommandedTorque(0);
+YAxis.SetCommandedTorque(0);
+ZAxis.SetCommandedTorque(0);
+SetBrakes;
+CalComplete := 2;
+end; { Cal Encoders}
+Procedure StopAll;
+  begin
+*CB    if RunningTask = 1 then AbortTask(TaskAddr(TaskPositionLoop));
+*@?     if RunningTask = 2 then AbortTask(TaskAddr(TaskPosLoop2));
+*BA    if RunningTask = 5 then AbortTask(TaskAddr(TaskCalEncoders));
+*'&AbortTask(TaskAddr(TaskPositionLoop));
+*&%AbortTask(TaskAddr(TaskCalEncoders));
+   RunningTask := 0;
+*!     XAxis.SetCommandedTorque(0);
+*!     YAxis.SetCommandedTorque(0);
+*!     ZAxis.SetCommandedTorque(0);
+SetBrakes;
+  end; {Stop All}
+DataBufferB[1]:=2; {byte}
+Single
+4000H
+state
+Integer
+ JumpTable[2]:=3; {integer}
+AzThetaW
+SingleW
+RUEEALSEWOW
+ElThetaW
+f state = 11 then {long
+SingleW
+RecElWOW
+Longint
+RecAzpTable[4]:=5; {single}
+Longint
+VelocityStart
+Longint9WOW
+   AzIndexDelta := (AzIndexPos
+- AzIndexPosOld) div 40;
+VelOffAz
+SingleW
+np 1WOW
+VelOffEl
+   CmdVelAz := 0;OW
+SingleW
+IntVelOffAzW
+SingleW
+IntVelOffEl
+SingleW 
+W PW 
+PosOffAz"
+Single
+ut 1
+w/
+PosOffEl/
+Single
+G%<G%@
+Function exp(v:single):single;
+  begin
+*32      exp := 1 + v + v*v/2 + v*v*v/6 + v*v*v*v/24;
+  end; {Exp}
+CPPflagr.MemReadByte($8000,$041B);/@
+Integer
+Azrdot
+Single22WOW
+ Server.MemReadByte($8000,$041
+);OW
+ElrdotOW
+SingleW
+np 4WOW
+db1W
+ut 2ver.MemReadByte($80
+SingleA);OW
+db2W
+SingleW
+db3zVoltagenprotected:=false;
+Single
+CppAz
+Single23WOW
+bAzVoltageW
+CppElWOW
+SingleW
+np 5WOW
+AzFFGain
+Single
+Voltage
+ElFFGain
+Single
+ErrAzA542WOW
+SingleW
+ErrElAOW
+SingleW
+ var scanner:longint;eW
+LogValAW
+Integer
+LogValBW
+Integer
+ReadBufferPntr
+Integer 
+W PW 
+WriteBufferPntr
+Integer"D
+w/
+xCmd/
+Single
+G%<G%@
+xCmdVElAzX
+SingleG%
+xCmdVelEl
+SingleG"
+Voltage
+Procedure ReleaseBrakes;
+  begin
+  IsoIo.SetOutputBit(1,on);
+  IsoIo.SetOutputBit(2,on);
+  end; {Release Brakes}
+Procedure SetBrakes;
+  begin
+  IsoIo.SetOutputBit(1,off);
+  IsoIo.SetOutputBit(2,off);
+  end; {Set Brakes}
+*('function rn2a(initseed:longint):single;
+var seed:longint;static;
+begin
+  if initseed <> 0 then
+     seed := initseed;
+*,+       seed := (16807*seed) mod 536870911; 
+      rn2a := (seed/536870911);
+end; {rn2a}
+utest4
+Single
+TestMode"
+Longint
++LogDataCount/
+Integer/
+ ElTheta := 15 * (
+5 - ElIndexDelta );W
+LogDataCountRate
+Integer/
+*BufferLengthFile.Writeln(
+ByteString)
+4000WOW
+pAzKoWOW
+SingleW
+pElKoWOW
+   Status.writel
+SinglexDelta < -75) then@
+pAzKv
+Single
+ed F
+   end;
+ ElTheta := -15 * (76 + ElIndexDelt
+pElKvd
+Single
+tatic567WOW
+pAze
+SingleW
+pEle
+SingleW
+ AddressCounter:
+f (ElIndexDelta < 0
+pAzAmaxdexDelta > -75) thenW
+SingleW
+pElAmax
+Single
+ for scanner:=20
+ ElTheta := 
+ * ( 75 + ElIndexDelta ) + ElIndexDelta/
+pAzVmax
+Single
+   begin
+pElVmaxW
+tatic568WOW
+SingleW
+pAzImaxW
+SingleW
+   Address:=scan
+pElImaxW
+SingleW
+n.MsbFl
+pAzKpp
+Single8
+pElKppIndexDelta > 75) then 31 do
+Single
+pAzKpi
+Single69WOW
+tatic543inW
+pElKpiOW
+SingleW
+pAzKvpOW
+rq SigntaByte:=Server.M
+Singleyte($E000,AddressCounter);WOW
+pElKvpOW
+SingleW
+pAzKvi
+ngA|
+tatic544eString,PacketS
+Single2,NumberToHex((DataByte div $10) a
+ $F));
+pElKvi
+Single70WOW
+     StringAl
+BiasketScanner*2+1,NumberToHex(DataByte 
+pAzKffOW
+SingleW
+PP eWOW
+pElKffOW
+     StringAtPut(DataBy
+Single
+pAzTmaxW
+Single
+Bias
+pElTmax
+ess4
+ess4
+tatic54
+Single
+pAzTmin
+Single71WOW
+     end;OW
+xis Cnts/RevWOW
+pElTminW
+SingleW
+PP KvOW
+pAzTsgnW
+   File.Writeln(DataByt
+Single);WOW
+pElTsgn
+Single
+ Cnts/Rev
+pAzTbias
+Single
+tatic546
+pAzEpo
+Single72WOW
+   end;
+tr Cnts
+pElEpoOW
+SingleW
+PP KoOW
+pAzEcrOW
+SingleW
+pElEcr
+Single
+Cnts/Rev
+pAzMEcr
+Single
+tatic547H
+pElMEcr
+SingleW
+ File.Cl
+e;WOW
+pAzArnc PosOffOW
+SingleW
+.40000.40000WOW
+pElArWOW
+SingleW
+SampleTime
+0.005
+VerW
+StringT
+PosOff
+VerConst
+'Ver 6mV105c'
+CalComplete
+Integer 
+W PW 
+Function Documentation:integer;
+  begin
+*XWThis is a dummy function.  Its purpose is to provide a software change and version log.
+*,+It is primative but will serve the purpose.
+******** 6mantvy ********
+*-,changed all crlf to cr only for rec and send
+*ml*****  6mantv4h - Added code in GetData so that when the encoder offsets are added to the calibration values
+*]\and the result is > 360 it is moded to 360.  Also, the effect of the <> 180 switch is added.
+*WVAdded a command , GALL, that will return AzEl, error, and status flags in one command.
+*`_*****  6mantv4g : modified calibration routine so if a prelimit is encountered, the calibration
+*%$will proceed in the other direction.
+  end;
+deltaVaztCommandedTorque(0);
+Single
+TimeNext
+Longint
+Axis.SetCommandedTorque(0);adB
+te($E000,AddressCounter);
+ElNext
+Single
+AzNext
+     StringAtPut(DataBy
+Singleg,PacketScanner*2,NumberToHex((Dat
+yte div $10) and $F)); 
+UpdateAll
+Integer
+etBrakes;ngAtP
+t(DataByteString,PacketScanner*2+1,Numbe
+LastCommandTime $F));0
+Longint
+WDTimer
+     St
+Longintt(DataByteString,PacketScanner*2+
+NumberOfErrors
+Longint
+alComplete := 2;ter:=AddressCounter+1;
+Procedure TaskSafetyMonitor;
+This task runs every 100 msec
+*gfIf the WDTimer counter reaches 10, i.e. 1 second, then something has happened in the taskposition loop
+*a`and it is shut down and the DACs set to 0. WDTimer is continually reset to 0 in taskpositionloop
+*gfIf LastCommandTime reaches 300, i.e. 30 seconds, then we assume the APC has failed and the taskposloop
+*BAis shut down. LastCommandTime is set to zero in interpretcommand.
+  begin
+    WDTimer := 11;
+    LastCommandTime := 500;
+  while true do
+    begin
+      if WDTimer = 10 then
+        begin
+          StopAll;
+        end
+      else
+        begin
+*"!          WDTimer := WDTimer + 1;
+        end;
+*$#      if LastCommandTime = 300 then
+        begin
+          StopAll;
+        end
+      else
+        begin
+*21          LastCommandTime := LastCommandTime + 1;
+        end;
+    delay(100);
+    end;
+  end;
+WDActive
+SingleW
+Integer
+lFFGain

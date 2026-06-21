@@ -5,16 +5,17 @@ Dash Small Radio Telescope Web App Dashboard
 """
 
 import dash
+import importlib
 
 try:
     from dash import dcc
-except:
-    import dash_core_components as dcc
+except Exception:
+    dcc = importlib.import_module("dash_core_components")
 
 try:
     from dash import html
-except:
-    import dash_html_components as html
+except Exception:
+    html = importlib.import_module("dash_html_components")
 
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State, ClientsideFunction
@@ -25,12 +26,20 @@ import numpy as np
 from time import time
 from pathlib import Path
 import base64
+import math
+import platform
+from threading import Event, Lock, Thread
+from typing import Any, cast
 
-from .layouts import monitor_page, system_page  # , figure_page
+from .layouts import monitor_page, system_page, antenna_page, spectrum_page
 from .layouts.sidebar import generate_sidebar
 from .messaging.status_fetcher import StatusThread
 from .messaging.command_dispatcher import CommandThread
-from .messaging.spectrum_fetcher import SpectrumThread
+
+try:
+    import cv2  # type: ignore[reportMissingImports]
+except Exception:
+    cv2 = None
 
 
 def generate_app(config_dir, config_dict):
@@ -48,19 +57,135 @@ def generate_app(config_dir, config_dict):
     (server, app)
     """
     config_dict["CONFIG_DIR"] = config_dir
-    software = config_dict["SOFTWARE"]
 
-    # Set Up Flash and Dash Objects
-    server = flask.Flask(__name__)
+    # Set Up Dash app/server objects
     app = dash.Dash(
         __name__,
-        server=server,
         external_stylesheets=[dbc.themes.BOOTSTRAP],
         meta_tags=[
             {"name": "viewport", "content": "width=device-width, initial-scale=1"}
         ],
     )
-    app.title = software
+    server = cast(Any, app.server)
+    app.title = "Moore 6m Telescope Dashboard"
+
+    webcam_enabled = bool(config_dict.get("WEBCAM_ENABLE", False))
+    webcam_device = int(config_dict.get("WEBCAM_DEVICE_INDEX", 0))
+    webcam_fps = max(1.0, float(config_dict.get("WEBCAM_TARGET_FPS", 10.0)))
+    webcam_jpeg_quality = int(config_dict.get("WEBCAM_JPEG_QUALITY", 70))
+    webcam_jpeg_quality = max(10, min(95, webcam_jpeg_quality))
+    webcam_width = int(config_dict.get("WEBCAM_MAX_WIDTH", 960))
+    webcam_width = max(160, webcam_width)
+
+    webcam_state = {
+        "latest_frame": None,
+        "error": "",
+    }
+    webcam_lock = Lock()
+    webcam_stop_event = Event()
+    webcam_thread = None
+
+    def _open_camera(device_index):
+        if cv2 is None:
+            return None
+        if platform.system().lower().startswith("win"):
+            capture = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
+            if capture is not None and capture.isOpened():
+                return capture
+        capture = cv2.VideoCapture(device_index)
+        if capture is not None and capture.isOpened():
+            return capture
+        return None
+
+    def _webcam_worker():
+        if cv2 is None:
+            with webcam_lock:
+                webcam_state["error"] = "OpenCV not installed (pip install opencv-python)."
+            return
+
+        capture = _open_camera(webcam_device)
+        if capture is None:
+            with webcam_lock:
+                webcam_state["error"] = f"Unable to open webcam device index {webcam_device}."
+            return
+
+        capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        frame_interval = 1.0 / webcam_fps
+        last_emit = 0.0
+
+        try:
+            while not webcam_stop_event.is_set():
+                ok, frame = capture.read()
+                if not ok or frame is None:
+                    with webcam_lock:
+                        webcam_state["error"] = "Webcam frame read failed."
+                    continue
+
+                now_ts = time()
+                if now_ts - last_emit < frame_interval:
+                    continue
+                last_emit = now_ts
+
+                h, w = frame.shape[:2]
+                if w > webcam_width and webcam_width > 0:
+                    new_h = int((webcam_width / float(w)) * float(h))
+                    frame = cv2.resize(frame, (webcam_width, max(1, new_h)))
+
+                ok, encoded = cv2.imencode(
+                    ".jpg",
+                    frame,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), webcam_jpeg_quality],
+                )
+                if not ok:
+                    with webcam_lock:
+                        webcam_state["error"] = "Failed to JPEG-encode webcam frame."
+                    continue
+
+                with webcam_lock:
+                    webcam_state["latest_frame"] = encoded.tobytes()
+                    webcam_state["error"] = ""
+        finally:
+            capture.release()
+
+    if webcam_enabled:
+        webcam_thread = Thread(target=_webcam_worker, name="dashboard-webcam", daemon=True)
+        webcam_thread.start()
+
+        @server.route("/video_feed")
+        def video_feed():
+            def generate_stream():
+                while True:
+                    with webcam_lock:
+                        frame = webcam_state.get("latest_frame")
+                        err = webcam_state.get("error", "")
+
+                    if frame is None:
+                        message = err or "Waiting for webcam frames..."
+                        yield (
+                            b"--frame\r\n"
+                            b"Content-Type: text/plain\r\n\r\n"
+                            + message.encode("utf-8", errors="replace")
+                            + b"\r\n"
+                        )
+                    else:
+                        yield (
+                            b"--frame\r\n"
+                            b"Content-Type: image/jpeg\r\n\r\n"
+                            + frame
+                            + b"\r\n"
+                        )
+
+            return flask.Response(
+                generate_stream(),
+                mimetype="multipart/x-mixed-replace; boundary=frame",
+            )
+
+        @server.route("/video_status")
+        def video_status():
+            with webcam_lock:
+                err = webcam_state.get("error", "")
+                has_frame = webcam_state.get("latest_frame") is not None
+            return {"enabled": True, "has_frame": has_frame, "error": err}
 
     # Start Listening for Radio and Status Data
     status_thread = StatusThread(port=5555)
@@ -69,17 +194,12 @@ def generate_app(config_dir, config_dict):
     command_thread = CommandThread(port=5556)
     command_thread.start()
 
-    raw_spectrum_thread = SpectrumThread(port=5561)
-    raw_spectrum_thread.start()
-
-    cal_spectrum_thread = SpectrumThread(port=5563)
-    cal_spectrum_thread.start()
-
     # Dictionary of Pages and matching URL prefixes
     pages = {
-        "Monitor Page": "monitor-page",
-        "System Page": "system-page",
-        #    "Figure Page": "figure-page"
+        "Pointing/Observation Page": "monitor-page",
+        "System Logs Page": "system-page",
+        "Servo Controller Page": "servo-page",
+        "Spectrum Analyzer Page": "spectrum-page",
     }
     if "DASHBOARD_REFRESH_MS" in config_dict.keys():
         refresh_time = config_dict["DASHBOARD_REFRESH_MS"]  # ms
@@ -88,15 +208,46 @@ def generate_app(config_dir, config_dict):
     pio.templates.default = "seaborn"  # Style Choice for Graphs
     curfold = Path(__file__).parent.absolute()
     # Generate Sidebar Objects
-    side_title = software
+    side_title = "Moore 6m Telescope"
     image_filename = curfold.joinpath(
-        "images", "MIT_HO_logo_landscape.png"
+        "images", "6m_logo.jpg"
     )  # replace with your own image
     # Check if file is there and if not put in a single pixel image.
     if image_filename.exists():
         encoded_image = base64.b64encode(open(image_filename, "rb").read())
     else:
         encoded_image = b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+
+    if webcam_enabled:
+        sidebar_media = html.Div(
+            [
+                html.H4("Live Webcam"),
+                html.Img(
+                    id="sidebar-webcam-feed",
+                    src="/video_feed",
+                    style={
+                        "width": "100%",
+                        "height": "auto",
+                        "maxHeight": "260px",
+                        "objectFit": "contain",
+                        "backgroundColor": "black",
+                        "borderRadius": "4px",
+                    },
+                ),
+            ]
+        )
+    else:
+        sidebar_media = html.Div(
+            [
+                html.H4("Telescope"),
+                html.Img(
+                    src="data:image/png;base64,{}".format(
+                        encoded_image.decode()
+                    ),
+                    style={"height": "100%", "width": "100%"},
+                ),
+            ]
+        )
 
     side_content = {
         "Status": dcc.Markdown(id="sidebar-status"),
@@ -117,53 +268,156 @@ def generate_app(config_dir, config_dict):
                 ),
             ]
         ),
-        "Image": html.Div(
-            [
-                html.A(
-                    [
-                        html.Img(
-                            src="data:image/png;base64,{}".format(
-                                encoded_image.decode()
-                            ),
-                            style={"height": "100%", "width": "100%"},
-                        )
-                    ],
-                    href="https://www.haystack.mit.edu/",
-                )
-            ]
-        ),
+        "Image": sidebar_media,
     }
     sidebar = generate_sidebar(side_title, side_content)
 
     # Build Dashboard Framework
+    auth_required = bool(config_dict.get("DASHBOARD_REQUIRE_AUTH", False))
+    auth_username = str(config_dict.get("DASHBOARD_USERNAME", "admin"))
+    auth_password = str(config_dict.get("DASHBOARD_PASSWORD", "admin"))
+    
     content = html.Div(id="page-content")
+    
+    # Login modal for authentication
+    login_modal = dbc.Modal(
+        [
+            dbc.ModalHeader("Dashboard Login", close_button=False),
+            dbc.ModalBody(
+                [
+                    html.Div(
+                        id="login-error-alert",
+                        children=[],
+                        style={"marginBottom": "15px"}
+                    ),
+                    dbc.InputGroup(
+                        [
+                            dbc.InputGroupText("Username"),
+                            dbc.Input(
+                                id="login-username",
+                                placeholder="Username",
+                                type="text",
+                                autoComplete="username",
+                            ),
+                        ],
+                        className="mb-3",
+                    ),
+                    dbc.InputGroup(
+                        [
+                            dbc.InputGroupText("Password"),
+                            dbc.Input(
+                                id="login-password",
+                                placeholder="Password",
+                                type="password",
+                                autoComplete="current-password",
+                            ),
+                        ],
+                        className="mb-3",
+                    ),
+                ]
+            ),
+            dbc.ModalFooter(
+                dbc.Button(
+                    "Login",
+                    id="login-submit-btn",
+                    className="ms-auto",
+                    color="primary",
+                    n_clicks=0,
+                )
+            ),
+        ],
+        id="login-modal",
+        backdrop="static",
+        keyboard=False,
+        is_open=auth_required,
+        centered=True,
+    )
+    
     layout = html.Div(
         [
             dcc.Location(id="url"),
-            sidebar,
-            content,
-            dcc.Interval(id="interval-component",
-                         interval=refresh_time, n_intervals=0),
-            html.Div(id="output-clientside"),
-        ],
-        id="mainContainer",
-        style={
-            "height": "100vh",
-            "min_height": "100vh",
-            "width": "100%",
-            "display": "inline-block",
-        },
+            dcc.Store(id="auth-session", storage_type="session"),
+            login_modal,
+            html.Div(
+                [
+                    sidebar,
+                    content,
+                    dcc.Interval(id="interval-component",
+                                 interval=refresh_time, n_intervals=0),
+                    html.Div(id="output-clientside"),
+                ],
+                id="mainContainer",
+                style={
+                    "height": "100vh",
+                    "min_height": "100vh",
+                    "width": "100%",
+                    "display": "inline-block" if not auth_required else "none",
+                },
+            ),
+        ]
     )
 
     app.layout = layout  # Set App Layout to Dashboard Framework
     app.validation_layout = html.Div(
         [
             layout,
-            monitor_page.generate_layout(config_dict["SOFTWARE"]),
+            monitor_page.generate_layout(config_dict),
             system_page.generate_layout(),
-            #    figure_page.generate_layout()
+            antenna_page.generate_layout(),
+            spectrum_page.generate_layout(config_dict),
         ]
     )  # Necessary for Allowing Other Files to Create Callbacks
+
+    # Authentication callbacks
+    if auth_required:
+        @app.callback(
+            [
+                Output("auth-session", "data"),
+                Output("login-modal", "is_open"),
+                Output("login-error-alert", "children"),
+            ],
+            [
+                Input("login-submit-btn", "n_clicks"),
+                Input("auth-session", "data"),
+            ],
+            [
+                State("login-username", "value"),
+                State("login-password", "value"),
+            ],
+            prevent_initial_call=False,
+        )
+        def handle_login(n_clicks, session_data, username, password):
+            # If already authenticated, keep modal closed
+            if session_data and session_data.get("authenticated"):
+                return session_data, False, []
+            
+            # If no submit yet, show modal
+            if not n_clicks or n_clicks == 0:
+                return {}, True, []
+            
+            # Check credentials
+            if username == auth_username and password == auth_password:
+                return {"authenticated": True}, False, []
+            else:
+                error_alert = dbc.Alert(
+                    "Invalid username or password",
+                    color="danger",
+                    dismissable=False,
+                )
+                return {}, True, [error_alert]
+        
+        @app.callback(
+            Output("mainContainer", "style"),
+            [Input("auth-session", "data")],
+        )
+        def toggle_main_container_visibility(session_data):
+            style = {
+                "height": "100vh",
+                "min_height": "100vh",
+                "width": "100%",
+                "display": "inline-block" if (session_data and session_data.get("authenticated")) else "none",
+            }
+            return style
 
     # Create Resizing JS Script Callback
     app.clientside_callback(
@@ -177,12 +431,11 @@ def generate_app(config_dir, config_dict):
         config_dict,
         status_thread,
         command_thread,
-        raw_spectrum_thread,
-        cal_spectrum_thread,
-        software
     )
     # Create Callbacks for System Page Objects
-    system_page.register_callbacks(app, config_dict, status_thread)
+    system_page.register_callbacks(app, config_dict, status_thread, command_thread)
+    antenna_page.register_callbacks(app, config_dict, status_thread)
+    spectrum_page.register_callbacks(app, config_dict, status_thread, command_thread)
 
     # # Create Callbacks for figure page callbacks
     # figure_page.register_callbacks(app,config_dict, status_thread)
@@ -267,52 +520,32 @@ def generate_app(config_dir, config_dict):
         """
         status = status_thread.get_status()
         if status is None:
-            lat = lon = np.nan
-            az = el = np.nan
-            az_offset = el_offset = np.nan
-            cf = np.nan
-            bandwidth = np.nan
-            status_string = "SRT Not Connected"
-            vlsr = np.nan
+            return """
+            #### SRT Not Connected
+            - Waiting for daemon status stream
+            """
         else:
-            lat = status["location"]["latitude"]
-            lon = status["location"]["longitude"]
-            az = status["motor_azel"][0]
-            el = status["motor_azel"][1]
-            az_offset = status["motor_offsets"][0]
-            el_offset = status["motor_offsets"][1]
-            cf = status["center_frequency"]
-            bandwidth = status["bandwidth"]
-            vlsr = status["vlsr"]
-            time_dif = time() - status["time"]
+            az = status.az
+            el = status.el
+            az_offset, el_offset = status.motor_offsets
+            time_dif = time() - status.time
             if time_dif > 5:
-                status_string = "SRT Daemon Not Available"
-            elif status["queue_size"] == 0 and status["queued_item"] == "None":
-                status_string = "SRT Inactive"
+                status_string = "Serial Link Not Available"
             else:
-                status_string = "SRT In Use!"
+                status_string = "Serial Link Active"
 
-        if config_dict["SOFTWARE"] == "Very Small Radio Telescope":
-            status_string = f"""
-            #### {status_string}
-            - Location Lat, Long: {lat:.1f}, {lon:.1f} deg
-            - Motor Az, El: {az:.1f}, {el:.1f} deg
-            - Center Frequency: {cf / pow(10, 6)} MHz
-            - Bandwidth: {bandwidth / pow(10, 6)} MHz
-            - VLSR: {vlsr:.1f} km/s
-            """
-        else:
-            status_string = f"""
-            #### {status_string}
-            - Location Lat, Long: {lat:.1f}, {lon:.1f} deg
-            - Motor Az, El: {az:.1f}, {el:.1f} deg
-            - Motor Offsets: {az_offset:.1f}, {el_offset:.1f} deg
-            - Center Frequency: {cf / pow(10, 6)} MHz
-            - Bandwidth: {bandwidth / pow(10, 6)} MHz
-            - VLSR: {vlsr:.1f} km/s
-            """
+        lines = [
+            f"#### {status_string}",
+            f"- Motor Az, El: {az:.1f}, {el:.1f} deg",
+        ]
 
-        return status_string
+        point_err = (status.rotor.az_err, status.rotor.el_err)
+        if point_err is not None and len(point_err) == 2:
+            lines.append(
+                f"- Pointing Err Az, El: {point_err[0]:.1f}, {point_err[1]:.1f} mdeg"
+            )
+
+        return "\n".join(lines)
 
     @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
     def render_page_content(pathname):
@@ -328,14 +561,16 @@ def generate_app(config_dir, config_dict):
         Content of page-content
         """
 
-        if pathname in ["/", f"/{pages['Monitor Page']}"]:
-            return monitor_page.generate_layout(config_dict["SOFTWARE"])
-        elif pathname == f"/{pages['System Page']}":
+        if pathname in ["/", f"/{pages['Pointing/Observation Page']}"]:
+            return monitor_page.generate_layout(config_dict)
+        elif pathname == f"/{pages['System Logs Page']}":
             return system_page.generate_layout()
-        # elif pathname == f"/{pages['Figure Page']}":
-        #     return figure_page.generate_layout()
+        elif pathname == f"/{pages['Servo Controller Page']}": 
+            return antenna_page.generate_layout()
+        elif pathname == f"/{pages['Spectrum Analyzer Page']}":
+            return spectrum_page.generate_layout(config_dict)
         # If the user tries to reach a different page, return a 404 message
-        return dbc.Jumbotron(
+        return dbc.Container(
             [
                 html.H1("404: Not found", className="text-danger"),
                 html.Hr(),
