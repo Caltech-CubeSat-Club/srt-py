@@ -811,15 +811,22 @@ class Moore6mDriver:
         """Send SPA directly (bypasses safe mode check — always permitted)."""
         raw = b"SPA\r"
         with self._serial_lock:
-            self._record_serial_comm("sent", "SPA (immediate)")
             self.serial.write(raw)
             sleep(0.01)
+            self.serial.write(raw)
+            sleep(0.01)
+            self.serial.write(raw)
+            sleep(0.01)
+            self._record_serial_comm("sent", "SPA (immediate)")
         # Pessimistically invalidate calibration if it was in progress
         with self._state_lock:
             if self._state.cal_sts == "Calibrating Now":
                 self._state.cal_sts = "Not Calibrated"
         if self._fsm_state not in (DriverState.FAULT, DriverState.SHUTDOWN):
             self._transition(DriverState.READY, "stop-all command")
+    
+    emergency_stop = spa
+    estop = spa
 
     def set_safe_mode(self, enabled: bool):
         self._safe_mode = enabled

@@ -4,11 +4,11 @@ Single root process for all Caltech 6m telescope control activities.
 
 Architecture
 ------------
-- Moore6mDriver      : owned directly in this process (serial port)
-- ZMQ PULL socket    : telescope motor e-stop requests from remote clients, processed immediately (port 5567)
-- SRT daemon         : threading.Thread — shares driver instance; stopped via quit()
-- Dash dashboard     : multiprocessing.Process — killed instantly on stop
-- Tkinter GUI        : runs on main thread
+- `Moore6mDriver`: a “singleton” class owned directly in this process and shared with whoever else needs to send commands to the telescope servo motor drivers. basically just the classic `telescope_control.py` with a built-in position and status polling loop. it is the only code that reads and writes directly to the telescope serial port — all public methods either read a copy of the latest received information, or add commands to the send queue.
+- `ZMQ PULL` socket: reserved for telescope motor e-stop requests from the web app, processed immediately (port 5567)
+- `SRT daemon`: part 1 of the original `srt-py` code, runs all of the science logic — i.e. calculating and updating azimuth/elevation positions of sky objects, reading from the spectrum analyzer,  type threading.Thread — shares `Moore6mDriver` instance; stopped via quit()
+- `Dash dashboard`: the web server for the web app. runs the webcam feed. sends e-stop signals to the dedicated `ZMQ PULL` socket. all other info and commands come directly to/from the daemon via a separate ZMQ socket. type multiprocessing.Process — killed instantly on stop
+- `Tkinter` GUI: runs on main thread
 
 The daemon runs as a Thread (not a Process) so it can share the single
 Moore6mDriver instance that owns the serial port. Stopping the daemon calls
@@ -63,7 +63,6 @@ from srt import config_loader
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_CMD_PORT    = 5566
 DEFAULT_ESTOP_PORT  = 5567
 DEFAULT_CONFIG_DIR  = "config"
 DEFAULT_CONFIG_FILE = "config.yaml"
@@ -398,6 +397,7 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
 
     root = tk.Tk()
     root.title("Moore 6m Dish Controller")
+    root.iconbitmap(os.path.join(os.path.pardir, "Caltech6m.ico"))
     root.resizable(True, True)
 
     def on_close():
