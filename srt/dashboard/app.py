@@ -196,10 +196,10 @@ def generate_app(config_dir, config_dict):
 
     # Dictionary of Pages and matching URL prefixes
     pages = {
-        "Monitor Page": "monitor-page",
-        "System Page": "system-page",
-        "Antenna Page": "antenna-page",
-        "Spectrum Page": "spectrum-page",
+        "Pointing/Observation Page": "monitor-page",
+        "System Logs Page": "system-page",
+        "Servo Controller Page": "servo-page",
+        "Spectrum Analyzer Page": "spectrum-page",
     }
     if "DASHBOARD_REFRESH_MS" in config_dict.keys():
         refresh_time = config_dict["DASHBOARD_REFRESH_MS"]  # ms
@@ -561,13 +561,13 @@ def generate_app(config_dir, config_dict):
         Content of page-content
         """
 
-        if pathname in ["/", f"/{pages['Monitor Page']}"]:
+        if pathname in ["/", f"/{pages['Pointing/Observation Page']}"]:
             return monitor_page.generate_layout(config_dict)
-        elif pathname == f"/{pages['System Page']}":
+        elif pathname == f"/{pages['System Logs Page']}":
             return system_page.generate_layout()
-        elif pathname == f"/{pages['Antenna Page']}": 
+        elif pathname == f"/{pages['Servo Controller Page']}": 
             return antenna_page.generate_layout()
-        elif pathname == f"/{pages['Spectrum Page']}":
+        elif pathname == f"/{pages['Spectrum Analyzer Page']}":
             return spectrum_page.generate_layout(config_dict)
         # If the user tries to reach a different page, return a 404 message
         return dbc.Container(

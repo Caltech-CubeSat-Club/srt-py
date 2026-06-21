@@ -42,7 +42,7 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
 from .graphs import build_spectrum_figure, emptygraph
-from ...daemon.types import SpectrumConfig
+from ...daemon.types import SpectrumConfig, DaemonStatus
 
 
 # ---------------------------------------------------------------------------
@@ -143,9 +143,6 @@ def generate_layout(config_dict=None):
         config = SpectrumConfig.from_dict(config_dict["SPECTRUM_ANALYZER"])
 
     frequency_group = _card("Frequency", [
-        _label("Instrument serial"),
-        dbc.Input(id="spectrum-instrument-serial", type="text",
-                  value=config.instrument_serial, debounce=True, size="sm"),
         _label("Frequency mode"),
         dbc.Select(
             id="spectrum-freq-mode",
@@ -308,11 +305,6 @@ def generate_layout(config_dict=None):
     ])
 
     config_panel = html.Div([
-        html.Div(id="spectrum-connection", className="mb-2"),
-        html.Small(
-            id="spectrum-sweep-status",
-            className="text-muted d-block mb-2",
-        ),
         frequency_group,
         bandwidth_group,
         level_group,
@@ -337,23 +329,19 @@ def generate_layout(config_dict=None):
         html.Div([
             html.Div([], className="one-third column", id="dummy"),
             html.Div(
-                html.H4("Spectrum Analyzer",
-                        style={"margin-bottom": "0px", "text-align": "center"}),
+                dbc.Col([
+                    html.H4("Spectrum Analyzer", style={"margin-bottom": "0px", "text-align": "center"}),
+                    html.Div(id="spectrum-connection", style={"justify-self": "center"}),
+                ], align='center'),
                 className="one-third column", id="title",
             ),
             html.Div([], className="one-third column", id="button"),
         ], id="header", className="row flex-display", style={"margin-bottom": "12px"}),
-        dbc.Row([
-            dbc.Col(
-                dcc.Graph(id="spectrum-graph", style={"height": "70vh"}),
-                width=8,
+        dbc.Row( [dcc.Graph(id="spectrum-graph")]  ),
+        dbc.Row( [html.Div(config_panel,
+                        #  style={"maxHeight": "80vh", "overflowY": "auto", "paddingRight": "4px"}
+                         )]
             ),
-            dbc.Col(
-                html.Div(config_panel,
-                         style={"maxHeight": "80vh", "overflowY": "auto", "paddingRight": "4px"}),
-                width=4,
-            ),
-        ]),
     ])
 
     return layout
@@ -371,7 +359,6 @@ def register_callbacks(app, config, status_thread, command_thread):
 
     @app.callback(
         Output("spectrum-graph", "figure"),
-        Output("spectrum-sweep-status", "children"),
         Input("interval-component", "n_intervals"),
     )
     def update_spectrum_graph(n):
@@ -394,10 +381,7 @@ def register_callbacks(app, config, status_thread, command_thread):
         avg_count = int(spec.get("avg_count", 0))
         fig = build_spectrum_figure(freq, power, config_obj, sweep_index, avg_count)
 
-        sweep_text = f"Sweep #{sweep_index}"
-        if config_obj.trace_type == "average":
-            sweep_text += f"  |  {avg_count}/{config_obj.num_averages} avg"
-        return fig, sweep_text
+        return fig
 
     # ------------------------------------------------------------------
     # Connection badge
@@ -426,7 +410,7 @@ def register_callbacks(app, config, status_thread, command_thread):
     # ------------------------------------------------------------------
 
     _live_inputs = [
-        "spectrum-instrument-serial", "spectrum-freq-mode",
+        "spectrum-freq-mode",
         "spectrum-start-hz", "spectrum-stop-hz",
         "spectrum-center-hz", "spectrum-span-hz",
         "spectrum-rbw-hz", "spectrum-vbw-hz",
@@ -449,7 +433,6 @@ def register_callbacks(app, config, status_thread, command_thread):
             raise PreventUpdate
 
         return [
-            cfg.instrument_serial,
             cfg.freq_mode,
             cfg.start_hz, cfg.stop_hz,
             cfg.center_hz, cfg.span_hz,
@@ -520,7 +503,7 @@ def register_callbacks(app, config, status_thread, command_thread):
         if not n_clicks:
             raise PreventUpdate
         (
-            instrument_serial, freq_mode,
+            freq_mode,
             start_hz, stop_hz, center_hz, span_hz,
             rbw_hz, vbw_hz, ref_level_dbm,
             atten_mode, atten_db,
@@ -536,7 +519,6 @@ def register_callbacks(app, config, status_thread, command_thread):
                 return
             parts.append(f"{k}={v}")
 
-        _p("instrument_serial", instrument_serial)
         _p("freq_mode", freq_mode)
         _p("start_hz", float(start_hz) if start_hz is not None else None)
         _p("stop_hz", float(stop_hz) if stop_hz is not None else None)
