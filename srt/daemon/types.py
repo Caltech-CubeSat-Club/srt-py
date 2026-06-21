@@ -210,7 +210,6 @@ class RotorState:
       - daemon          (reads for status publish)
       - Moore6mController GUI (reads directly)
       - dashboard antenna panel (reads via DaemonStatus)
-      - Moore6mClient._apply_status (writes from ZMQ response)
     """
 
     # ---- Position ----
@@ -255,7 +254,7 @@ class RotorState:
 
     # ---- Amplifier currents ----
     # {"2A01": {"commanded": int|None, "actual": int|None}, ...}
-    amp_currents: Dict = field(default_factory=lambda: {
+    amp_currents: Dict[str, Dict[str, Optional[int]]] = field(default_factory=lambda: {
         "2A01": {"commanded": None, "actual": None},
         "2A02": {"commanded": None, "actual": None},
         "2A03": {"commanded": None, "actual": None},
@@ -428,13 +427,14 @@ class SpectrumConfig:
 class SpectrumFrame:
     """One acquired and processed spectrum snapshot."""
 
-    freq_hz: "np.ndarray"
-    power_dbm: "np.ndarray"
-    raw_dbm: "np.ndarray"
+    freq_hz: list = field(default_factory=list)
+    power_dbm: list = field(default_factory=list)
+    raw_dbm: list = field(default_factory=list)
     sweep_index: int = 0
     timestamp: float = 0.0
     config: SpectrumConfig = field(default_factory=SpectrumConfig)
     avg_count: int = 1
+    connected: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         def _to_list(value: Any) -> List[float]:
@@ -450,6 +450,7 @@ class SpectrumFrame:
             "timestamp": float(self.timestamp),
             "avg_count": int(self.avg_count),
             "config": self.config.to_dict(),
+            "connected": bool(self.connected),
         }
 
     @classmethod
@@ -457,13 +458,14 @@ class SpectrumFrame:
         if not d:
             raise ValueError("SpectrumFrame.from_dict requires a dict")
         return cls(
-            freq_hz=d.get("freq_hz"),
-            power_dbm=d.get("power_dbm"),
-            raw_dbm=d.get("raw_dbm"),
+            freq_hz=d.get("freq_hz", []),
+            power_dbm=d.get("power_dbm", []),
+            raw_dbm=d.get("raw_dbm", []),
             sweep_index=int(d.get("sweep_index", 0)),
             timestamp=float(d.get("timestamp", 0.0)),
             config=SpectrumConfig.from_dict(d.get("config") or {}),
             avg_count=int(d.get("avg_count", 1)),
+            connected=bool(d.get("connected", False)),
         )
 
 # ---------------------------------------------------------------------------
@@ -485,7 +487,7 @@ class DaemonStatus:
     rotor: RotorState = field(default_factory=RotorState)
 
     # ---- Spectrum ----
-    spectrum: SpectrumConfig = field(default_factory=SpectrumConfig)
+    spectrum: Optional[SpectrumFrame] = field(default_factory=SpectrumFrame)
 
     # ---- Antenna geometry ----
     beam_width:     float         = 0.0
@@ -503,12 +505,12 @@ class DaemonStatus:
     # ---- Ephemeris ----
     object_locs:      Dict  = field(default_factory=dict)
     object_time_locs: Dict  = field(default_factory=dict)
-    vlsr:             float = 0.0
+    vlsr:             Dict = {}
 
     # ---- Pointing ----
     motor_offsets:          Tuple         = (0.0, 0.0)
     pointing_error_history: List          = field(default_factory=list)
-    amp_current_history:    List          = field(default_factory=list)
+    amp_current_history:    List[dict[str, Any]]          = field(default_factory=list)
 
     # ---- Command queue ----
     queued_item: str = "None"

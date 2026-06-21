@@ -5,8 +5,7 @@ Single root process for all Caltech 6m telescope control activities.
 Architecture
 ------------
 - Moore6mDriver      : owned directly in this process (serial port)
-- ZMQ REP socket     : queued command/response for Moore6mClient (port 5566)
-- ZMQ PULL socket    : immediate e-stop bypass (port 5567)
+- ZMQ PULL socket    : telescope motor e-stop requests from remote clients, processed immediately (port 5567)
 - SRT daemon         : threading.Thread — shares driver instance; stopped via quit()
 - Dash dashboard     : multiprocessing.Process — killed instantly on stop
 - Tkinter GUI        : runs on main thread
@@ -23,14 +22,13 @@ The controller itself exits via os._exit(0) which bypasses Python's
 shutdown sequence entirely (ZMQ C-level threads cannot block it).
 
 Usage (shortcut target):
-    powershell.exe -ExecutionPolicy Bypass -File "C:\path\to\run_controller.ps1"
+    powershell.exe -ExecutionPolicy Bypass -File "C:/path/to/srt-py/run_controller.ps1"
 
 CLI args (all optional, override config where applicable):
     --port        Serial port (default COM1)
     --baud        Baudrate   (default 115200)
     --config_dir  Path to SRT config directory (default ./config)
     --config_file Config YAML filename (default config.yaml)
-    --cmd-port    ZMQ command REP port (default 5566)
     --estop-port  ZMQ e-stop PULL port (default 5567)
     --safe-mode   Start with motion/control commands blocked
     --nogui       Headless mode (no Tkinter window; run until Ctrl-C)
@@ -56,6 +54,7 @@ except Exception:
     tk = None
 
 from srt.daemon.rotor_control import make_driver
+from srt.daemon import daemon as srt_d
 from srt.daemon.types import LprParams
 from srt import config_loader
 
@@ -122,19 +121,15 @@ class Moore6mController:
 
     def __init__(
         self,
-        serial_port: str,
         baudrate: int,
         config_dir: str,
         config_file: str,
-        cmd_port: int   = DEFAULT_CMD_PORT,
         estop_port: int = DEFAULT_ESTOP_PORT,
         safe_mode: bool = False,
     ):
-        self.serial_port = serial_port
         self.baudrate    = baudrate
         self.config_dir  = config_dir
         self.config_file = config_file
-        self.cmd_port    = cmd_port
         self.estop_port  = estop_port
 
         self._running = threading.Event()
@@ -157,7 +152,7 @@ class Moore6mController:
 
         self.moore6m = make_driver(
             motor_type=self.config_dict.get("MOTOR_TYPE", "MOORE6M"),
-            port=serial_port,
+            port=self.config_dict.get("MOTOR_PORT", "COM1"),
             baudrate=baudrate,
             az_limits=self.config_dict.get("AZIMUTH_LIMITS", (-89, 449)),
             el_limits=self.config_dict.get("ELEVATION_LIMITS", (15, 81)),
@@ -166,12 +161,11 @@ class Moore6mController:
         )
 
         self._zmq_ctx      = zmq.Context()
-        self._cmd_socket   = self._zmq_ctx.socket(zmq.REP)
-        self._cmd_socket.bind(f"tcp://*:{self.cmd_port}")
         self._estop_socket = self._zmq_ctx.socket(zmq.PULL)
         self._estop_socket.bind(f"tcp://*:{self.estop_port}")
 
-        self._daemon_proc    : Optional[multiprocessing.Process] = None
+        self._daemon_proc    : Optional[threading.Thread] = None
+        self._daemon_obj     : Optional[srt_d.SmallRadioTelescopeDaemon] = None
         self._dashboard_proc : Optional[multiprocessing.Process] = None
 
         self._dash_host = self.config_dict.get("DASHBOARD_HOST", "127.0.0.1")
@@ -205,24 +199,8 @@ class Moore6mController:
     # ------------------------------------------------------------------
 
     def start(self):
-        for target, name in (
-            (self._cmd_loop,   "zmq-cmd-loop"),
-            (self._estop_loop, "zmq-estop-loop"),
-        ):
-            t = threading.Thread(target=target, name=name, daemon=True)
-            t.start()
-
-    def _cmd_loop(self):
-        while self._running.is_set():
-            try:
-                msg = self._cmd_socket.recv_string(flags=0)
-            except zmq.error.ZMQError:
-                break
-            resp = self._handle_command(msg)
-            try:
-                self._cmd_socket.send_string(json.dumps(resp))
-            except Exception:
-                logging.exception("Failed to send ZMQ response")
+        t = threading.Thread(target=self._estop_loop, name="zmq-estop-loop", daemon=True)
+        t.start()
 
     def _estop_loop(self):
         poller = zmq.Poller()
@@ -249,7 +227,6 @@ class Moore6mController:
             self._log("Daemon already running")
             return True
         try:
-            from srt.daemon import daemon as srt_d
             d = srt_d.SmallRadioTelescopeDaemon(
                 self.config_dir,
                 self.config_dict,
@@ -399,76 +376,15 @@ class Moore6mController:
             self.moore6m.shutdown()
         except Exception:
             logging.exception("Error during driver shutdown")
-        for sock in (self._cmd_socket, self._estop_socket):
-            try:
-                sock.setsockopt(zmq.LINGER, 0)
-                sock.close()
-            except Exception:
-                pass
+        try:
+            self._estop_socket.setsockopt(zmq.LINGER, 0)
+            self._estop_socket.close()
+        except Exception:
+            pass
         try:
             self._zmq_ctx.destroy(linger=0)
         except Exception:
             pass
-
-    # ------------------------------------------------------------------
-    # ZMQ command dispatch
-    # ------------------------------------------------------------------
-
-    def _handle_command(self, raw: str) -> dict:
-        parts = raw.strip().split()
-        cmd   = parts[0].upper() if parts else ""
-        try:
-            if cmd in ("STATUS", "GET_STATUS"):
-                state = self.moore6m.get_state()
-                return {"ok": True, "rotor_state": state.to_dict()}
-
-            if cmd == "POINT" and len(parts) >= 3:
-                self.moore6m.point(float(parts[1]), float(parts[2]))
-                return {"ok": True}
-
-            if cmd == "CALIBRATE":
-                threading.Thread(target=self.moore6m.calibrate, daemon=True).start()
-                return {"ok": True}
-
-            if cmd == "STARTUP":
-                threading.Thread(target=self.moore6m.startup, daemon=True).start()
-                return {"ok": True}
-
-            if cmd in ("SPA", "ESTOP"):
-                return {"ok": self._send_spa_immediate()}
-
-            if cmd == "GET_COMM_HISTORY":
-                return {"ok": True, "history": self.moore6m.get_recent_command_history(limit=20)}
-
-            if cmd == "GET_SERIAL_COMM":
-                return {"ok": True, "serial": self.moore6m.get_recent_serial_communications(limit=20)}
-
-            if cmd == "DAEMON_START":
-                return {"ok": self.start_daemon()}
-
-            if cmd == "DAEMON_STOP":
-                self.stop_daemon()
-                return {"ok": True}
-
-            if cmd == "DASHBOARD_START":
-                return {"ok": self.start_dashboard()}
-
-            if cmd == "DASHBOARD_STOP":
-                self.stop_dashboard()
-                return {"ok": True}
-
-            if cmd == "SYSTEM_STATUS":
-                return {
-                    "ok": True,
-                    "daemon_running":    self.daemon_is_running(),
-                    "dashboard_running": self.dashboard_is_running(),
-                }
-
-        except Exception:
-            logging.exception("Error handling ZMQ command: %s", raw)
-            return {"ok": False, "error": "exception"}
-
-        return {"ok": False, "error": f"unknown command: {cmd}"}
 
 
 # ---------------------------------------------------------------------------
@@ -582,7 +498,7 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
     estop_engaged = tk.BooleanVar(value=controller.moore6m.get_state().safe_mode)
 
     # Forward-declare so the lambda can reference it after creation
-    estop_btn_ref = [None]
+    estop_btn_ref = [tk.Button()]
 
     def _do_estop():
         btn = estop_btn_ref[0]
@@ -679,6 +595,8 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
 
     # ---- Periodic update ----
     def _update_gui():
+        if tk is None:
+            return
         try:
             state = controller.moore6m.get_state()
             state_var.set(state.fsm_state)
@@ -713,11 +631,9 @@ def main():
     parser = argparse.ArgumentParser(
         description="Moore 6m Controller — serial worker, daemon, dashboard"
     )
-    parser.add_argument("--port",        default="COM1")
     parser.add_argument("--baud",        default=115200,            type=int)
     parser.add_argument("--config_dir",  default=DEFAULT_CONFIG_DIR)
     parser.add_argument("--config_file", default=DEFAULT_CONFIG_FILE)
-    parser.add_argument("--cmd-port",    default=DEFAULT_CMD_PORT,  type=int)
     parser.add_argument("--estop-port",  default=DEFAULT_ESTOP_PORT, type=int)
     parser.add_argument("--safe-mode",   action="store_true")
     parser.add_argument("--nogui",       action="store_true")
@@ -732,11 +648,9 @@ def main():
 
     try:
         controller = Moore6mController(
-            serial_port=args.port,
             baudrate=args.baud,
             config_dir=args.config_dir,
             config_file=args.config_file,
-            cmd_port=args.cmd_port,
             estop_port=args.estop_port,
             safe_mode=args.safe_mode,
         )

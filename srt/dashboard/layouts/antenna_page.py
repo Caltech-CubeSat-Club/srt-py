@@ -59,12 +59,13 @@ If absent the plots show empty.
 """
 
 from time import time
+from typing import Any
 
 try:
     from dash import dcc, html
 except ImportError:
-    import dash_core_components as dcc
-    import dash_html_components as html
+    import dash_core_components as dcc # pyright: ignore[reportMissingImports]
+    import dash_html_components as html # pyright: ignore[reportMissingImports]
 
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output
@@ -322,7 +323,7 @@ def generate_layout():
 # Helpers for building graph and reading params
 # ---------------------------------------------------------------------------
 
-def _build_amp_current_graph(history):
+def _build_amp_current_graph(history: list[dict[str, Any]]) -> go.Figure:
     """Build a Plotly figure from amp current history.
 
     history: list of dicts with keys "time", "2A01", "2A02", "2A03"
@@ -341,24 +342,24 @@ def _build_amp_current_graph(history):
         )
         return fig
 
-    valid_times = [
+    valid_times: list[int|float] = [
         entry.get("time")
         for entry in history
         if isinstance(entry, dict)
         and isinstance(entry.get("time"), (int, float))
-    ]
+    ] # pyright: ignore[reportAssignmentType]
     if valid_times:
         latest_time = max(valid_times)
-        times = [
+        times: list[int|float] = [
             (entry["time"] - latest_time)
             if isinstance(entry, dict)
             and isinstance(entry.get("time"), (int, float))
             else None
             for entry in history
-        ]
+        ] # pyright: ignore[reportAssignmentType]
     else:
         last_index = max(len(history) - 1, 0)
-        times = [idx - last_index for idx in range(len(history))]
+        times: list[int|float] = [idx - last_index for idx in range(len(history))]
 
     for amp_id in AMP_IDS:
         cmd_color, act_color = _AMP_COLORS[amp_id]
@@ -421,7 +422,7 @@ def _build_amp_current_graph(history):
     return fig
 
 
-def _trim_amp_history(history, window_seconds=AMP_HISTORY_WINDOW_SEC):
+def _trim_amp_history(history: list[dict[str, Any]], window_seconds: int = AMP_HISTORY_WINDOW_SEC) -> list[dict[str, Any]]:
     if not history:
         return []
     times = [

@@ -80,6 +80,7 @@ class DriverState(Enum):
 # ACK/command metadata
 # ---------------------------------------------------------------------------
 
+# commands that can be sent in safe mode (no movement)
 READ_ONLY_COMMANDS = {
     "STS", "STX", "ERR", "GAE", "VER", "ENC", "NER",
     "2A01SIC", "2A01SIA", "2A02SIC", "2A02SIA", "2A03SIC", "2A03SIA",
@@ -466,7 +467,7 @@ class Moore6mDriver:
             fut.set_result("")
             return fut
 
-        raw = cmd if isinstance(cmd, bytes) else cmd.encode("utf-8")
+        raw: bytes = cmd.encode("utf-8") if isinstance(cmd, str) else cmd
         if not raw.endswith(b"\r"):
             raw += b"\r"
 

@@ -11,7 +11,6 @@
 
 $scriptPath = "C:\Users\Caltech6mUser\srt-py\bin\Moore6mController.py"
 $configDir  = "C:\Users\Caltech6mUser\srt-py\config"
-$serialPort = "COM1"
 
 # ---- Single-instance lock ----
 Add-Type -AssemblyName PresentationFramework   # for MessageBox
@@ -30,7 +29,6 @@ $env:PYTHONUNBUFFERED = "1"
 
 try {
     conda run --no-capture-output -n srt-dev python $scriptPath `
-        --port        $serialPort `
         --config_dir  $configDir `
         --autostart 2>&1
 } finally {

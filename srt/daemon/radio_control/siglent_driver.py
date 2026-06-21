@@ -111,12 +111,12 @@ class SiglentDriver:
                 rm = pyvisa.ResourceManager()
                 inst = rm.open_resource(resource_name)
                 inst.timeout = 60000
-                inst.write_termination = "\n"
-                inst.read_termination = "\n"
+                inst.write_termination = "\n" # pyright: ignore[reportAttributeAccessIssue]
+                inst.read_termination = "\n" # pyright: ignore[reportAttributeAccessIssue]
 
                 logging.info("SiglentDriver connected to %s", resource_name)
                 try:
-                    logging.info("Siglent ID: %s", inst.query("*IDN?").strip())
+                    logging.info("Siglent ID: %s", inst.query("*IDN?").strip()) # pyright: ignore[reportAttributeAccessIssue]
                 except Exception:
                     pass
 
@@ -141,9 +141,9 @@ class SiglentDriver:
                     )
 
                     frame = SpectrumFrame(
-                        freq_hz=freq_hz,
-                        power_dbm=power_dbm,
-                        raw_dbm=raw_dbm,
+                        freq_hz=freq_hz.tolist(),
+                        power_dbm=power_dbm.tolist(),
+                        raw_dbm=raw_dbm.tolist(),
                         sweep_index=self._sweep_index,
                         timestamp=time.time(),
                         config=config,

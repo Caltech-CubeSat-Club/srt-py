@@ -28,6 +28,9 @@ from typing import Dict, Optional
 import numpy as np
 import dash_bootstrap_components as dbc
 
+from srt.dashboard.messaging.command_dispatcher import CommandThread
+from srt.dashboard.messaging.status_fetcher import StatusThread
+
 try:
     from dash import dcc
 except Exception:
@@ -57,7 +60,7 @@ def _label(text, **kwargs):
     return dbc.Label(text, className="mb-0 mt-2 fw-semibold", style={"fontSize": "0.8rem"}, **kwargs)
 
 
-def _num_input(id_, value, step=1, **kwargs):
+def _num_input(id_, value, step: float = 1.0, **kwargs):
     return dbc.Input(id=id_, type="number", value=value, step=step,
                      debounce=True, size="sm", **kwargs)
 
@@ -73,7 +76,7 @@ def _card(title, children):
     )
 
 
-def _live_config_from_status(status) -> Optional[SpectrumConfig]:
+def _live_config_from_status(status: Optional[DaemonStatus]) -> Optional[SpectrumConfig]:
     """Extract SpectrumConfig from the live status dict if available."""
     if status is None:
         return None
@@ -90,8 +93,10 @@ def _live_config_from_status(status) -> Optional[SpectrumConfig]:
     return SpectrumConfig.from_dict(cfg if isinstance(cfg, dict) else cfg.to_dict())
 
 
-def _describe_target(status: DaemonStatus) -> str:
+def _describe_target(status: Optional[DaemonStatus]) -> str:
     """Return a string like 'Moon az=250.2 el=45.1' or 'az=180.0 el=30.0'."""
+    if status is None:
+        return "Unknown"
     if status.queued_item and status.queued_item not in ("None", "none", ""):
         return f"{status.queued_item} az={status.az:.2f} el={status.el:.2f}"
     return f"az={status.az:.2f} el={status.el:.2f}"
@@ -351,7 +356,7 @@ def generate_layout(config_dict=None):
 # Callbacks
 # ---------------------------------------------------------------------------
 
-def register_callbacks(app, config, status_thread, command_thread):
+def register_callbacks(app, config, status_thread: StatusThread, command_thread: CommandThread):
 
     # ------------------------------------------------------------------
     # Live graph update
@@ -557,7 +562,7 @@ def register_callbacks(app, config, status_thread, command_thread):
         prevent_initial_call=True,
     )
     def download_csv(n_clicks):
-        status = status_thread.get_status()
+        status: Optional[DaemonStatus] = status_thread.get_status()
         spec = None
         if status is not None:
             spec = (status.get("spectrum") if isinstance(status, dict)
@@ -573,7 +578,7 @@ def register_callbacks(app, config, status_thread, command_thread):
         cfg = SpectrumConfig.from_dict(spec.get("config", {}))
         sweep_index = int(spec.get("sweep_index", 0))
         avg_count = int(spec.get("avg_count", 0))
-        target_str = _describe_target(status)
+        target_str: str = _describe_target(status)
 
         header = _make_csv_header(cfg, target_str, sweep_index, avg_count)
         data = np.column_stack((freq, power))
@@ -609,7 +614,7 @@ def register_callbacks(app, config, status_thread, command_thread):
         cfg = SpectrumConfig.from_dict(spec.get("config", {}))
         sweep_index = int(spec.get("sweep_index", 0))
         avg_count = int(spec.get("avg_count", 0))
-        target_str = _describe_target(status)
+        target_str: str = _describe_target(status)
 
         fig = build_spectrum_figure(freq, power, cfg, sweep_index, avg_count,
                                     title_extra=target_str)

@@ -9,6 +9,7 @@ from datetime import timedelta, datetime, timezone
 from threading import Thread
 from queue import Queue, Empty
 from collections import deque
+from typing import Any, Dict
 from xmlrpc.client import ServerProxy
 from pathlib import Path
 from operator import add
@@ -18,9 +19,12 @@ import json
 import logging
 import numpy as np
 
+from srt.daemon.rotor_control.moore6m_driver import Moore6mDriver
+from srt.daemon.rotor_control.testing_driver import TestingDriver
+
 from .rotor_control import make_driver
 from .radio_control import SiglentDriver
-from .types import LprParams, DaemonStatus, RotorState, SpectrumConfig
+from .types import LprParams, DaemonStatus, RotorState, SpectrumConfig, SpectrumFrame
 from .utilities.object_tracker import EphemerisTracker
 from .utilities.functions import azel_within_range
 
@@ -29,7 +33,7 @@ class SmallRadioTelescopeDaemon:
     Controller Class for the Small Radio Telescope
     """
 
-    def __init__(self, config_directory, config_dict, rotor=None):
+    def __init__(self, config_directory, config_dict, rotor: Moore6mDriver | TestingDriver | None = None):
         """Initializer for the Small Radio Telescope Daemon
 
         Parameters
@@ -145,7 +149,7 @@ class SmallRadioTelescopeDaemon:
         self.beam_switch_data = []
         self.pointing_error = None
         self.pointing_error_history = deque(maxlen=900)
-        self.amp_current_history = deque(maxlen=900)
+        self.amp_current_history: deque[dict[str, Any]] = deque(maxlen=900)
         self._rotor_state = RotorState()
         self.observation_events = deque(maxlen=1200)
         self.active_observation = None
@@ -597,12 +601,12 @@ class SmallRadioTelescopeDaemon:
             self.log_message("Encoder calibration is unavailable while motion is not allowed")
             return
         self._end_active_observation("encoder_calibration")
-        if not hasattr(self.rotor.motor, "calibrate"):
+        if not hasattr(self.rotor, "calibrate"):
             self.log_message("Encoder calibration is unavailable for this motor backend")
             return
         self.log_message("Starting 6m encoder calibration")
-        self.rotor.motor.calibrate()
-        cal_sts = getattr(self.rotor.motor, "CalSts", "Unknown")
+        self.rotor.calibrate()
+        cal_sts = getattr(self.rotor, "CalSts", "Unknown")
         self.log_message(f"Encoder calibration complete: {cal_sts}")
 
     def set_coords(self, lat, long, config_directory="config/sky_coords.csv", name=None):
@@ -790,7 +794,7 @@ class SmallRadioTelescopeDaemon:
                     self.pointing_error = None
 
                 if isinstance(state.amp_currents, dict):
-                    amp_sample = {"time": time()}
+                    amp_sample: Dict[str, Any] = {"time": time()}
                     for amp_id, amp_vals in state.amp_currents.items():
                         if isinstance(amp_vals, dict):
                             amp_sample[amp_id] = {
@@ -840,15 +844,6 @@ class SmallRadioTelescopeDaemon:
         while self.keep_running:
             try:
                 frame = self.spectrum_driver.get_latest()
-                spectrum_payload = {
-                    "freq_hz": frame.freq_hz.tolist() if frame else [],
-                    "power_dbm": frame.power_dbm.tolist() if frame else [],
-                    "sweep_index": frame.sweep_index if frame else 0,
-                    "timestamp": frame.timestamp if frame else 0.0,
-                    "avg_count": frame.avg_count if frame else 0,
-                    "config": self.spectrum_driver.get_config().to_dict(),
-                    "connected": self.spectrum_driver.connected,
-                }
                 try:
                     serial_comms = self.rotor.get_recent_serial_communications(limit=12)
                 except Exception:
@@ -860,7 +855,7 @@ class SmallRadioTelescopeDaemon:
 
                 status = DaemonStatus(
                     rotor = self._rotor_state,
-                    spectrum = spectrum_payload,
+                    spectrum = frame,
                     beam_width = self.beamwidth,
                     az_limits = self.az_limits,
                     el_limits = self.el_limits,
