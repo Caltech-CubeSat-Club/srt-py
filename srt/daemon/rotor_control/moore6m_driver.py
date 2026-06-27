@@ -32,15 +32,14 @@ from collections import deque
 from concurrent.futures import Future
 from dataclasses import replace
 from datetime import datetime
-from enum import Enum
 from queue import Empty, Queue
 from threading import Event, RLock, Thread
 from time import monotonic, sleep
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Literal, Literal, Optional, Tuple
 
 from parse import parse
 
-from ..types import LprParams, RotorState
+from ..telescope_types import LprParams, RotorState, DriverState, AmpCurrent
 
 
 # ---------------------------------------------------------------------------
@@ -57,24 +56,6 @@ def _parse_named(pattern: str, text: str) -> Dict[str, Any]:
         return {}
     named = getattr(parsed, "named", None)
     return named if isinstance(named, dict) else {}
-
-
-# ---------------------------------------------------------------------------
-# FSM state enum
-# ---------------------------------------------------------------------------
-
-class DriverState(Enum):
-    DISCONNECTED = "disconnected"
-    CONNECTING   = "connecting"
-    STARTUP_SYNC = "startup_sync"
-    READY        = "ready"
-    SLEWING      = "slewing"
-    TRACKING     = "tracking"
-    CALIBRATING  = "calibrating"
-    FAULT        = "fault"
-    RECOVERING   = "recovering"
-    SHUTDOWN     = "shutdown"
-
 
 # ---------------------------------------------------------------------------
 # ACK/command metadata
@@ -150,7 +131,7 @@ class Moore6mDriver:
 
         # ---- Internal state ----
         self._state      = RotorState(
-            fsm_state=DriverState.DISCONNECTED.value,
+            fsm_state=DriverState.DISCONNECTED,
             lpr=lpr_params,
         )
         self._state_lock  = RLock()
@@ -231,7 +212,7 @@ class Moore6mDriver:
             msg += f" ({reason})"
         logging.warning("Moore6mDriver: %s", msg)
         with self._state_lock:
-            self._state.fsm_state       = new_state.value
+            self._state.fsm_state       = new_state
             self._state.last_transition = ts
             if reason and new_state == DriverState.FAULT:
                 self._state.last_error = reason
@@ -510,7 +491,6 @@ class Moore6mDriver:
     # ------------------------------------------------------------------
     # Poll parsers — each takes (state, response) and mutates state
     # ------------------------------------------------------------------
-
     @staticmethod
     def _parse_sts(state: RotorState, response: str):
         named = _parse_named(
@@ -537,15 +517,33 @@ class Moore6mDriver:
 
         mode_int = named.get("mode")
         if isinstance(mode_int, int):
-            state.loop_mode = {0: "Stop", 1: "Track"}.get(mode_int, f"Unknown({mode_int})")
+            mode_str = 'Track' if mode_int == 1 else 'Stop'
+            if mode_str is not None:
+                state.loop_mode = mode_str
+            else:
+                logging.warning(
+                    "Moore6mDriver: STS reported out-of-range mode=%d "
+                    "(expected 0 or 1) — likely transient serial glitch, "
+                    "leaving loop_mode=%r unchanged this cycle",
+                    mode_int, state.loop_mode,
+                )
 
         cal_int = named.get("CalSts")
         if isinstance(cal_int, int):
-            state.cal_sts = {
-                0: "Not Calibrated",
-                1: "Calibrating Now",
-                2: "Calibration OK",
-            }.get(cal_int, f"Unknown({cal_int})")
+            match cal_int:
+                case 0:
+                    state.cal_sts = "Not Calibrated"
+                case 1:
+                    state.cal_sts = "Calibrating Now"
+                case 2:
+                    state.cal_sts = "Calibration OK"
+                case _:
+                    logging.warning(
+                        "Moore6mDriver: STS reported out-of-range CalSts=%d "
+                        "(expected 0, 1, or 2) — likely transient serial glitch, "
+                        "leaving cal_sts=%r unchanged this cycle",
+                        cal_int, state.cal_sts,
+                    )
 
     @staticmethod
     def _parse_gae(state: RotorState, response: str):
@@ -564,11 +562,14 @@ class Moore6mDriver:
     @staticmethod
     def _parse_amp(prefix: str, key: str, state: RotorState, response: str):
         named = _parse_named(f"{prefix}{{current:d}}", response)
-        if named:
-            curr = int(named.get("current", -999999))
-            if prefix not in state.amp_currents:
-                state.amp_currents[prefix] = {"commanded": None, "actual": None}
-            state.amp_currents[prefix][key] = curr
+        if not named:
+            return
+        curr = int(named["current"])
+        existing = state.amp_currents.get(prefix)
+        if existing is None:
+            state.amp_currents[prefix] = AmpCurrent(**{key: curr})
+        else:
+            state.amp_currents[prefix] = existing.model_copy(update={key: curr})
 
     # ------------------------------------------------------------------
     # Polling loop (background thread)
@@ -629,7 +630,7 @@ class Moore6mDriver:
                 self._apply_sts_fsm(working)
 
             # Sync fsm_state field in working copy
-            working.fsm_state = self._fsm_state.value
+            working.fsm_state = self._fsm_state
             working.last_poll_time = monotonic()
 
             with self._state_lock:

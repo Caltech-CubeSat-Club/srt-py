@@ -55,7 +55,7 @@ except Exception:
 
 from srt.daemon.rotor_control import make_driver
 from srt.daemon import daemon as srt_d
-from srt.daemon.types import LprParams
+from srt.daemon.telescope_types import LprParams
 from srt import config_loader
 
 
@@ -147,7 +147,7 @@ class Moore6mController:
         lpr_dict = self.config_dict.get("MOTOR_LPR_PARAMS")
         if not lpr_dict:
             raise RuntimeError("MOTOR_LPR_PARAMS missing from config")
-        lpr_params = LprParams.from_dict(lpr_dict)
+        lpr_params = LprParams.model_validate(lpr_dict)
 
         self.moore6m = make_driver(
             motor_type=self.config_dict.get("MOTOR_TYPE", "MOORE6M"),
@@ -599,7 +599,7 @@ def make_gui(controller: Moore6mController, poll_ms: int = GUI_POLL_MS):
             return
         try:
             state = controller.moore6m.get_state()
-            state_var.set(state.fsm_state)
+            state_var.set(state.fsm_state.value)
             pos_var.set(f"az: {state.az:.3f}°  el: {state.el:.3f}°")
             cal_var.set(state.cal_sts)
             mode_var.set(state.loop_mode)

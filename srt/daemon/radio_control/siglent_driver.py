@@ -15,16 +15,14 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pyvisa
 
-from ..types import SpectrumConfig, SpectrumFrame
+from ..telescope_types import SpectrumConfig, SpectrumFrame
 
 
 class SiglentDriver:
     """Owns VISA connection and acquisition loop for a Siglent analyzer."""
 
     def __init__(self, config: SpectrumConfig, history_limit: int = 200):
-        self._config = SpectrumConfig.from_dict(
-            config.to_dict() if isinstance(config, SpectrumConfig) else config
-        )
+        self._config = config
         self._config_lock = RLock()
 
         self._latest: Optional[SpectrumFrame] = None
@@ -62,9 +60,24 @@ class SiglentDriver:
         if not partial_dict:
             return
         with self._config_lock:
-            merged = self._config.to_dict()
+            # Catch typo'd keys explicitly rather than letting model_validate
+            # silently drop them — this is operator-typed input from the
+            # daemon's "spectrum_config key=value ..." command, so a typo
+            # should be visible, not silently ignored.
+            known_fields = set(SpectrumConfig.model_fields.keys())
+            unknown = set(partial_dict) - known_fields
+            if unknown:
+                logging.warning(
+                    "spectrum_config: ignoring unrecognized key(s) %s — known fields: %s",
+                    sorted(unknown), sorted(known_fields),
+                )
+                partial_dict = {k: v for k, v in partial_dict.items() if k in known_fields}
+                if not partial_dict:
+                    return
+
+            merged = self._config.model_dump()
             merged.update(partial_dict)
-            new_config = SpectrumConfig.from_dict(merged)
+            new_config = SpectrumConfig.model_validate(merged)
             if new_config != self._config:
                 self._config = new_config
                 self._reconfigure_flag.set()

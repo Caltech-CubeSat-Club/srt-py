@@ -8,7 +8,7 @@ import copy
 from threading import RLock
 from time import monotonic
 
-from ..types import LprParams, RotorState
+from ..telescope_types import LprParams, RotorState, DriverState
 
 
 class TestingDriver:
@@ -22,7 +22,7 @@ class TestingDriver:
         self,
         az_limits=(-89, 449),
         el_limits=(15, 81),
-        lpr_params: LprParams = None,
+        lpr_params: LprParams = LprParams(),
     ):
         self.az_limits  = az_limits
         self.el_limits  = el_limits
@@ -31,7 +31,7 @@ class TestingDriver:
         self._state     = RotorState(
             az=float(az_limits[0]),
             el=float(el_limits[0]),
-            fsm_state="ready",
+            fsm_state=DriverState.READY,
             cal_sts="Calibration OK",
             loop_mode="Track",
             az_brake=False,
@@ -92,7 +92,7 @@ class TestingDriver:
             if self._state.cal_sts == "Calibrating Now":
                 self._state.cal_sts = "Not Calibrated"
             self._state.loop_mode = "Stop"
-            self._state.fsm_state = "ready"
+            self._state.fsm_state = DriverState.READY
 
     def set_safe_mode(self, enabled: bool):
         with self._lock:
@@ -100,7 +100,7 @@ class TestingDriver:
 
     def shutdown(self):
         with self._lock:
-            self._state.fsm_state = "shutdown"
+            self._state.fsm_state = DriverState.SHUTDOWN
 
     # ------------------------------------------------------------------
     # History (no-ops — nothing to record)

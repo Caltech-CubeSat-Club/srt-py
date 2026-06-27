@@ -24,7 +24,7 @@ from srt.daemon.rotor_control.testing_driver import TestingDriver
 
 from .rotor_control import make_driver
 from .radio_control import SiglentDriver
-from .types import LprParams, DaemonStatus, RotorState, SpectrumConfig, SpectrumFrame
+from .telescope_types import AmpCurrent, Location, LprParams, DaemonStatus, RotorState, SpectrumConfig, SpectrumFrame
 from .utilities.object_tracker import EphemerisTracker
 from .utilities.functions import azel_within_range
 
@@ -124,7 +124,7 @@ class SmallRadioTelescopeDaemon:
                 baudrate=self.motor_baudrate,
                 az_limits=self.az_limits,
                 el_limits=self.el_limits,
-                lpr_params=LprParams.from_dict(lpr_dict),
+                lpr_params=LprParams.model_validate(lpr_dict),
             )
         try:
             current_azel = (self.rotor.get_state().az, self.rotor.get_state().el)
@@ -160,7 +160,7 @@ class SmallRadioTelescopeDaemon:
     def _load_spectrum_config(self, config_dict) -> SpectrumConfig:
         block = config_dict.get("SPECTRUM_ANALYZER")
         if isinstance(block, dict):
-            return SpectrumConfig.from_dict(block)
+            return SpectrumConfig.model_validate(block)
 
         legacy = {}
         if "SPECTRUM_ANALYZER_SERIAL" in config_dict:
@@ -177,7 +177,7 @@ class SmallRadioTelescopeDaemon:
             legacy["ref_level_dbm"] = config_dict.get("SPECTRUM_ANALYZER_REF_LEVEL_DBM")
 
         if legacy:
-            return SpectrumConfig.from_dict(legacy)
+            return SpectrumConfig.model_validate(legacy)
         return SpectrumConfig()
 
     @staticmethod
@@ -793,21 +793,15 @@ class SmallRadioTelescopeDaemon:
                 else:
                     self.pointing_error = None
 
-                if isinstance(state.amp_currents, dict):
-                    amp_sample: Dict[str, Any] = {"time": time()}
-                    for amp_id, amp_vals in state.amp_currents.items():
-                        if isinstance(amp_vals, dict):
-                            amp_sample[amp_id] = {
-                                "commanded": amp_vals.get("commanded"),
-                                "actual": amp_vals.get("actual"),
-                            }
-                    if len(amp_sample) > 1:
-                        self.amp_current_history.append(amp_sample)
-
-                if self.rotor_location != past_rotor_location:
-                    g_lat, g_lon = self.ephemeris_tracker.convert_to_gal_coord(
-                        self.rotor_location
-                    )
+                amp_sample: Dict[str, Any] = {"time": time()}
+                for amp_id, amp_vals in state.amp_currents.items():
+                    if isinstance(amp_vals, AmpCurrent):
+                        amp_sample[amp_id] = {
+                            "commanded": amp_vals.commanded,
+                            "actual": amp_vals.actual,
+                        }
+                if len(amp_sample) > 1:
+                    self.amp_current_history.append(amp_sample)
 
                 sleep(0.1)
             except AssertionError as e:
@@ -830,16 +824,6 @@ class SmallRadioTelescopeDaemon:
         status_socket = context.socket(zmq.PUB)
         status_socket.bind("tcp://*:%s" % status_port)
         logging.warning("Status socket bound on localhost:%s", status_port)
-
-        def _json_default(obj):
-            """Best-effort conversion for status payload serialization."""
-            if isinstance(obj, np.ndarray):
-                return obj.tolist()
-            if isinstance(obj, (np.floating, np.integer, np.bool_)):
-                return obj.item()
-            if isinstance(obj, bytes):
-                return obj.decode("utf-8", errors="replace")
-            return str(obj)
         
         while self.keep_running:
             try:
@@ -862,7 +846,7 @@ class SmallRadioTelescopeDaemon:
                     stow_loc = self.stow_location,
                     cal_loc = self.cal_location,
                     horizon_points = self.horizon_points,
-                    location = self.station,
+                    location = Location.model_validate(self.station),
                     object_locs = self.ephemeris_locations,
                     object_time_locs = self.ephemeris_time_locs,
                     vlsr = self.ephemeris_vlsr,
@@ -881,7 +865,7 @@ class SmallRadioTelescopeDaemon:
                     time = time()
                 )
 
-                serialized = json.dumps(status.to_dict(), default=_json_default)
+                serialized = status.model_dump_json()
                 status_socket.send_string(serialized)
             except Exception as e:
                 logging.exception("Status publish error: %s", str(e))

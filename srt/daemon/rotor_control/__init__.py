@@ -21,7 +21,7 @@ This is the only place that knows which driver class maps to which type string.
 
 """
 
-from ..types import LprParams
+from ..telescope_types import LprParams
 from .moore6m_driver import Moore6mDriver
 from .testing_driver import TestingDriver
 

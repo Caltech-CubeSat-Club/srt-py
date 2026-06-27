@@ -45,7 +45,7 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
 from .graphs import build_spectrum_figure, emptygraph
-from ...daemon.types import SpectrumConfig, DaemonStatus
+from ...daemon.telescope_types import SpectrumConfig, DaemonStatus
 
 
 # ---------------------------------------------------------------------------

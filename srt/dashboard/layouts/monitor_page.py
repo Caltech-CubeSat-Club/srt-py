@@ -43,7 +43,7 @@ from .graphs import (
 from astropy.table import Table
 from srt import config_loader
 
-from ...daemon.types import DaemonStatus, RotorState
+from ...daemon.telescope_types import DaemonStatus, RotorState
 
 
 root_folder = Path(__file__).parent.parent.parent.parent

@@ -74,7 +74,7 @@ import plotly.graph_objects as go
 from .graphs import generate_pointing_error_graph
 from .navbar import generate_navbar
 
-from ...daemon.types import RotorState, DaemonStatus
+from ...daemon.telescope_types import RotorState, DaemonStatus
 from ...dashboard.messaging.status_fetcher import StatusThread
 
 
@@ -505,7 +505,7 @@ def register_callbacks(app, config, status_thread: StatusThread):
         status = status_thread.get_status()
         if status is None:
             return ["—"] * len(LPR_PARAMS)
-        lpr = status.lpr.to_dict()
+        lpr = status.lpr
         result = []
         for key, _, _ in LPR_PARAMS:
             v = lpr.get(key)
