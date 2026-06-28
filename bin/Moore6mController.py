@@ -55,7 +55,7 @@ except Exception:
 
 from srt.daemon.rotor_control import make_driver
 from srt.daemon import daemon as srt_d
-from srt.daemon.telescope_types import LprParams
+from srt.daemon.telescope_types import LprParams, DaemonConfig
 from srt import config_loader
 
 
@@ -75,41 +75,38 @@ LOG_MAXLINES = 500
 # Process target functions (must be module-level for multiprocessing spawn)
 # ---------------------------------------------------------------------------
 
-def _run_dashboard(config_dir, config_dict):
-    from waitress import serve
-    from srt.dashboard import app as srt_app
-    logging.getLogger("waitress.queue").disabled = True
+def _run_dashboard(config: DaemonConfig):
+    import uvicorn
+    from srt.fastapi_backend.main import app as fastapi_app
     logging.basicConfig(
         level=logging.WARNING,
         format="%(asctime)s %(levelname)s: %(message)s",
     )
-    app_server, _ = srt_app.generate_app(config_dir, config_dict)
-    host = config_dict.get("DASHBOARD_HOST", "127.0.0.1")
-    port = config_dict.get("DASHBOARD_PORT", 8080)
-    serve(app_server, host=host, port=port)
-
+    uvicorn.run(
+        fastapi_app,
+        host=str(config.DASHBOARD_HOST),
+        port=config.DASHBOARD_PORT,
+        log_level="warning",
+    )
 
 # ---------------------------------------------------------------------------
 # Config loader
 # ---------------------------------------------------------------------------
 
-def _load_config(config_dir: str, config_file: str) -> Optional[dict]:
+def _load_config(config_dir: str, config_file: str) -> DaemonConfig:
     config_dir_path = Path(config_dir)
     config_path     = config_dir_path / config_file
-    schema_path     = config_dir_path / "schema.yaml"
     sky_coords_path = config_dir_path / "sky_coords.csv"
 
     missing = [
-        str(p) for p in (config_dir_path, sky_coords_path, schema_path, config_path)
+        str(p) for p in (config_dir_path, sky_coords_path, config_path)
         if not p.exists()
     ]
     if missing:
         logging.error("Missing required config paths: %s", missing)
-        return None
-    if not config_loader.validate_yaml_schema(config_path, schema_path):
-        logging.error("Config YAML failed schema validation: %s", config_path)
-        return None
-    return config_loader.load_yaml(config_path)
+        raise RuntimeError(f"Missing required config paths: {missing}")
+
+    return config_loader.load_config(config_path)
 
 
 # ---------------------------------------------------------------------------
@@ -134,8 +131,8 @@ class Moore6mController:
         self._running = threading.Event()
         self._running.set()
 
-        self.config_dict = _load_config(config_dir, config_file)
-        if self.config_dict is None:
+        self.config = _load_config(config_dir, config_file)
+        if self.config is None:
             raise RuntimeError(
                 f"Failed to load config from {config_dir}/{config_file}"
             )
@@ -144,17 +141,17 @@ class Moore6mController:
         self._log_lines : list = []
         self._log_dirty = False
 
-        lpr_dict = self.config_dict.get("MOTOR_LPR_PARAMS")
+        lpr_dict = self.config.MOTOR_LPR_PARAMS
         if not lpr_dict:
             raise RuntimeError("MOTOR_LPR_PARAMS missing from config")
         lpr_params = LprParams.model_validate(lpr_dict)
 
         self.moore6m = make_driver(
-            motor_type=self.config_dict.get("MOTOR_TYPE", "MOORE6M"),
-            port=self.config_dict.get("MOTOR_PORT", "COM1"),
+            motor_type=self.config.MOTOR_TYPE,
+            port=self.config.MOTOR_PORT,
             baudrate=baudrate,
-            az_limits=self.config_dict.get("AZIMUTH_LIMITS", (-89, 449)),
-            el_limits=self.config_dict.get("ELEVATION_LIMITS", (15, 81)),
+            az_limits=self.config.AZLIMITS,
+            el_limits=self.config.ELLIMITS,
             lpr_params=lpr_params,
             safe_mode=bool(safe_mode),
         )
@@ -167,8 +164,8 @@ class Moore6mController:
         self._daemon_obj     : Optional[srt_d.SmallRadioTelescopeDaemon] = None
         self._dashboard_proc : Optional[multiprocessing.Process] = None
 
-        self._dash_host = self.config_dict.get("DASHBOARD_HOST", "127.0.0.1")
-        self._dash_port = self.config_dict.get("DASHBOARD_PORT", 8080)
+        self._dash_host = self.config.DASHBOARD_HOST
+        self._dash_port = self.config.DASHBOARD_PORT
 
     # ------------------------------------------------------------------
     # Logging
@@ -228,7 +225,7 @@ class Moore6mController:
         try:
             d = srt_d.SmallRadioTelescopeDaemon(
                 self.config_dir,
-                self.config_dict,
+                self.config,
                 rotor=self.moore6m,   # <-- share the existing driver
             )
             t = threading.Thread(
@@ -312,7 +309,7 @@ class Moore6mController:
         try:
             self._dashboard_proc = multiprocessing.Process(
                 target=_run_dashboard,
-                args=(self.config_dir, self.config_dict),
+                args=(self.config,),
                 name="srt-dashboard",
                 daemon=True,
             )

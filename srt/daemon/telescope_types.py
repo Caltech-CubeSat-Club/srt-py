@@ -322,14 +322,14 @@ class SpectrumConfig(BaseModel):
     rbw_hz: float = 1.0e6
     vbw_hz: float = 100.0e3
     ref_level_dbm: float = -30.0
-    y_axis_mode: Literal["db_per_div", "log_full_scale"] = "db_per_div"
+    y_axis_mode: Literal["auto", "fixed_limits", "db_per_div"] = "db_per_div"
     y_db_per_div: float = 10.0
     y_num_divs: int = 10
     y_lim_dbm: tuple[float, float] = (-120.0, -30.0)
     atten_auto: bool = True
     atten_db: float = 0.0
     preamp_on: Optional[bool] = True
-    trace_type: Literal["clear_write", "max_hold", "min_hold", "average"] = "clear_write"
+    trace_type: Literal["clear_write", "average"] = "clear_write"
     num_averages: int = 300
     x_units: Literal["Hz", "kHz", "MHz", "GHz"] = "MHz"
 
@@ -371,20 +371,12 @@ class SpectrumFrame(BaseModel):
 # ---------------------------------------------------------------------------
 
 class EmergencyContact(BaseModel):
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
+    name: str
+    email: str
+    phone_number: str
 
 
 class Location(BaseModel):
-    """Observer/station location. Mirrors daemon.py's self.station dict
-    (config_dict["STATION"], or the hand-built fallback in __init__/
-    set_coords), which always carries a "name" key — added here after
-    confirming against the real daemon.py source; the dataclass version
-    only declared this as a bare Dict so this field wasn't visible
-    until now.
-    """
-
     latitude: float = 0.0
     longitude: float = 0.0
     elevation: float = 0.0
@@ -484,7 +476,7 @@ class DaemonStatus(BaseModel):
     cal_values: list[float] = Field(default_factory=list)
 
     # ---- System ----
-    emergency_contact: EmergencyContact = Field(default_factory=EmergencyContact)
+    emergency_contact: Optional[EmergencyContact] = None
     time: float = Field(default_factory=_time.time)
 
     # ------------------------------------------------------------------
@@ -506,4 +498,109 @@ class DaemonStatus(BaseModel):
     @property
     def lpr(self) -> LprParams:
         return self.rotor.lpr
-    
+
+
+# ---------------------------------------------------------------------------
+# Daemon configuration (config.yaml) — replaces schema.yaml/yamale +
+# config_loader.py's load_yaml() returning an untyped dict.
+#
+# Field types/required-ness below are transcribed directly from the real schema.yaml
+# ---------------------------------------------------------------------------
+
+class Limit(BaseModel):
+    """AZLIMITS / ELLIMITS — schema.yaml's `limit` include."""
+
+    lower_bound: float
+    upper_bound: float
+
+    def to_tuple(self) -> tuple[float, float]:
+        return (self.lower_bound, self.upper_bound)
+
+
+class AzElPoint(BaseModel):
+    """STOW_LOCATION / CAL_LOCATION / HORIZON_POINTS entries —
+    schema.yaml's `az_el_point` include."""
+
+    azimuth: float
+    elevation: float
+
+    def to_tuple(self) -> tuple[float, float]:
+        return (self.azimuth, self.elevation)
+
+
+class DaemonConfig(BaseModel):
+    """Top-level config.yaml structure. Load with:
+
+        DaemonConfig.model_validate(config_loader.load_yaml(path))
+
+    This replaces yamale's role (schema.yaml + validate_yaml_schema())
+    as well as the untyped dict that load_yaml() previously handed to
+    SmallRadioTelescopeDaemon.__init__ — every config_dict["KEY"] access
+    in __init__ becomes a typed, autocompleted, statically-checked
+    attribute access instead.
+
+    Required-ness mirrors schema.yaml's required=False markers exactly:
+    fields with no default below are required (yamale's default), and
+    fields with `= None` / `= <value>` correspond to schema.yaml's
+    explicit required=False entries, using the SAME fallback values
+    daemon.py's __init__ already applies via config_dict.get(key, default)
+    where one exists (e.g. OBSERVATION_DWELL_TIME defaults to 5).
+    """
+
+    STATION: Location
+    EMERGENCY_CONTACT: EmergencyContact
+    AZLIMITS: Limit
+    ELLIMITS: Limit
+    STOW_LOCATION: AzElPoint
+    CAL_LOCATION: AzElPoint
+    HORIZON_POINTS: list[AzElPoint] = Field(default_factory=list)
+
+    MOTOR_TYPE: Literal["NONE", "CALTECH6M"]
+    MOTOR_BAUDRATE: int
+    MOTOR_PORT: str
+    NUM_BEAMSWITCHES: int
+    BEAMWIDTH: float
+
+    OBSERVATION_DWELL_TIME: int = 5
+    SCAN_SETTLE_TIME: float = 1.0
+    ROTOR_MOVE_TIMEOUT: float = 180.0
+    TRACKING_COMMAND_DEADBAND_MDEG: float = 150.0
+    POINTING_ERROR_THRESHOLD_MDEG: float = 150.0
+    POINTING_ERROR_STABLE_CYCLES: int = 4
+
+    SAVE_DIRECTORY: str
+    RUN_HEADLESS: bool
+    DASHBOARD_PORT: int
+    DASHBOARD_HOST: str 
+    DASHBOARD_DOWNLOADS: bool
+    DASHBOARD_REFRESH_MS: int
+    DASHBOARD_REQUIRE_AUTH: Optional[bool] = None
+    DASHBOARD_USERNAME: Optional[str] = None
+    DASHBOARD_PASSWORD: Optional[str] = None
+
+    WEBCAM_ENABLE: Optional[bool] = None
+    WEBCAM_DEVICE_INDEX: Optional[int] = None
+    WEBCAM_TARGET_FPS: Optional[float] = None
+    WEBCAM_JPEG_QUALITY: Optional[int] = None
+    WEBCAM_MAX_WIDTH: Optional[int] = None
+
+    SPECTRUM_ANALYZER: Optional[SpectrumConfig] = None
+    SPECTRUM_ANALYZER_SERIAL: Optional[str] = None
+    SPECTRUM_ANALYZER_START_HZ: Optional[float] = None
+    SPECTRUM_ANALYZER_STOP_HZ: Optional[float] = None
+    SPECTRUM_ANALYZER_RBW_HZ: Optional[float] = None
+    SPECTRUM_ANALYZER_VBW_HZ: Optional[float] = None
+    SPECTRUM_ANALYZER_REF_LEVEL_DBM: Optional[float] = None
+
+    END_OBSERVATION_ON_OOB: Optional[bool] = True
+    STOW_ON_OOB: Optional[bool] = False
+
+    MOTOR_LPR_PARAMS: LprParams
+
+    @model_validator(mode="after")
+    def _check_az_limits_ordered(self) -> "DaemonConfig":
+        if self.AZLIMITS.lower_bound >= self.AZLIMITS.upper_bound:
+            raise ValueError("AZLIMITS.lower_bound must be less than upper_bound")
+        if self.ELLIMITS.lower_bound >= self.ELLIMITS.upper_bound:
+            raise ValueError("ELLIMITS.lower_bound must be less than upper_bound")
+        return self

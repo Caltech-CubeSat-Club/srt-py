@@ -39,7 +39,7 @@ from typing import Any, Callable, Dict, Literal, Literal, Optional, Tuple
 
 from parse import parse
 
-from ..telescope_types import LprParams, RotorState, DriverState, AmpCurrent
+from ..telescope_types import LprParams, RotorState, DriverState, AmpCurrent, Limit
 
 
 # ---------------------------------------------------------------------------
@@ -112,8 +112,8 @@ class Moore6mDriver:
         self,
         port: str,
         baudrate: int,
-        az_limits: Tuple[float, float],
-        el_limits: Tuple[float, float],
+        az_limits: Limit,
+        el_limits: Limit,
         lpr_params: LprParams,
         safe_mode: bool = False,
     ):
@@ -730,17 +730,17 @@ class Moore6mDriver:
         if not state.calibrated:
             logging.error("Moore6mDriver: cannot point — not calibrated")
             return
-        if not (self.az_limits[0] <= az <= self.az_limits[1]):
+        if not (self.az_limits.lower_bound <= az <= self.az_limits.upper_bound):
             logging.error(
                 "Moore6mDriver: az %.3f outside limits [%s, %s]",
-                az, self.az_limits[0], self.az_limits[1],
+                az, self.az_limits.lower_bound, self.az_limits.upper_bound,
             )
             return
-        if el < self.el_limits[0]:
-            logging.error("Moore6mDriver: el %.3f below minimum %s", el, self.el_limits[0])
+        if el < self.el_limits.lower_bound:
+            logging.error("Moore6mDriver: el %.3f below minimum %s", el, self.el_limits.lower_bound)
             return
-        if el > self.el_limits[1]:
-            logging.error("Moore6mDriver: el %.3f above maximum %s", el, self.el_limits[1])
+        if el > self.el_limits.upper_bound:
+            logging.error("Moore6mDriver: el %.3f above maximum %s", el, self.el_limits.upper_bound)
             return
 
         self.brakes_off()

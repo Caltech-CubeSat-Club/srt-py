@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from .routes import auth, websocket
+from .zmq_bridge.bridge import status_broadcaster
 
 app = FastAPI(title="SRT Dashboard")
 
@@ -18,6 +19,15 @@ app.add_middleware(SessionMiddleware, secret_key="REPLACE_ME")  # required by au
 
 app.include_router(auth.router)
 app.include_router(websocket.router)
+
+@app.on_event("startup")
+async def _start_status_broadcaster():
+    await status_broadcaster.start()
+ 
+ 
+@app.on_event("shutdown")
+async def _stop_status_broadcaster():
+    await status_broadcaster.stop()
 
 # Static Svelte build mounted LAST so it doesn't shadow /ws or /api
 # routes. adapter-static outputs to frontend/build/ by default.
