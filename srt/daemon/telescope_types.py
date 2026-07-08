@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import time as _time
 from enum import Enum
-from typing import Optional, Literal
+from typing import Optional, Literal, Union
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -449,13 +449,13 @@ class DaemonStatus(BaseModel):
 
     # ---- Ephemeris ----
     object_locs: dict[str, tuple[float, float]] = Field(default_factory=dict)
-    object_time_locs: dict[str, list[tuple[float, float]]] = Field(default_factory=dict)
+    object_time_locs: dict[int, dict[str, tuple[float, float]]] = Field(default_factory=dict)
     vlsr: dict[str, float] = Field(default_factory=dict)
 
     # ---- Pointing ----
     motor_offsets: tuple[float, float] = (0.0, 0.0)
-    pointing_error_history: list[tuple[float, float]] = Field(default_factory=list)
-    amp_current_history: list[dict[str, AmpCurrent]] = Field(default_factory=list)
+    pointing_error_history: list[dict[str, float]] = Field(default_factory=list)
+    amp_current_history: list[dict[str, Union[float, AmpCurrent]]] = Field(default_factory=list)
 
     # ---- Command queue ----
     queued_item: str = "None"

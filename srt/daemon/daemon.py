@@ -7,15 +7,13 @@ Main Control and Orchestration Class for the Small Radio Telescope
 from time import sleep, time
 from datetime import timedelta, datetime, timezone
 from threading import Thread
-from queue import Queue, Empty
+from queue import Queue
 from collections import deque
-from typing import Any, Dict
-from xmlrpc.client import ServerProxy
+from typing import Any, Dict, Tuple, Union
 from pathlib import Path
 from operator import add
 
 import zmq
-import json
 import logging
 import numpy as np
 
@@ -95,35 +93,13 @@ class SmallRadioTelescopeDaemon:
         self.beam_switch_data = []
         self.pointing_error = None
         self.pointing_error_history = deque(maxlen=900)
-        self.amp_current_history: deque[dict[str, Any]] = deque(maxlen=900)
+        self.amp_current_history: deque[dict[str, Union[float,AmpCurrent]]] = deque(maxlen=900)
         self._rotor_state = RotorState()
         self.observation_events = deque(maxlen=1200)
         self.active_observation = None
 
-        spectrum_config = self._load_spectrum_config(self.config)
+        spectrum_config = self.config.SPECTRUM_ANALYZER or SpectrumConfig()
         self.spectrum_driver = SiglentDriver(spectrum_config)
-
-    def _load_spectrum_config(self, config: DaemonConfig) -> SpectrumConfig:
-        block = config.SPECTRUM_ANALYZER
-        if isinstance(block, dict):
-            return SpectrumConfig.model_validate(block)
-
-        legacy = {}
-        legacy["instrument_serial"] = config.SPECTRUM_ANALYZER_SERIAL
-        if config.SPECTRUM_ANALYZER_START_HZ is not None:
-            legacy["start_hz"] = config.SPECTRUM_ANALYZER_START_HZ
-        if config.SPECTRUM_ANALYZER_STOP_HZ is not None:
-            legacy["stop_hz"] = config.SPECTRUM_ANALYZER_STOP_HZ
-        if config.SPECTRUM_ANALYZER_RBW_HZ is not None:
-            legacy["rbw_hz"] = config.SPECTRUM_ANALYZER_RBW_HZ
-        if config.SPECTRUM_ANALYZER_VBW_HZ is not None:
-            legacy["vbw_hz"] = config.SPECTRUM_ANALYZER_VBW_HZ
-        if config.SPECTRUM_ANALYZER_REF_LEVEL_DBM is not None:
-            legacy["ref_level_dbm"] = config.SPECTRUM_ANALYZER_REF_LEVEL_DBM
-
-        if legacy:
-            return SpectrumConfig.model_validate(legacy)
-        return SpectrumConfig()
 
     @staticmethod
     def _parse_key_value_pairs(parts):
@@ -712,13 +688,10 @@ class SmallRadioTelescopeDaemon:
                 else:
                     self.pointing_error = None
 
-                amp_sample: Dict[str, Any] = {"time": time()}
+                amp_sample: Dict[str, Union[float, AmpCurrent]] = {"time": time()}
                 for amp_id, amp_vals in state.amp_currents.items():
                     if isinstance(amp_vals, AmpCurrent):
-                        amp_sample[amp_id] = {
-                            "commanded": amp_vals.commanded,
-                            "actual": amp_vals.actual,
-                        }
+                        amp_sample[amp_id] = amp_vals
                 if len(amp_sample) > 1:
                     self.amp_current_history.append(amp_sample)
 
@@ -836,13 +809,15 @@ class SmallRadioTelescopeDaemon:
 
         # Create Infinite Looping Threads
         ephemeris_tracker_thread = Thread(
-            target=self.update_ephemeris_location, daemon=True
+            target=self.update_ephemeris_location, daemon=True, name="ephemeris_tracker"
         )
         rotor_pointing_thread = Thread(
-            target=self.update_rotor_status, daemon=True)
+            target=self.update_rotor_status, daemon=True, name="rotor_pointing"
+        )
         command_queueing_thread = Thread(
-            target=self.update_command_queue, daemon=True)
-        status_thread = Thread(target=self.update_status, daemon=True)
+            target=self.update_command_queue, daemon=True, name="command_queueing"
+        )
+        status_thread = Thread(target=self.update_status, daemon=True, name="status_updater")
 
         # Start Infinite Looping Update Threads
         ephemeris_tracker_thread.start()

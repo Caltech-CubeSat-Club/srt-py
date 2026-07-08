@@ -82,6 +82,7 @@ def _run_dashboard(config: DaemonConfig):
         level=logging.WARNING,
         format="%(asctime)s %(levelname)s: %(message)s",
     )
+    fastapi_app.state.config = config
     uvicorn.run(
         fastapi_app,
         host=str(config.DASHBOARD_HOST),

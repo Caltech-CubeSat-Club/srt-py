@@ -12,18 +12,18 @@ import astropy.units as _u
 
 import numpy as np
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, Dict, Tuple, Optional
 
 
-deg: Any = getattr(_u, "deg")
-hourangle: Any = getattr(_u, "hourangle")
-km: Any = getattr(_u, "km")
-m: Any = getattr(_u, "m")
-s: Any = getattr(_u, "s")
-second: Any = getattr(_u, "second")
+deg = getattr(_u, "deg")
+hourangle = getattr(_u, "hourangle")
+km = getattr(_u, "km")
+m = getattr(_u, "m")
+s = getattr(_u, "s")
+second = getattr(_u, "second")
 
 
-root_folder = Path(__file__).parent.parent.parent.parent
+root_folder: Path = Path(__file__).parent.parent.parent.parent
 
 
 class EphemerisTracker:
@@ -33,13 +33,13 @@ class EphemerisTracker:
 
     def __init__(
         self,
-        observer_lat,
-        observer_lon,
-        observer_elevation=0,
-        config_file="config/sky_coords.csv",
-        refresh_time=10,
-        auto_download=True,
-    ):
+        observer_lat: float,
+        observer_lon: float,
+        observer_elevation: float = 0,
+        config_file: str = "config/sky_coords.csv",
+        refresh_time: float = 10,
+        auto_download: bool = True,
+    ) -> None:
         """Initializer for EphemerisTracker
 
         - Reads CSV File for Objects to Track
@@ -64,9 +64,9 @@ class EphemerisTracker:
 
         table = Table.read(Path(root_folder, config_file), format="ascii.csv")
 
-        self.sky_coord_names = {}
-        sky_coords_ra = np.zeros(len(table))
-        sky_coords_dec = np.zeros(len(table))
+        self.sky_coord_names: Dict[str, int] = {}
+        sky_coords_ra: np.ndarray = np.zeros(len(table))
+        sky_coords_dec: np.ndarray = np.zeros(len(table))
 
         for index, row in enumerate(table):
             coordinate_system = row["coordinate_system"]
@@ -86,24 +86,24 @@ class EphemerisTracker:
             sky_coords_dec[index] = sky_coord_transformed.dec.degree
             self.sky_coord_names[name] = index
 
-        self.sky_coords = SkyCoord(
+        self.sky_coords: SkyCoord = SkyCoord(
             ra=sky_coords_ra * deg, dec=sky_coords_dec * deg, frame=CIRS
         )
-        self.location = EarthLocation.from_geodetic(
+        self.location: EarthLocation = EarthLocation.from_geodetic(
             lat=observer_lat * deg,
             lon=observer_lon * deg,
             height=observer_elevation * m,
         )
-        self.latest_time = None
+        self.latest_time: Optional[Time] = None
         self.refresh_time = refresh_time * second
 
-        self.az_el_dict = {}
-        self.vlsr_dict = {}
+        self.az_el_dict: Dict[str, Tuple[float, float]] = {}
+        self.vlsr_dict: Dict[str, float] = {}
         # self.time_interval_dict = {}
-        self.time_offsets_seconds = sorted(
+        self.time_offsets_seconds: list[int] = sorted(
             set(list(range(0, 61, 5)) + [3600, 7200, 10800, 14400, 18000, 21600])
         )
-        self.time_interval_dict = self.initial_azeltime()
+        self.time_interval_dict: Dict[int, Dict[str, Tuple[float, float]]] = self.initial_azeltime()
 
         # Configure astropy download behavior before first ephemeris update.
         conf.auto_download = auto_download
@@ -111,7 +111,7 @@ class EphemerisTracker:
         self.update_all_az_el()
         # self.update_azeltime()
 
-    def calculate_az_el(self, name, time, alt_az_frame):
+    def calculate_az_el(self, name: str, time: Time, alt_az_frame: AltAz) -> Tuple[float, float]:
         """Calculates Azimuth and Elevation of the Specified Object at the Specified Time
 
         Parameters
@@ -146,7 +146,7 @@ class EphemerisTracker:
             )
         return alt_az.az.degree, alt_az.alt.degree
 
-    def calculate_vlsr(self, name, time, frame):
+    def calculate_vlsr(self, name: str, time: Time, frame: AltAz) -> float:
         """Calculates the velocity in the local standard of rest.
 
         Parameters
@@ -187,7 +187,7 @@ class EphemerisTracker:
 
         return vlsr.to(km / s).value
 
-    def calculate_vlsr_azel(self, az_el, time=None):
+    def calculate_vlsr_azel(self, az_el: Tuple[float, float], time: Optional[Time] = None) -> float:
         """Takes an AzEl tuple and derives the vlsr from  Location
 
         Parameters
@@ -218,7 +218,7 @@ class EphemerisTracker:
 
         return vlsr.to(km / s).value
 
-    def convert_to_gal_coord(self, az_el, time=None):
+    def convert_to_gal_coord(self, az_el: Tuple[float, float], time: Optional[Time] = None) -> Tuple[float, float]:
         """Converts an AzEl Tuple into a Galactic Tuple from Location
 
         Parameters
@@ -245,7 +245,7 @@ class EphemerisTracker:
         g_lng = float(result.l.degree)
         return g_lat, g_lng
 
-    def update_all_az_el(self):
+    def update_all_az_el(self) -> None:
         """Updates Every Entry in the AzEl Dictionary Cache, if the Cache is Outdated
 
         Returns
@@ -296,7 +296,7 @@ class EphemerisTracker:
 
         self.latest_time = time
 
-    def get_all_azimuth_elevation(self):
+    def get_all_azimuth_elevation(self) -> Dict[str, Tuple[float, float]]:
         """Returns Dictionary Mapping the Objects to their Current AzEl Coordinates
 
         Returns
@@ -305,7 +305,7 @@ class EphemerisTracker:
         """
         return self.az_el_dict
 
-    def get_all_azel_time(self):
+    def get_all_azel_time(self) -> Dict[int, Dict[str, Tuple[float, float]]]:
         """Returns Dictionary Mapping the Time Offset to a dictionary of updated azel coordinates
 
         Returns
@@ -315,7 +315,7 @@ class EphemerisTracker:
         # return
         return self.time_interval_dict
 
-    def get_azimuth_elevation(self, name, time_offset):
+    def get_azimuth_elevation(self, name: str, time_offset: float) -> Tuple[float, float]:
         """Returns Individual Object AzEl at Specified Time Offset
 
         Parameters
@@ -337,10 +337,10 @@ class EphemerisTracker:
                 name, time, AltAz(obstime=time, location=self.location)
             )
 
-    def get_all_vlsr(self):
+    def get_all_vlsr(self) -> Dict[str, float]:
         return self.vlsr_dict
 
-    def get_vlsr(self, name, time_offset=0):
+    def get_vlsr(self, name: str, time_offset: float = 0) -> float:
 
         if time_offset == 0:
             return self.get_all_vlsr()[name]
@@ -349,23 +349,23 @@ class EphemerisTracker:
             frame = AltAz(obstime=time, location=self.location)
             return self.calculate_vlsr(name, time, frame)
 
-    def iter_time_offsets_seconds(self):
+    def iter_time_offsets_seconds(self) -> Tuple[int, ...]:
         """Iterate configured future time offsets in seconds."""
         return tuple(self.time_offsets_seconds)
 
-    def initial_azeltime(self):
-        new_dict = {}
+    def initial_azeltime(self) -> Dict[int, Dict[str, Tuple[float, float]]]:
+        new_dict: Dict[int, Dict[str, Tuple[float, float]]] = {}
         for time_passed in self.iter_time_offsets_seconds():
             # new_time_dict = deepcopy(self.az_el_dict)
-            new_time_dict = {}
+            new_time_dict: Dict[str, Tuple[float, float]] = {}
             new_dict[time_passed] = new_time_dict
         return new_dict
 
-    def inital_azeltime(self):
+    def inital_azeltime(self) -> Dict[int, Dict[str, Tuple[float, float]]]:
         """Backward-compatible alias for initial_azeltime."""
         return self.initial_azeltime()
 
-    def update_azeltime(self):
+    def update_azeltime(self) -> None:
         # if (
         #     self.latest_time is not None
         #     and Time.now() < self.latest_time + self.refresh_time
@@ -374,12 +374,12 @@ class EphemerisTracker:
 
         for time_passed in self.iter_time_offsets_seconds():
 
-            time = Time.now() + time_passed * second
-            frame = AltAz(obstime=time, location=self.location)
-            transformed = cast(Any, self.sky_coords.transform_to(frame))
+            time: Time = Time.now() + time_passed * second
+            frame: AltAz = AltAz(obstime=time, location=self.location)
+            transformed: Any = cast(Any, self.sky_coords.transform_to(frame))
 
             for name in self.sky_coord_names:
-                index = self.sky_coord_names[name]
+                index: int = self.sky_coord_names[name]
                 self.time_interval_dict[time_passed][name] = (
                     transformed.az[index].degree,
                     transformed.alt[index].degree,

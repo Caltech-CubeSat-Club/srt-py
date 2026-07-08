@@ -8,7 +8,7 @@ import copy
 from threading import RLock
 from time import monotonic
 
-from ..telescope_types import LprParams, RotorState, DriverState
+from ..telescope_types import LprParams, RotorState, DriverState, Limit
 
 
 class TestingDriver:
@@ -20,17 +20,15 @@ class TestingDriver:
 
     def __init__(
         self,
-        az_limits=(-89, 449),
-        el_limits=(15, 81),
+        az_limits: Limit,
+        el_limits: Limit,
         lpr_params: LprParams = LprParams(),
     ):
         self.az_limits  = az_limits
         self.el_limits  = el_limits
-        self.lpr_params = lpr_params or LprParams()
+        self.lpr_params = lpr_params
         self._lock      = RLock()
         self._state     = RotorState(
-            az=float(az_limits[0]),
-            el=float(el_limits[0]),
             fsm_state=DriverState.READY,
             cal_sts="Calibration OK",
             loop_mode="Track",

@@ -1,127 +1,112 @@
 """
-Auth: Google OAuth for identity, restricted to @caltech.edu accounts,
-then our own short-lived JWT for everything afterward (HTTP routes
-and WebSocket auth alike).
+Simple username/password auth, replacing the Google OAuth scaffold for
+now. Carries over the exact same config fields the existing Dash
+dashboard already uses (DASHBOARD_REQUIRE_AUTH / DASHBOARD_USERNAME /
+DASHBOARD_PASSWORD — confirmed from dashboard/app.py's generate_app()),
+so config.yaml needs zero changes.
 
-Google's token is only trusted at login time. Once we've verified
-identity and domain, we mint our own JWT — the rest of the app never
-talks to Google again per-request. This keeps the auth dependency
-uniform regardless of login method, and avoids re-validating against
-Google on every request.
+Two pieces:
+  - HTTPBasic for normal HTTP requests (the browser's native login
+    prompt — no custom login modal to build, unlike the old Dash
+    version's hand-rolled dbc.Modal).
+  - A short-lived JWT, issued after a successful Basic Auth check, for
+    the WebSocket — browsers can't send Authorization headers on the
+    WS handshake, so the token rides as a ?token=... query param, same
+    pattern used in the Google-OAuth version of this file.
 
-Kept deliberately thin/illustrative:
-- no refresh-token flow
-- no persistent user table (stateless JWT only)
-- secrets/config hardcoded as placeholders, not loaded from env
-A real implementation would add all of the above plus rate limiting
-on the login endpoint and proper secret management.
+SECURITY NOTE: HTTP Basic sends the password on every single request,
+base64-encoded (NOT encrypted) — this is fine ONLY over HTTPS. If this
+server is reachable from the open internet without TLS in front of it
+(e.g. a reverse proxy terminating HTTPS), the password is sent in the
+clear on every page load. Don't deploy this past localhost/LAN testing
+without HTTPS in front of it.
 """
 
+import os
+import secrets
 import time
 
 import jwt
-from authlib.integrations.starlette_client import OAuth
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-router = APIRouter()
+basic_auth = HTTPBasic()
 
-# --- Config placeholders — load from env/secrets manager in reality ---
-GOOGLE_CLIENT_ID = "REPLACE_ME.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "REPLACE_ME"
-JWT_SECRET = "REPLACE_ME_WITH_A_REAL_SECRET"
+JWT_SECRET = os.environ.get("JWT_SECRET", "dev-only-insecure-secret-change-me")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_SECONDS = 60 * 60 * 8  # 8 hour session
-ALLOWED_HOSTED_DOMAIN = "caltech.edu"
-
-oauth = OAuth()
-oauth.register(
-    name="google",
-    client_id=GOOGLE_CLIENT_ID,
-    client_secret=GOOGLE_CLIENT_SECRET,
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
-)
-
-# Used only so FastAPI's dependency system can extract the Bearer
-# token from the Authorization header on normal HTTP requests; the
-# WebSocket case is handled separately (see get_current_user_ws below)
-# since browsers can't set custom headers on the WS handshake.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
-def _issue_jwt(email: str) -> str:
-    payload = {
-        "sub": email,
-        "exp": int(time.time()) + JWT_EXPIRY_SECONDS,
-    }
+def _get_dashboard_credentials(request: Request) -> tuple[bool, str, str]:
+    """Reads DASHBOARD_REQUIRE_AUTH / DASHBOARD_USERNAME / DASHBOARD_PASSWORD
+    from the loaded DaemonConfig. Imported lazily inside the function
+    (rather than at module level) to avoid a circular import between
+    this module and wherever the global config singleton lives —
+    adjust this to match however your app actually exposes the loaded
+    config (e.g. a FastAPI dependency, an app.state.config, etc.)."""
+    config = request.app.state.config
+
+    return (
+        bool(config.DASHBOARD_REQUIRE_AUTH),
+        str(config.DASHBOARD_USERNAME),
+        str(config.DASHBOARD_PASSWORD),
+    )
+
+
+def _check_credentials(request: Request, username: str, password: str) -> bool:
+    require_auth, real_username, real_password = _get_dashboard_credentials(request)
+    if not require_auth:
+        return True
+    # secrets.compare_digest instead of == — avoids a timing
+    # side-channel that could let an attacker infer the password
+    # character-by-character from response timing. Minor in practice
+    # for a small research-instrument deployment, but free to do
+    # correctly.
+    username_ok = secrets.compare_digest(username, real_username)
+    password_ok = secrets.compare_digest(password, real_password)
+    return username_ok and password_ok
+
+
+def require_auth(request: Request, credentials: HTTPBasicCredentials = Depends(basic_auth)) -> str:
+    """FastAPI dependency for normal HTTP routes:
+    Depends(require_auth). Returns the username on success."""
+    if not _check_credentials(request, credentials.username, credentials.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
+def _issue_jwt(username: str) -> str:
+    payload = {"sub": username, "exp": int(time.time()) + JWT_EXPIRY_SECONDS}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def _verify_jwt(token: str) -> str:
-    """Returns the email (sub claim) if valid, raises otherwise."""
+def login_for_token(request: Request, credentials: HTTPBasicCredentials = Depends(basic_auth)) -> dict:
+    """Mount this as a GET/POST route (e.g. /auth/token) that the
+    Svelte frontend calls once after the browser's native Basic Auth
+    prompt succeeds, to get a JWT for the WebSocket. See main.py for
+    wiring."""
+    if not _check_credentials(request, credentials.username, credentials.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return {"access_token": _issue_jwt(credentials.username), "token_type": "bearer"}
+
+
+async def get_current_user_ws(token: str | None) -> str:
+    """WebSocket variant — same shape as the Google-OAuth version of
+    this function. Token arrives as a query param
+    (wss://host/ws/status?token=...) since browsers can't set
+    Authorization headers on the WS upgrade request."""
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload["sub"]
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-
-
-@router.get("/auth/login")
-async def login(request: Request):
-    redirect_uri = request.url_for("auth_callback")
-    return await oauth.google.authorize_redirect(request, redirect_uri)
-
-
-@router.get("/auth/callback", name="auth_callback")
-async def auth_callback(request: Request):
-    token = await oauth.google.authorize_access_token(request)
-    userinfo = token.get("userinfo") or {}
-
-    email = userinfo.get("email", "")
-    hosted_domain = userinfo.get("hd")
-    email_verified = userinfo.get("email_verified")
-
-    # Belt-and-suspenders per earlier discussion: check both the `hd`
-    # claim AND the email's actual domain suffix, since `hd` alone
-    # isn't bulletproof.
-    domain_ok = (
-        hosted_domain == ALLOWED_HOSTED_DOMAIN
-        and email
-        and email.endswith(f"@{ALLOWED_HOSTED_DOMAIN}")
-    )
-
-    if not (email_verified and domain_ok):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Access restricted to verified @{ALLOWED_HOSTED_DOMAIN} accounts",
-        )
-
-    our_jwt = _issue_jwt(email)
-
-    # Real implementation: redirect to the Svelte app with the token
-    # (e.g. as a fragment) so client-side code can pick it up and
-    # store it. Returning it directly here for scaffold simplicity.
-    return {"access_token": our_jwt, "token_type": "bearer"}
-
-
-# --- Dependencies for protecting routes ---
-
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
-    """Use as a dependency on normal HTTP routes: Depends(get_current_user)."""
-    if token is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    return _verify_jwt(token)
-
-
-async def get_current_user_ws(token: str | None) -> str:
-    """
-    WebSocket variant. Browsers can't set Authorization headers on the
-    WS upgrade request, so the token arrives as a query param instead:
-    wss://host/ws/telescope?token=...
-    Call this explicitly inside the websocket route before accepting
-    the connection / before entering the broadcast loop.
-    """
-    if token is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
-    return _verify_jwt(token)

@@ -22,7 +22,7 @@ function pydanticTypeGen(): Plugin {
 		buildStart() {
 			if (process.env.SKIP_TYPE_GEN) return;
 			try {
-				execSync('python3 ../scripts/generate_ts_types.py', {
+				execSync('python3 scripts/generate_ts_types.py', {
 					cwd: REPO_ROOT,
 					stdio: 'inherit'
 				});
@@ -38,4 +38,35 @@ function pydanticTypeGen(): Plugin {
 	};
 }
 
-export default defineConfig({ plugins: [tailwindcss(), pydanticTypeGen(), sveltekit()] });
+export default defineConfig({ 
+	plugins: [tailwindcss(), pydanticTypeGen(), sveltekit()],
+	server: {
+		// Dev-only: pnpm run dev serves the Svelte app on its own origin
+		// (typically localhost:5173), separate from FastAPI/uvicorn. In
+		// production, Caddy + app.frontend() serve everything from one
+		// origin, so the app's relative fetch('/auth/token') and
+		// `${window.location.host}` WebSocket URLs just work without any
+		// proxy. This config exists ONLY to make those same relative
+		// URLs work during local dev, by having Vite's dev server
+		// transparently forward matching requests to the real FastAPI
+		// backend running on 127.0.0.1:8080 (per DASHBOARD_HOST/PORT).
+		proxy: {
+			'/auth': {
+				target: 'http://127.0.0.1:8080',
+				changeOrigin: true
+			},
+			'/ws': {
+				// Deliberately http:// here, not ws:// — there's a known
+				// Vite issue (vitejs/vite#20223) where some configurations
+				// with a ws:// target fail to upgrade the connection at
+				// all and silently fall back to plain HTTP. Using an
+				// http:// target with ws: true lets Vite's own proxy
+				// middleware detect and perform the upgrade itself, which
+				// is the documented reliable form.
+				target: 'http://127.0.0.1:8080',
+				ws: true,
+				changeOrigin: true
+			}
+		}
+	}
+ });
