@@ -5,6 +5,7 @@
 	import { Canvas } from '@threlte/core'
 	import type { CameraControlsRef } from '@threlte/extras';
 	import ControlPanel from '$lib/ControlPanel.svelte';
+	import { cursorAzEl } from '$lib/stores/ui';
 
 	let { data } = $props();
 
@@ -14,6 +15,22 @@
 	let socket: WebSocket | null = null;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	let destroyed = false;
+
+
+	let time = $state(liveTelescopeData.time);
+	let telescopeAzEl = $state([0, 0]);
+	$effect(() => {
+		const interval = setInterval(() => {
+		time = liveTelescopeData.time;
+		telescopeAzEl = [liveTelescopeData.rotor.az ?? 0, liveTelescopeData.rotor.el ?? 0];
+		}, 500);
+		return () => clearInterval(interval);
+	});
+
+	let cursorAzElValue = $state<[number, number]>([0, 0]);
+	cursorAzEl.subscribe(([az, el]) => {
+		cursorAzElValue = [az, el];
+	});
 
 	function connect(token: string) {
 		connectionState = 'connecting';
@@ -33,7 +50,8 @@
 				observation_events: status.observation_events,
 				serial_communications: status.serial_communications,
 				command_history: status.command_history,
-				location: status.location
+				location: status.location,
+				beamwidth: status.beam_width
 			});
 
 			// Mutate in place — no store, no reactivity, Threlte reads this
@@ -41,7 +59,7 @@
 			Object.assign(liveTelescopeData.rotor, status.rotor);
 			liveTelescopeData.spectrum = status.spectrum ?? null; // null when the instrument isn't connected
 			liveTelescopeData.time = status.time ?? Date.now() / 1000; // fallback to local time if not provided
-			Object.assign(liveTelescopeData.object_locs, status.object_locs); 
+			Object.assign(liveTelescopeData.object_locs, status.object_locs);
 		 };
 
 		socket.onclose = () => {
@@ -67,11 +85,16 @@
 	});
 </script>
 
-<h1>Telescope Monitor</h1>
-<p>Connection: {connectionState}</p>
+<div class="p-4">
+	<h1>Telescope Monitor</h1>
+	<p>Connection: {connectionState}</p>
+	<p>Time: {new Date(time * 1000).toISOString()}</p>
+	<p>Cursor Az/El: {cursorAzElValue[0].toFixed(2)}°, {cursorAzElValue[1].toFixed(2)}°</p>
+	<p>Rotor Az/El: {telescopeAzEl[0].toFixed(2)}°, {telescopeAzEl[1].toFixed(2)}°</p>
 
-<div class="m-2 border-2 border-gray-700 rounded-lg h-[80vh]">
-<Canvas>
-	<ControlPanel bind:controls />
-</Canvas>
+	<div class="border-2 border-gray-700 rounded-lg h-[80vh]">
+		<Canvas>
+			<ControlPanel bind:controls />
+		</Canvas>
+	</div>
 </div>

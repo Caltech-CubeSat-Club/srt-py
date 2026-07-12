@@ -1,26 +1,47 @@
 <script lang="ts">
   import { T, useThrelte } from '@threlte/core'
   import { interactivity, CameraControls, type CameraControlsRef } from '@threlte/extras'
-  import { Text } from '@threlte/extras'
   import * as THREE from 'three'
-  import { azEltoVector3 } from '$lib/coordinates'
-  import { liveTelescopeData } from '$lib/stores/telescope_state';
+  import { liveTelescopeData, telescopeState } from '$lib/stores/telescope_state';
+  import { azEltoVector3 } from '$lib/coordinates';
 
   import SkyGrid from '$lib/SkyGrid.svelte';
+  import Objects from '$lib/Objects.svelte';
+  import BackgroundSphere from '$lib/BackgroundSphere.svelte';
 
-  let PI = Math.PI;
-
+  const PI = Math.PI;
+  const RADIUS = 500; // Size of the sky dome
   interface Props {
     controls?: CameraControlsRef;
   }
 
   let { controls = $bindable() }: Props = $props();
 
-  const RADIUS = 500; // Size of the sky dome
+  // Update values from nonreactive high frequency store every frame
+  // And other frame-based updates
+  let telescopeAzEl = $state([0, 0]);
+	$effect(() => {
+		let frameId: number;
+		function tick() {
+      telescopeAzEl = [liveTelescopeData.rotor.az ?? 0, liveTelescopeData.rotor.el ?? 0];
+      frameId = requestAnimationFrame(tick);
+    }
+    frameId = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(frameId);
+	});
 
-  let telescopeAzEl = $derived(
-    [liveTelescopeData.rotor.az, liveTelescopeData.rotor.el]
-  )
+  // Update values from reactive telescopeState store
+  let beamwidth = $state(0); // Beamwidth in degrees
+  let beamwidth_on_sky = $state(0); // Convert beamwidth in degrees to a width on the sky sphere of RADIUS
+  let beam_vector = $state(new THREE.Vector3(0, 0, 0));
+  telescopeState.subscribe((state) => {
+    if (state.beamwidth !== undefined) {
+      beamwidth = state.beamwidth;
+      beamwidth_on_sky = 2*Math.tan((beamwidth/2) * (PI/180)) * RADIUS;
+      beam_vector = azEltoVector3(telescopeAzEl[0], telescopeAzEl[1], RADIUS/1.15);
+    }
+  });
+
 
   const { scene } = useThrelte();
   scene.background = new THREE.Color('#0f172a'); // Dark background for the sky
@@ -30,7 +51,7 @@
 <T.PerspectiveCamera
   makeDefault
   fov={60}
-  minPolarAngle={Math.PI / 2 - 0.1}
+  minPolarAngle={PI / 2 - 0.1}
   near={0.01}
   far={RADIUS * 2}
 />
@@ -38,13 +59,13 @@
 <CameraControls
   bind:ref={controls}
   mouseButtons.wheel={32} // CameraControls.ACTION.ZOOM
-  minZoom={1}
-  maxZoom={10}
+  minZoom={.2}
+  maxZoom={50}
   azimuthRotateSpeed={-0.5}
   polarRotateSpeed={-0.5}
   oncreate={(ref) => {
     ref.setPosition(0, 0, 1e-5);
-    ref.rotateTo(Math.PI, 3*Math.PI / 4, false);
+    ref.rotateTo(PI, 3*PI / 4, false);
   }}
 />
 
@@ -52,38 +73,29 @@
 
 <!-- Sky -->
 <SkyGrid latitude_deg={37} />
-<T.Mesh position={[0, 0, 0]}>
-  <T.SphereGeometry args={[RADIUS, 128, 128]} />
-</T.Mesh>
+<BackgroundSphere radius={RADIUS}  />
 
 <!-- Ground -->
-<T.Mesh position={[0, -1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+<!-- <T.Mesh position={[0, -1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
   <T.CircleGeometry args={[RADIUS, 64]} />
   <T.MeshBasicMaterial color="#efffff" transparent opacity={0.8} side={THREE.DoubleSide} />
-</T.Mesh>
+</T.Mesh> -->
 
-<!-- Objects -->
-{#each Object.entries(liveTelescopeData.object_locs) as [name, [az, el]]}
-  {@const pos = azEltoVector3(az, el, RADIUS)}
-  <T.Mesh position={[pos.x, pos.y, pos.z]}>
-    <T.SphereGeometry args={[2, 16, 16]} />
-    <T.MeshBasicMaterial color="#f59e0b" toneMapped={false} />
-  </T.Mesh>
-  <Text
-    text={name}
-    position={[pos.x/1.1, pos.y/1.1, pos.z/1.1]}
-    fontSize={15}
-    color={'#0f0'}
-    anchorX={'left'}
-    anchorY={'bottom'}
-    onadded={(e) => {
-        e.target.lookAt(0, 0, 0);
-    }}
-/>
-{/each}
+<Objects radius={RADIUS} />
 
 <!-- Horizon -->
-<T.Mesh position={[0, RADIUS*Math.sin(PI/12)/2, 0]} rotation={[0, 0, 0]}>
-  <T.CylinderGeometry args={[RADIUS, RADIUS, RADIUS*Math.sin(PI/12), 64, 1, true]} />
+<T.Mesh position={[0, RADIUS*Math.sin(PI/12), 0]} rotation={[PI/2, 0, 0]}>
+  <T.TorusGeometry args={[RADIUS, 5]} />
   <T.MeshBasicMaterial color="#f00" transparent opacity={0.8} side={THREE.DoubleSide} />
+</T.Mesh>
+
+<!-- Telescope position -->
+<T.Mesh 
+  position={[beam_vector.x, beam_vector.y, beam_vector.z]} 
+  onadded={(e) => {
+    e.target.lookAt(0, 0, 0);
+  }}
+  >
+  <T.CircleGeometry args={[beamwidth_on_sky/2]} />
+  <T.MeshBasicMaterial color="#0f0" toneMapped={false} />
 </T.Mesh>

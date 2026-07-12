@@ -70,3 +70,20 @@ export function azEltoVector3(az_deg: number, el_deg: number, RADIUS: number = 1
         RADIUS * Math.cos(elRad) * Math.cos(azRad)
     );
 }
+
+export function pointToAzEl(point: THREE.Vector3, RADIUS: number = 1): [az_deg: number, el_deg: number] {
+    const x = point.x;
+    const y = point.y;
+    const z = point.z;
+
+    let el_rad = Math.asin(y / RADIUS);
+    let az_rad = Math.atan2(x, z);
+
+    let az_deg = az_rad * 180 / PI;
+    if (az_deg < 0) {
+        az_deg += 360;
+    }
+    let el_deg = el_rad * 180 / PI;
+
+    return [az_deg, el_deg];
+}

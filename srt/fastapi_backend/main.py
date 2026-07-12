@@ -6,7 +6,6 @@ There is no separate Node server in this architecture.
 
 from fastapi import APIRouter, FastAPI
 from contextlib import asynccontextmanager
-from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from .routes import auth, websocket

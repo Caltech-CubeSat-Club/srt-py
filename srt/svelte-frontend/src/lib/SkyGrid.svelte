@@ -11,8 +11,17 @@
 
     let { latitude_deg }: { latitude_deg: number } = $props();
 
+    let time = $state(liveTelescopeData.time);
+
+	$effect(() => {
+		const interval = setInterval(() => {
+		time = liveTelescopeData.time;
+		}, 500);
+		return () => clearInterval(interval);
+	});
+
     function raDecToVector3(ra_deg: number, dec_deg: number) {
-        const [az_deg, el_deg] = raDecToAzElDegrees(ra_deg, dec_deg, latitude_deg, -118.129, liveTelescopeData.time / 86400 + 2440587.5);
+        const [az_deg, el_deg] = raDecToAzElDegrees(ra_deg, dec_deg, latitude_deg, -118.129, time / 86400 + 2440587.5);
         return azEltoVector3(az_deg, el_deg, RADIUS);
     }
 
@@ -38,7 +47,7 @@
 {#snippet ra_ring(ra_deg: number, color: string = '#555')}
     {@const lat = latitude_deg * PI / 180}
     {@const ra = ra_deg * PI / 180}
-    {@const lst = localSiderealTime(liveTelescopeData.time / 86400 + 2440587.5, -118.129 * PI / 180)}
+    {@const lst = localSiderealTime(time / 86400 + 2440587.5, -118.129 * PI / 180)}
     <!-- Get North Pole vector -->
     <!-- +Z = North -->
     <T.Mesh position={[0, 0, 0]} rotation={[PI/2 - lat, - ra - lst, PI/2]}>

@@ -246,6 +246,7 @@ class SmallRadioTelescopeDaemon:
         return True
 
     def n_point_scan(self, object_id):
+        # TODO: revisit @danichua
         """Runs an N-Point (25) Scan About an Object
 
         Parameters
@@ -314,6 +315,7 @@ class SmallRadioTelescopeDaemon:
         self.ephemeris_cmd_location = object_id
 
     def beam_switch(self, object_id):
+        # TODO: revisit @danichua
         """Swings Antenna Across Object
 
         Parameters

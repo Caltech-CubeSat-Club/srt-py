@@ -10,7 +10,8 @@ import type {
     RotorState,
     SpectrumFrame,
     Location,
-    ObjectLocs
+    ObjectLocs,
+    Beamwidth
 } from '$lib/generated/types';
 
 export interface TelescopeState {
@@ -22,6 +23,7 @@ export interface TelescopeState {
 	serial_communications?: SerialCommunication[];
 	command_history?: CommandHistoryEntry[];
     location?: Location;
+    beamwidth?: Beamwidth;
 }
 
 export const telescopeState = writable<TelescopeState>({});
