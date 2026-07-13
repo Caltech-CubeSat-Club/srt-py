@@ -36,7 +36,6 @@ CLI args (all optional, override config where applicable):
 """
 
 import argparse
-import json
 import logging
 import multiprocessing
 import os

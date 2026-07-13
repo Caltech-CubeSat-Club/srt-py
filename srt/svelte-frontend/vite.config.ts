@@ -4,6 +4,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import 'dotenv/config';
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../');
 
@@ -22,7 +23,7 @@ function pydanticTypeGen(): Plugin {
 		buildStart() {
 			if (process.env.SKIP_TYPE_GEN) return;
 			try {
-				execSync('python3 scripts/generate_ts_types.py', {
+				execSync('$SRT_DEV_PYTHON_PATH scripts/generate_ts_types.py', {
 					cwd: REPO_ROOT,
 					stdio: 'inherit'
 				});
