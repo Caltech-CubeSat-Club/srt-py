@@ -4,6 +4,7 @@
 
 let PI = Math.PI;
 import * as THREE from 'three';
+import { SKY_DOME_RADIUS } from './constants';
 
 //All input and output angles are in radians, jd is Julian Date in UTC
 export function raDecToAzEl(ra: number, dec: number, lat: number, lon: number, jd_ut: number): [az: number, el: number, lst: number, HA: number] {
@@ -60,8 +61,8 @@ export function localSiderealTime(jd_ut: number, lon: number): number {
     return localSiderealTime;
 }
 
-export function azEltoVector3(az_deg: number, el_deg: number, RADIUS: number = 1): THREE.Vector3 {
-    const azRad = az_deg * PI / 180;
+export function azEltoVector3(az_deg: number, el_deg: number, RADIUS: number = SKY_DOME_RADIUS): THREE.Vector3 {
+    const azRad = -az_deg * PI / 180; // Azimuth is clockwise
     const elRad = el_deg * PI / 180;
 
     return new THREE.Vector3(
@@ -71,13 +72,13 @@ export function azEltoVector3(az_deg: number, el_deg: number, RADIUS: number = 1
     );
 }
 
-export function pointToAzEl(point: THREE.Vector3, RADIUS: number = 1): [az_deg: number, el_deg: number] {
+export function pointToAzEl(point: THREE.Vector3, RADIUS: number = SKY_DOME_RADIUS): [az_deg: number, el_deg: number] {
     const x = point.x;
     const y = point.y;
     const z = point.z;
 
     let el_rad = Math.asin(y / RADIUS);
-    let az_rad = Math.atan2(x, z);
+    let az_rad = -Math.atan2(x, z); // Azimuth is clockwise
 
     let az_deg = az_rad * 180 / PI;
     if (az_deg < 0) {

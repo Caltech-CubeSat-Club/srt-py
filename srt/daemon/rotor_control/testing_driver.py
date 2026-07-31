@@ -29,6 +29,8 @@ class TestingDriver:
         self.lpr_params = lpr_params
         self._lock      = RLock()
         self._state     = RotorState(
+            az=180.0,
+            el=81.0,
             fsm_state=DriverState.READY,
             cal_sts="Calibration OK",
             loop_mode="Track",

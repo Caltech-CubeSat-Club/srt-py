@@ -1,0 +1,1 @@
+export const SKY_DOME_RADIUS = 500.0;

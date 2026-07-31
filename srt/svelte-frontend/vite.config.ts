@@ -5,6 +5,7 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import 'dotenv/config';
+import glsl from 'vite-plugin-glsl';
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../');
 
@@ -40,7 +41,7 @@ function pydanticTypeGen(): Plugin {
 }
 
 export default defineConfig({ 
-	plugins: [tailwindcss(), pydanticTypeGen(), sveltekit()],
+	plugins: [ tailwindcss(), pydanticTypeGen(), sveltekit(), glsl(), ],
 	server: {
 		// Dev-only: pnpm run dev serves the Svelte app on its own origin
 		// (typically localhost:5173), separate from FastAPI/uvicorn. In

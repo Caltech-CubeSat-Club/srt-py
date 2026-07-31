@@ -1,4 +1,18 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "webgl-glsl-editor.codeInjection": true,
+    "webgl-glsl-editor.codeInjectionSource": [
+        "uniform mat4 modelMatrix;",
+        "uniform mat4 modelViewMatrix;",
+        "uniform mat4 projectionMatrix;",
+        "uniform vec3 cameraPosition;",
+        "uniform mat4 viewMatrix;",
+        "uniform mat3 normalMatrix;",
+        "attribute vec3 position;",
+        "attribute vec3 normal;",
+        "attribute vec2 uv;",
+        "#extension GL_GOOGLE_include_directive: enable"
+    ],
+    "webgl-glsl-editor.diagnostics": false
 }
