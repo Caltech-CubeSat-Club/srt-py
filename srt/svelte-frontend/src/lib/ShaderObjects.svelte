@@ -5,7 +5,7 @@
     import starsFrag from '$lib/shaders/stars.frag'
     import StereographicText from '$lib/StereographicText.svelte'
 
-    import { azEltoVector3 } from '$lib/coordinates.svelte'
+    import { AzEl } from '$lib/coordinates.svelte'
     import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
     import { cursorAzEl } from '$lib/stores/ui.svelte';
     import { uFovScale, projectToScreenNDC } from '$lib/stores/projection.svelte';
@@ -21,13 +21,12 @@
     const DEFAULT_COLOR = new THREE.Color('#f59e0b');
     // stars.vert scales the base [-0.5,0.5] quad by angularSize * uFovScale directly
     // in clip space, so this is NDC half-width per unit, not a real angular/pixel size.
-    // 0.03 -> roughly a 0.02 NDC-radius dot; retune once markers are visibly on screen.
-    const MARKER_ANGULAR_SIZE = 0.03;
+    const MARKER_ANGULAR_SIZE = 0.015;
 
     let object_locs = $derived(daemonStatus.object_locs ?? {});
     let objectNames = $derived(Object.keys(object_locs));
 
-    let cursorPos = $derived(azEltoVector3(cursorAzEl[0], cursorAzEl[1], radius));
+    let cursorPos = $derived(cursorAzEl.toVector3(radius));
 
     // Screen-space (NDC) selection: mirrors what stars.vert actually renders
     // (via projectToScreenNDC), rather than comparing real 3D world-space
@@ -44,7 +43,7 @@
         const cursorNDC = projectToScreenNDC(cursorPos, cam);
 
         for (const [name, [az, el]] of Object.entries(object_locs)) {
-            const pos = azEltoVector3(az, el, radius);
+            const pos = new AzEl(az, el).toVector3(radius);
             const ndc = projectToScreenNDC(pos, cam);
             const dx = ndc.x - cursorNDC.x;
             const dy = ndc.y - cursorNDC.y;
@@ -102,7 +101,7 @@
 
         names.forEach((name, i) => {
             const [az, el] = object_locs[name];
-            const pos = azEltoVector3(az, el, radius);
+            const pos = new AzEl(az, el).toVector3(radius);
             translateAttr.setXYZ(i, pos.x, pos.y, pos.z);
             sizeAttr.setX(i, MARKER_ANGULAR_SIZE);
 
@@ -130,10 +129,10 @@
 
 {#each objectNames as name}
     {@const [az, el] = object_locs[name]}
-    {@const pos = azEltoVector3(az, el, radius)}
+    {@const pos = new AzEl(az, el).toArray(radius)}
     <StereographicText
         text={name}
-        position={[pos.x, pos.y, pos.z]}
+        position={pos}
         fontSize={15}
         color={name === selectedObject ? '#00ff00' : '#f59e0b'}
         anchorX={'left'}

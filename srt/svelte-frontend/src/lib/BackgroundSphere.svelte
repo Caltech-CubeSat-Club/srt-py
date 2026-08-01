@@ -2,9 +2,9 @@
 	import { T } from '@threlte/core';
     import { interactivity } from '@threlte/extras';
 	import * as THREE from 'three';
-    import { pointToAzEl } from '$lib/coordinates.svelte';
+    import { AzEl } from '$lib/coordinates.svelte';
     import { cursorAzEl } from '$lib/stores/ui.svelte';
-    import { SKY_DOME_RADIUS as radius } from '$lib/constants';
+    import { SKY_DOME_RADIUS as radius, HORIZON_TEXTURE, HORIZON_TEXTURE_ROTATION_DEG, HORIZON_TEXTURE_VERTICAL_OFFSET } from '$lib/constants';
     import { uFovScale, inverseStereographicToViewDirection } from '$lib/stores/projection.svelte';
     import skyDomeVert from '$lib/shaders/skyDome.vert';
     import skyDomeFrag from '$lib/shaders/skyDome.frag';
@@ -27,7 +27,7 @@
 			let v = uvAttribute.getY(i);
 
 			// Apply the transformation to the vertical coordinate
-			v = v + 0.0;
+			v = v + HORIZON_TEXTURE_VERTICAL_OFFSET;
 			u = 1 - u;
 
 			// Update the attribute array
@@ -38,7 +38,7 @@
 		uvAttribute.needsUpdate = true;
 	}
 
-	const texture = new THREE.TextureLoader().load('/moore_roof.jpg');
+	const texture = new THREE.TextureLoader().load(HORIZON_TEXTURE);
 	texture.wrapS = THREE.ClampToEdgeWrapping;
 	texture.wrapT = THREE.ClampToEdgeWrapping;
 	texture.colorSpace = THREE.SRGBColorSpace; // Ensure correct color space
@@ -61,7 +61,7 @@
 </script>
 
 <T.Mesh
-    rotation={[0, 4.37, 0]}
+    rotation={[0, HORIZON_TEXTURE_ROTATION_DEG * Math.PI / 180, 0]}
     position={[0, 0, 0]}
     renderOrder={-2}
     onpointermove={(e) => {
@@ -74,9 +74,9 @@
         const viewDir = inverseStereographicToViewDirection(e.pointer.x, e.pointer.y);
         const worldDir = viewDir.applyQuaternion(e.camera.quaternion);
         const worldPoint = worldDir.multiplyScalar(radius * 1.1);
-        const azEl = pointToAzEl(worldPoint, radius * 1.1);
-        cursorAzEl[0] = azEl[0];
-        cursorAzEl[1] = azEl[1];
+        const azEl = AzEl.fromVector3(worldPoint, radius * 1.1);
+        cursorAzEl.az_deg = azEl.az_deg;
+        cursorAzEl.el_deg = azEl.el_deg;
     }}>
 	<T.SphereGeometry args={[radius * 1.1, 64, 64]} bind:ref={geometry} />
 	<T is={material} />

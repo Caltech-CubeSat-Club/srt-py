@@ -7,9 +7,7 @@
     interface Props {
         // Unitless like MARKER_ANGULAR_SIZE in ShaderObjects.svelte - troika's
         // local glyph units (which scale with fontSize) times this give the
-        // clip-space billboard offset. Default tuned for fontSize ~30; retune
-        // per-label via this prop if a different fontSize needs a different
-        // on-screen size.
+        // clip-space billboard offset.
         billboardScale?: number;
         [key: string]: any;
     }
@@ -58,7 +56,7 @@
                 uniform float uTextBillboardScale;
             `,
             vertexMainOutro: `
-                vec2 glyphLocalXY = mix(aTroikaGlyphBounds.xy, aTroikaGlyphBounds.zw, position.xy) + 5.;
+                vec2 glyphLocalXY = mix(aTroikaGlyphBounds.xy, aTroikaGlyphBounds.zw, position.xy) + uTextBillboardScale;
                 vec4 centerView = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
                 vec4 projectedCenter = stereographicProject(centerView.xyz);
                 gl_Position = projectedCenter + vec4(glyphLocalXY * uTextBillboardScale, 0.0, 0.0);

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
+  import { daemonStatus, connection } from '$lib/stores/daemonStatus.svelte';
+  import { timeState } from '$lib/stores/time.svelte';
   import type { DriverState, CalSts } from '$lib/generated/types';
 
   // Color mapping for FSM states
@@ -58,6 +59,20 @@
   <!-- Card Header -->
   <div class="mb-4">
     <h5 class="text-lg font-semibold text-gray-900">Antenna State</h5>
+  </div>
+
+  <!-- Connection State -->
+  <div class="mb-4">
+    <p class="text-sm text-gray-600">
+      Connection: <span class={`font-medium ${connection.state === 'open' ? 'text-green-500' : 'text-red-500'}`}>{connection.state}</span>
+    </p>
+  </div>
+
+  <!-- Time -->
+  <div class="mb-4">
+    <p class="text-sm text-gray-600">
+      Local Time: <span class="font-medium">{new Date(timeState.time*1000).toLocaleString()}</span>
+    </p>
   </div>
 
   <!-- Card Body -->

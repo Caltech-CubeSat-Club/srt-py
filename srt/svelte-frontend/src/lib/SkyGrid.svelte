@@ -2,13 +2,14 @@
     import * as THREE from 'three'
     import { T } from '@threlte/core'
     import StereographicText from '$lib/StereographicText.svelte'
-    import { raDecToVector3, lst_radians } from '$lib/coordinates.svelte'
+    import { RaDec, lst_radians } from '$lib/coordinates.svelte'
+    import { timeState } from '$lib/stores/time.svelte';
     import { uFovScale } from '$lib/stores/projection.svelte';
     import gridVert from '$lib/shaders/grid.vert';
     import gridFrag from '$lib/shaders/grid.frag';
     import { SKY_DOME_RADIUS as RADIUS, PI, LATITUDE_DEG } from '$lib/constants';
 
-    let northPoleVector = $derived(raDecToVector3(0, 90)); // North Pole is at ra=0, dec=90
+    let northPoleVector = $derived(new RaDec(0, 90).toAzEl(timeState.jd_ut).toVector3()); // North Pole is at ra=0, dec=90
 </script>
 
 {#snippet dec_ring(dec_deg: number, ringRenderOrder: number)}
@@ -36,7 +37,7 @@
     {@const ra = ra_deg * PI / 180}
     <!-- Get North Pole vector -->
     <!-- +Z = North -->
-    <T.Mesh position={[0, 0, 0]} rotation={[PI/2 - lat, - ra - lst_radians(), PI/2]} renderOrder={ringRenderOrder}>
+    <T.Mesh position={[0, 0, 0]} rotation={[PI/2 - lat, - ra - lst_radians(timeState.jd_ut), PI/2]} renderOrder={ringRenderOrder}>
         <T.TorusGeometry args={[
             RADIUS, //radius of torus
             .75 / uFovScale.value, //radius of tube

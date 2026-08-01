@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '@threlte/core'
-  import { azEltoVector3 } from '$lib/coordinates.svelte'
+  import { AzEl } from '$lib/coordinates.svelte'
   import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
   import { Text } from '@threlte/extras'
   import { cursorAzEl } from '$lib/stores/ui.svelte';
@@ -9,14 +9,14 @@
 
   import { SKY_DOME_RADIUS as radius } from '$lib/constants';
 
-  let cursorPos = $derived(azEltoVector3(cursorAzEl[0], cursorAzEl[1], radius));
+  let cursorPos = $derived(cursorAzEl.toVector3(radius));
 
   let selectedObject = $derived.by( () => {
     let closestObject: string | null = null;
     let closestDistance = 10; // Threshold distance in the same units as the radius
 
     for (const [name, [az, el]] of Object.entries(object_locs)) {
-      const pos = azEltoVector3(az, el, radius);
+      const pos = new AzEl(az, el).toVector3(radius);
       const distance = pos.distanceTo(cursorPos);
 
       if (distance < closestDistance) {
@@ -31,9 +31,9 @@
 
 
 {#each Object.entries(object_locs) as [name, [az, el]]}
-  {@const pos = azEltoVector3(az, el, radius)}
+  {@const pos = new AzEl(az, el).toVector3(radius)}
   {@const ball_radius = (name === selectedObject) ? 10 : 2}
-  <T.Mesh position={[pos.x, pos.y, pos.z]}>
+  <T.Mesh position={pos.toArray()}>
     <T.SphereGeometry args={[ball_radius, 16, 16]} />
     <T.MeshBasicMaterial color={(name === selectedObject) ? "#0f0" : "#f59e0b"} toneMapped={false} />
   </T.Mesh>

@@ -7,7 +7,7 @@ varying vec2 vUv;
 // TelescopeBeam.svelte's uAngularSize (used there to size the billboard quad).
 uniform float uLambdaMeters;
 uniform float uApertureMeters;
-uniform float uEdgeThetaDeg;
+uniform float uEdgeThetaRad;
 const float PI = 3.14159265358979;
 
 // Numerical Recipes' rational-polynomial approximation of the Bessel
@@ -35,7 +35,7 @@ float besselJ1( float x ) {
 void main() {
   float r = length( vUv - 0.5 ); // 0 at center, 0.5 at the quad edge
   if ( r > 0.5 ) discard; // outside the quad, don't render
-  float thetaRad = radians( 2.0 * r * uEdgeThetaDeg ); // small-angle: UV radius scales linearly with real angle here
+  float thetaRad = 2.0 * r * uEdgeThetaRad; // small-angle: UV radius scales linearly with real angle here
 
   float x = ( PI * uApertureMeters / uLambdaMeters ) * sin( thetaRad );
 

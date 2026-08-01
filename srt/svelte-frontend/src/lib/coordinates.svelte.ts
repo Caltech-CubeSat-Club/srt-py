@@ -4,10 +4,53 @@
 
 import * as THREE from 'three';
 import { SKY_DOME_RADIUS, PI, LATITUDE_DEG, LONGITUDE_DEG } from './constants';
-import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
 
-let time = $derived(daemonStatus.time ?? Date.now() / 1000);
+// Horizontal coordinates - observer-relative (azimuth/elevation), and the
+// sky-dome Cartesian vectors the renderer actually places things at. Not
+// time-dependent.
+export class AzEl {
+    constructor(public az_deg: number, public el_deg: number) {}
 
+    toVector3(radius = SKY_DOME_RADIUS): THREE.Vector3 {
+        const azRad = -this.az_deg * PI / 180; // Azimuth is clockwise
+        const elRad = this.el_deg * PI / 180;
+
+        return new THREE.Vector3(
+            radius * Math.cos(elRad) * Math.sin(azRad),
+            radius * Math.sin(elRad),
+            radius * Math.cos(elRad) * Math.cos(azRad)
+        );
+    }
+
+    toArray(radius = SKY_DOME_RADIUS): [number, number, number] {
+        return this.toVector3(radius).toArray();
+    }
+
+    static fromVector3(point: THREE.Vector3, radius = SKY_DOME_RADIUS): AzEl {
+        const el_rad = Math.asin(point.y / radius);
+        const az_rad = -Math.atan2(point.x, point.z); // Azimuth is clockwise
+
+        let az_deg = az_rad * 180 / PI;
+        if (az_deg < 0) { az_deg += 360; }
+        const el_deg = el_rad * 180 / PI;
+
+        return new AzEl(az_deg, el_deg);
+    }
+}
+
+// Equatorial coordinates - fixed on the celestial sphere, independent of
+// observer or time. Resolving to a horizontal (Az/El) position takes an
+// explicit jd_ut (Julian Date, UTC): callers decide whether that's the
+// current live/custom time (see stores/time.svelte.ts's `timeState.jd_ut`) or an
+// arbitrary time to preview, e.g. for a future time-scrubbing UI.
+export class RaDec {
+    constructor(public ra_deg: number, public dec_deg: number) {}
+
+    toAzEl(jd_ut: number, lat_deg = LATITUDE_DEG, lon_deg = LONGITUDE_DEG): AzEl {
+        const [az_deg, el_deg] = raDecToAzElDegrees(this.ra_deg, this.dec_deg, lat_deg, lon_deg, jd_ut);
+        return new AzEl(az_deg, el_deg);
+    }
+}
 
 //All input and output angles are in radians, jd is Julian Date in UTC
 export function raDecToAzEl(ra: number, dec: number, lat: number, lon: number, jd_ut: number): [az: number, el: number, lst: number, HA: number] {
@@ -15,17 +58,16 @@ export function raDecToAzEl(ra: number, dec: number, lat: number, lon: number, j
     const gmst = greenwichMeanSiderealTime(jd_ut);
     let localSiderealTime = (gmst + lon) % (2 * PI);
 
-
     let H = (localSiderealTime - ra);
     if (H < 0) { H += 2 * PI; }
     if (H > PI) { H = H - 2 * PI; }
 
     let az = (Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat)));
-    let a = (Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(H)));
+    let el = (Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(H)));
     az -= PI;
 
     if (az < 0) { az += 2 * PI; }
-    return [az, a, localSiderealTime, H];
+    return [az, el, localSiderealTime, H];
 }
 
 export function greenwichMeanSiderealTime(jd: number) {
@@ -41,7 +83,6 @@ export function greenwichMeanSiderealTime(jd: number) {
 
 export function earthRotationAngle(jd: number) {
     //IERS Technical Note No. 32
-
     const t = jd - 2451545.0;
     const f = jd % 1.0;
 
@@ -64,40 +105,6 @@ export function localSiderealTime(jd_ut: number, lon: number): number {
     return localSiderealTime;
 }
 
-export function lst_radians(): number {
-    return localSiderealTime(time / 86400 + 2440587.5, LONGITUDE_DEG * PI / 180)
-}
-
-export function azEltoVector3(az_deg: number, el_deg: number, RADIUS: number = SKY_DOME_RADIUS): THREE.Vector3 {
-    const azRad = -az_deg * PI / 180; // Azimuth is clockwise
-    const elRad = el_deg * PI / 180;
-
-    return new THREE.Vector3(
-        RADIUS * Math.cos(elRad) * Math.sin(azRad),
-        RADIUS * Math.sin(elRad),
-        RADIUS * Math.cos(elRad) * Math.cos(azRad)
-    );
-}
-
-export function pointToAzEl(point: THREE.Vector3, RADIUS: number = SKY_DOME_RADIUS): [az_deg: number, el_deg: number] {
-    const x = point.x;
-    const y = point.y;
-    const z = point.z;
-
-    let el_rad = Math.asin(y / RADIUS);
-    let az_rad = -Math.atan2(x, z); // Azimuth is clockwise
-
-    let az_deg = az_rad * 180 / PI;
-    if (az_deg < 0) {
-        az_deg += 360;
-    }
-    let el_deg = el_rad * 180 / PI;
-
-    return [az_deg, el_deg];
-}
-
-
-export function raDecToVector3(ra_deg: number, dec_deg: number): THREE.Vector3 {
-    const [az_deg, el_deg] = raDecToAzElDegrees(ra_deg, dec_deg, LATITUDE_DEG, -118.129, time / 86400 + 2440587.5);
-    return azEltoVector3(az_deg, el_deg, SKY_DOME_RADIUS);
+export function lst_radians(jd_ut: number, lon_deg = LONGITUDE_DEG): number {
+    return localSiderealTime(jd_ut, lon_deg * PI / 180);
 }
