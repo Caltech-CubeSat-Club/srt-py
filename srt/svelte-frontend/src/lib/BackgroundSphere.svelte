@@ -2,7 +2,7 @@
 	import { T } from '@threlte/core';
     import { interactivity } from '@threlte/extras';
 	import * as THREE from 'three';
-    import { pointToAzEl } from '$lib/coordinates';
+    import { pointToAzEl } from '$lib/coordinates.svelte';
     import { cursorAzEl } from '$lib/stores/ui.svelte';
     import { SKY_DOME_RADIUS as radius } from '$lib/constants';
     import { uFovScale, inverseStereographicToViewDirection } from '$lib/stores/projection.svelte';

@@ -3,8 +3,9 @@
     import * as THREE from 'three'
     import starsVert from '$lib/shaders/stars.vert'
     import starsFrag from '$lib/shaders/stars.frag'
+    import StereographicText from '$lib/StereographicText.svelte'
 
-    import { azEltoVector3 } from '$lib/coordinates'
+    import { azEltoVector3 } from '$lib/coordinates.svelte'
     import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
     import { cursorAzEl } from '$lib/stores/ui.svelte';
     import { uFovScale, projectToScreenNDC } from '$lib/stores/projection.svelte';
@@ -126,3 +127,16 @@
     <T is={geometry} />
     <T is={material} />
 </T.Mesh>
+
+{#each objectNames as name}
+    {@const [az, el] = object_locs[name]}
+    {@const pos = azEltoVector3(az, el, radius)}
+    <StereographicText
+        text={name}
+        position={[pos.x, pos.y, pos.z]}
+        fontSize={15}
+        color={name === selectedObject ? '#00ff00' : '#f59e0b'}
+        anchorX={'left'}
+        anchorY={'bottom'}
+    />
+{/each}

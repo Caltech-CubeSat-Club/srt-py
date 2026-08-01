@@ -2,21 +2,16 @@
   import { T, useThrelte, useTask } from '@threlte/core'
   import { interactivity, CameraControls, type CameraControlsRef } from '@threlte/extras'
   import * as THREE from 'three'
-  import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
-  import { azEltoVector3 } from '$lib/coordinates';
-  import { SKY_DOME_RADIUS as RADIUS } from '$lib/constants';
+  import { SKY_DOME_RADIUS as RADIUS, PI, BASE_FOV_DEG } from '$lib/constants';
   import { setFov, uFovScale } from '$lib/stores/projection.svelte';
   import gridVert from '$lib/shaders/grid.vert';
   import gridFrag from '$lib/shaders/grid.frag';
 
   import SkyGrid from '$lib/SkyGrid.svelte';
-  import Objects from '$lib/Objects.svelte';
   import ShaderObjects from '$lib/ShaderObjects.svelte';
   import BackgroundSphere from '$lib/BackgroundSphere.svelte';
   import TelescopeBeam from '$lib/TelescopeBeam.svelte';
 
-  const PI = Math.PI;
-  const BASE_FOV_DEG = 60;
   interface Props {
     controls?: CameraControlsRef;
   }
@@ -24,7 +19,8 @@
   let { controls = $bindable() }: Props = $props();
   let camera = $state.raw<THREE.PerspectiveCamera>();
 
-  const { scene } = useThrelte();
+  const threlteCtx = useThrelte();
+  const { scene } = threlteCtx;
   scene.background = new THREE.Color('#0f172a'); // Dark background for the sky
   interactivity();
 
@@ -53,27 +49,47 @@
 <CameraControls
   bind:ref={controls}
   mouseButtons.wheel={32} // CameraControls.ACTION.ZOOM
-  minZoom={.2}
-  maxZoom={50}
-  azimuthRotateSpeed={-0.5}
-  polarRotateSpeed={-0.5}
+  minZoom={.05}
+  maxZoom={250}
+  azimuthRotateSpeed={-0.5 / uFovScale.value}
+  polarRotateSpeed={-0.5 / uFovScale.value}
   oncreate={(ref) => {
     ref.setPosition(0, 0, 1e-5);
-    ref.rotateTo(PI, 3*PI / 4, false);
+    ref.rotateTo(0, PI, false);
   }}
 />
 
 <T.AmbientLight intensity={0.5} />
 
 <!-- Sky -->
-<SkyGrid latitude_deg={37} />
+<SkyGrid />
 <BackgroundSphere />
 <!-- <Objects /> -->
 <ShaderObjects />
 
 <!-- Horizon: fixed at 15deg elevation -->
-<T.Mesh position={[0, RADIUS*Math.sin(PI/12), 0]} rotation={[PI/2, 0, 0]} renderOrder={-1}>
-  <T.TorusGeometry args={[RADIUS, 1]} />
+<T.Mesh position={[0, RADIUS*Math.sin(15*PI/180), 0]} rotation={[PI/2, 0, 0]} renderOrder={-1}>
+  <T.TorusGeometry args={[RADIUS*Math.cos(15*PI/180), 1]} />
+  <T.ShaderMaterial
+    vertexShader={gridVert}
+    fragmentShader={gridFrag}
+    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale }}
+    side={THREE.DoubleSide}
+    transparent
+  />
+</T.Mesh>
+<T.Mesh position={[0, RADIUS*Math.sin(81*PI/180), 0]} rotation={[PI/2, 0, 0]} renderOrder={-1}>
+  <T.TorusGeometry args={[RADIUS*Math.cos(81*PI/180), 1]} />
+  <T.ShaderMaterial
+    vertexShader={gridVert}
+    fragmentShader={gridFrag}
+    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale }}
+    side={THREE.DoubleSide}
+    transparent
+  />
+</T.Mesh>
+<T.Mesh position={[0, RADIUS/1.1, 0]} renderOrder={-1}>
+  <T.SphereGeometry args={[2, 16, 16]} />
   <T.ShaderMaterial
     vertexShader={gridVert}
     fragmentShader={gridFrag}

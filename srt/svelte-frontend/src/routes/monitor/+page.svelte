@@ -6,6 +6,7 @@
 	import ControlPanel from '$lib/ControlPanel.svelte';
 	import AntennaStatePanel from '$lib/AntennaStatePanel.svelte';
 	import { cursorAzEl } from '$lib/stores/ui.svelte';
+	import { uFovScale } from '$lib/stores/projection.svelte';
 
 	let { data }: { data: { token: string } } = $props();
 
@@ -66,6 +67,7 @@
 	<p>Time: {new Date(time * 1000).toISOString()}</p>
 	<p>Cursor Az/El: {cursorAzEl[0].toFixed(2)}°, {cursorAzEl[1].toFixed(2)}°</p>
 	<p>Rotor Az/El: {telescopeAzEl[0].toFixed(2)}°, {telescopeAzEl[1].toFixed(2)}°</p>
+	<p>FOV Scale: {uFovScale.value.toFixed(2)}</p>
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 		<AntennaStatePanel />
 		<div class="border-2 border-gray-700 rounded-lg h-[80vh]">

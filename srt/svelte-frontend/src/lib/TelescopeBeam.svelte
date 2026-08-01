@@ -1,13 +1,13 @@
 <script lang="ts">
     import { T } from '@threlte/core'
 	import * as THREE from 'three';
-    import { azEltoVector3 } from '$lib/coordinates'
+    import { azEltoVector3 } from '$lib/coordinates.svelte'
     import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
     import { uFovScale } from '$lib/stores/projection.svelte';
     import beamVert from '$lib/shaders/beam.vert';
     import beamFrag from '$lib/shaders/beam.frag';
 
-    import { SKY_DOME_RADIUS as radius } from '$lib/constants';
+    import { SKY_DOME_RADIUS as radius, PI } from '$lib/constants';
 
     // Same physical constants as scripts/plot_beam_pattern.py's Airy pattern
     // for a uniformly-illuminated circular aperture. Live-computed in
@@ -25,7 +25,7 @@
     // for a point at edgeThetaDeg from view center, before the shared
     // uFovScale multiplier.
     let beamAngularSize = $derived.by(() => {
-        const edgeThetaRad = (edgeThetaDeg * Math.PI) / 180;
+        const edgeThetaRad = (edgeThetaDeg * PI) / 180;
         const edgeRadius = (2 * Math.sin(edgeThetaRad)) / (1 + Math.cos(edgeThetaRad));
         return 2 * edgeRadius;
     });

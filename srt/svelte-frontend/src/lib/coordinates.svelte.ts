@@ -2,26 +2,29 @@
 //Released as public domain
 //http://www.celestialprogramming.com/
 
-let PI = Math.PI;
 import * as THREE from 'three';
-import { SKY_DOME_RADIUS } from './constants';
+import { SKY_DOME_RADIUS, PI, LATITUDE_DEG, LONGITUDE_DEG } from './constants';
+import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
+
+let time = $derived(daemonStatus.time ?? Date.now() / 1000);
+
 
 //All input and output angles are in radians, jd is Julian Date in UTC
 export function raDecToAzEl(ra: number, dec: number, lat: number, lon: number, jd_ut: number): [az: number, el: number, lst: number, HA: number] {
     //Meeus 13.5 and 13.6, modified so West longitudes are negative and 0 is North
     const gmst = greenwichMeanSiderealTime(jd_ut);
-    let localSiderealTime = (gmst + lon) % (2 * Math.PI);
+    let localSiderealTime = (gmst + lon) % (2 * PI);
 
 
     let H = (localSiderealTime - ra);
-    if (H < 0) { H += 2 * Math.PI; }
-    if (H > Math.PI) { H = H - 2 * Math.PI; }
+    if (H < 0) { H += 2 * PI; }
+    if (H > PI) { H = H - 2 * PI; }
 
     let az = (Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat)));
     let a = (Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(H)));
-    az -= Math.PI;
+    az -= PI;
 
-    if (az < 0) { az += 2 * Math.PI; }
+    if (az < 0) { az += 2 * PI; }
     return [az, a, localSiderealTime, H];
 }
 
@@ -29,9 +32,9 @@ export function greenwichMeanSiderealTime(jd: number) {
     //"Expressions for IAU 2000 precession quantities" N. Capitaine1,P.T.Wallace2, and J. Chapront
     const t = ((jd - 2451545.0)) / 36525.0;
 
-    let gmst = earthRotationAngle(jd) + (0.014506 + 4612.156534 * t + 1.3915817 * t * t - 0.00000044 * t * t * t - 0.000029956 * t * t * t * t - 0.0000000368 * t * t * t * t * t) / 60.0 / 60.0 * Math.PI / 180.0;  //eq 42
-    gmst %= 2 * Math.PI;
-    if (gmst < 0) gmst += 2 * Math.PI;
+    let gmst = earthRotationAngle(jd) + (0.014506 + 4612.156534 * t + 1.3915817 * t * t - 0.00000044 * t * t * t - 0.000029956 * t * t * t * t - 0.0000000368 * t * t * t * t * t) / 60.0 / 60.0 * PI / 180.0;  //eq 42
+    gmst %= 2 * PI;
+    if (gmst < 0) gmst += 2 * PI;
 
     return gmst;
 }
@@ -42,23 +45,27 @@ export function earthRotationAngle(jd: number) {
     const t = jd - 2451545.0;
     const f = jd % 1.0;
 
-    let theta = 2 * Math.PI * (f + 0.7790572732640 + 0.00273781191135448 * t); //eq 14
-    theta %= 2 * Math.PI;
-    if (theta < 0) theta += 2 * Math.PI;
+    let theta = 2 * PI * (f + 0.7790572732640 + 0.00273781191135448 * t); //eq 14
+    theta %= 2 * PI;
+    if (theta < 0) theta += 2 * PI;
 
     return theta;
 }
 
 export function raDecToAzElDegrees(ra: number, dec: number, lat: number, lon: number, jd_ut: number): [az: number, el: number, lst: number, HA: number] {
-    const [az, el, lst, HA] = raDecToAzEl(ra * Math.PI / 180.0, dec * Math.PI / 180.0, lat * Math.PI / 180.0, lon * Math.PI / 180.0, jd_ut);
-    return [az * 180.0 / Math.PI, el * 180.0 / Math.PI, lst * 180.0 / Math.PI, HA * 180.0 / Math.PI];
+    const [az, el, lst, HA] = raDecToAzEl(ra * PI / 180.0, dec * PI / 180.0, lat * PI / 180.0, lon * PI / 180.0, jd_ut);
+    return [az * 180.0 / PI, el * 180.0 / PI, lst * 180.0 / PI, HA * 180.0 / PI];
 }
 
 export function localSiderealTime(jd_ut: number, lon: number): number {
     const gmst = greenwichMeanSiderealTime(jd_ut);
-    let localSiderealTime = (gmst + lon) % (2 * Math.PI);
-    if (localSiderealTime < 0) { localSiderealTime += 2 * Math.PI; }
+    let localSiderealTime = (gmst + lon) % (2 * PI);
+    if (localSiderealTime < 0) { localSiderealTime += 2 * PI; }
     return localSiderealTime;
+}
+
+export function lst_radians(): number {
+    return localSiderealTime(time / 86400 + 2440587.5, LONGITUDE_DEG * PI / 180)
 }
 
 export function azEltoVector3(az_deg: number, el_deg: number, RADIUS: number = SKY_DOME_RADIUS): THREE.Vector3 {
@@ -87,4 +94,10 @@ export function pointToAzEl(point: THREE.Vector3, RADIUS: number = SKY_DOME_RADI
     let el_deg = el_rad * 180 / PI;
 
     return [az_deg, el_deg];
+}
+
+
+export function raDecToVector3(ra_deg: number, dec_deg: number): THREE.Vector3 {
+    const [az_deg, el_deg] = raDecToAzElDegrees(ra_deg, dec_deg, LATITUDE_DEG, -118.129, time / 86400 + 2440587.5);
+    return azEltoVector3(az_deg, el_deg, SKY_DOME_RADIUS);
 }

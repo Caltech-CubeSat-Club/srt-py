@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '@threlte/core'
-  import { azEltoVector3 } from '$lib/coordinates'
+  import { azEltoVector3 } from '$lib/coordinates.svelte'
   import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
   import { Text } from '@threlte/extras'
   import { cursorAzEl } from '$lib/stores/ui.svelte';

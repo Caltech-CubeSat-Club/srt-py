@@ -1,6 +1,7 @@
 // projection.svelte.ts
 import { Vector3 } from 'three';
 import type { Camera } from 'three';
+import { BASE_FOV_DEG } from '$lib/constants';
 
 function fovScaleFromDegrees(fovDeg: number): number {
   const halfFovRad = (fovDeg * Math.PI / 180) / 2;
@@ -8,7 +9,7 @@ function fovScaleFromDegrees(fovDeg: number): number {
   return 1 / edgeRadius;
 }
 
-let fovDeg = $state(90);
+let fovDeg = $state(BASE_FOV_DEG);
 
 export const uFovScale = {
   get value() {
