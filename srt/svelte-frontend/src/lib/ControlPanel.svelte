@@ -3,14 +3,14 @@
   import { interactivity, CameraControls, type CameraControlsRef } from '@threlte/extras'
   import * as THREE from 'three'
   import { SKY_DOME_RADIUS as RADIUS, PI, BASE_FOV_DEG } from '$lib/constants';
-  import { setFov, setAspect, uFovScale, uAspect } from '$lib/stores/projection.svelte';
-  import gridVert from '$lib/shaders/grid.vert';
-  import gridFrag from '$lib/shaders/grid.frag';
+  import { setFov, setAspect, uFovScale } from '$lib/stores/projection.svelte';
 
   import SkyGrid from '$lib/SkyGrid.svelte';
+  import AzElGrid from '$lib/AzElGrid.svelte';
   import ShaderObjects from '$lib/ShaderObjects.svelte';
   import BackgroundSphere from '$lib/BackgroundSphere.svelte';
   import TelescopeBeam from '$lib/TelescopeBeam.svelte';
+  import HorizonRings from '$lib/HorizonRings.svelte';
 
   interface Props {
     controls?: CameraControlsRef;
@@ -66,42 +66,14 @@
 <T.AmbientLight intensity={0.5} />
 
 <!-- Sky -->
-<SkyGrid />
+<!-- <SkyGrid /> -->
+<AzElGrid />
 <BackgroundSphere />
 <!-- <Objects /> -->
 <ShaderObjects />
 
-<!-- Horizon: fixed at 15deg elevation -->
-<T.Mesh position={[0, RADIUS*Math.sin(15*PI/180), 0]} rotation={[PI/2, 0, 0]} renderOrder={-1}>
-  <T.TorusGeometry args={[RADIUS*Math.cos(15*PI/180), 1]} />
-  <T.ShaderMaterial
-    vertexShader={gridVert}
-    fragmentShader={gridFrag}
-    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale, uAspect }}
-    side={THREE.DoubleSide}
-    transparent
-  />
-</T.Mesh>
-<T.Mesh position={[0, RADIUS*Math.sin(81*PI/180), 0]} rotation={[PI/2, 0, 0]} renderOrder={-1}>
-  <T.TorusGeometry args={[RADIUS*Math.cos(81*PI/180), 1]} />
-  <T.ShaderMaterial
-    vertexShader={gridVert}
-    fragmentShader={gridFrag}
-    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale, uAspect }}
-    side={THREE.DoubleSide}
-    transparent
-  />
-</T.Mesh>
-<T.Mesh position={[0, RADIUS/1.1, 0]} renderOrder={-1}>
-  <T.SphereGeometry args={[2, 16, 16]} />
-  <T.ShaderMaterial
-    vertexShader={gridVert}
-    fragmentShader={gridFrag}
-    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale, uAspect }}
-    side={THREE.DoubleSide}
-    transparent
-  />
-</T.Mesh>
+<!-- Horizon: mount elevation tracking limits -->
+<HorizonRings />
 
 <!-- Telescope position -->
 <TelescopeBeam />
