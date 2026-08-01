@@ -10,6 +10,7 @@ function fovScaleFromDegrees(fovDeg: number): number {
 }
 
 let fovDeg = $state(BASE_FOV_DEG);
+let aspect = $state(1);
 
 export const uFovScale = {
   get value() {
@@ -17,8 +18,22 @@ export const uFovScale = {
   }
 };
 
+// Camera aspect ratio (width/height) - see chunks/stereographic.glsl for why
+// every projection needs this to avoid stretching circles into ellipses on
+// a non-square canvas. Kept in sync with the real camera via setAspect(),
+// called each frame alongside setFov() (see ControlPanel.svelte's useTask).
+export const uAspect = {
+  get value() {
+    return aspect;
+  }
+};
+
 export function setFov(deg: number) {
   fovDeg = deg;
+}
+
+export function setAspect(a: number) {
+  aspect = a;
 }
 
 /**
@@ -34,7 +49,7 @@ export function projectToScreenNDC(worldPos: Vector3, camera: Camera): { x: numb
   const dir = viewPos.normalize();
   const denom = Math.max(1 - dir.z, 1e-4);
   const scale = (2 / denom) * fovScaleFromDegrees(fovDeg);
-  return { x: dir.x * scale, y: dir.y * scale };
+  return { x: (dir.x * scale) / aspect, y: dir.y * scale };
 }
 
 /**
@@ -50,7 +65,7 @@ export function projectToScreenNDC(worldPos: Vector3, camera: Camera): { x: numb
  */
 export function inverseStereographicToViewDirection(ndcX: number, ndcY: number): Vector3 {
   const fovScale = fovScaleFromDegrees(fovDeg);
-  const sx = ndcX / fovScale;
+  const sx = (ndcX * aspect) / fovScale;
   const sy = ndcY / fovScale;
   const r2 = sx * sx + sy * sy;
   const z = (r2 - 4) / (r2 + 4);

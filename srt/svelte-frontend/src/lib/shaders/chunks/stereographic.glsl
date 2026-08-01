@@ -1,4 +1,12 @@
 uniform float uFovScale;
+// Camera aspect ratio (width/height). NDC space always spans -1..1 in both
+// axes regardless of the canvas's actual dimensions, so without this, the
+// same NDC displacement covers different physical pixel distances
+// horizontally vs vertically on a non-square canvas - stretching circles
+// into ellipses and breaking cursor math the same way. FOV is treated as
+// vertical (matching THREE.PerspectiveCamera.fov), so X gets the extra
+// division - same convention as a standard perspective projection matrix.
+uniform float uAspect;
 
 // For points/billboards only: divides manually and fixes w=1 so a later
 // vec4 offset (e.g. a billboard's screen-space size) added to the result
@@ -15,6 +23,7 @@ vec4 stereographicProject(vec3 viewPos) {
     vec3 dir = normalize(viewPos);
     float denom = max(1.0 - dir.z, 1e-4);
     vec2 screenXY = dir.xy * (2.0 / denom) * uFovScale;
+    screenXY.x /= uAspect;
     return vec4(screenXY, 0.0, 1.0);
 }
 
@@ -35,5 +44,6 @@ vec4 stereographicProjectClipped(vec3 viewPos, out float denomOut) {
     vec3 dir = normalize(viewPos);
     denomOut = 1.0 - dir.z;
     vec2 screenXY = dir.xy * 2.0 * uFovScale;
+    screenXY.x /= uAspect;
     return vec4(screenXY, 0.0, denomOut);
 }

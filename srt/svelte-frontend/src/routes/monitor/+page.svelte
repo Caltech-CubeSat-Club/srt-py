@@ -52,9 +52,9 @@
 </script>
 
 <div class="p-4">
-	<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+	<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
 		<AntennaStatePanel />
-		<div class="border-2 border-gray-700 h-[90vh]">
+		<div class="border-2 border-gray-700 h-[90vh] md:col-span-2">
 			<Canvas>
 				<ControlPanel bind:controls />
 			</Canvas>

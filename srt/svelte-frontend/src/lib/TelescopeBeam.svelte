@@ -3,7 +3,7 @@
 	import * as THREE from 'three';
     import { AzEl } from '$lib/coordinates.svelte'
     import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
-    import { uFovScale } from '$lib/stores/projection.svelte';
+    import { uFovScale, uAspect } from '$lib/stores/projection.svelte';
     import { uiState } from '$lib/stores/ui.svelte';
     import beamVert from '$lib/shaders/beam.vert';
     import beamFrag from '$lib/shaders/beam.frag';
@@ -43,7 +43,7 @@
 	const material = new THREE.ShaderMaterial({
 		vertexShader: beamVert,
 		fragmentShader: beamFrag,
-		uniforms: { uLambdaMeters, uApertureMeters, uEdgeThetaRad, uAngularSize, uFovScale },
+		uniforms: { uLambdaMeters, uApertureMeters, uEdgeThetaRad, uAngularSize, uFovScale, uAspect },
 		transparent: true,
 		depthTest: false,
 		depthWrite: false,

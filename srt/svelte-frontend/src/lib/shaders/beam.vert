@@ -11,6 +11,10 @@ void main() {
   // of an instanced attribute since there's only one beam.
   vec4 centerView = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
   vec4 projectedCenter = stereographicProject( centerView.xyz );
-  gl_Position = projectedCenter + vec4( position.xy * uAngularSize * uFovScale, 0.0, 0.0 );
+  // see stars.vert - the billboard offset needs the same /uAspect as the
+  // center's own x to stay round on a non-square canvas.
+  vec2 offset = position.xy * uAngularSize * uFovScale;
+  offset.x /= uAspect;
+  gl_Position = projectedCenter + vec4( offset, 0.0, 0.0 );
   vUv = uv;
 }

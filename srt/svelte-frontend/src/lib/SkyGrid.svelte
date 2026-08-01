@@ -4,7 +4,7 @@
     import StereographicText from '$lib/StereographicText.svelte'
     import { RaDec, lst_radians } from '$lib/coordinates.svelte'
     import { timeState } from '$lib/stores/time.svelte';
-    import { uFovScale } from '$lib/stores/projection.svelte';
+    import { uFovScale, uAspect } from '$lib/stores/projection.svelte';
     import gridVert from '$lib/shaders/grid.vert';
     import gridFrag from '$lib/shaders/grid.frag';
     import { SKY_DOME_RADIUS as RADIUS, PI, LATITUDE_DEG } from '$lib/constants';
@@ -26,7 +26,7 @@
         <T.ShaderMaterial
             vertexShader={gridVert}
             fragmentShader={gridFrag}
-            uniforms={{ uColor: { value: new THREE.Color('#bbb') }, uOpacity: { value: 1.0 }, uFovScale }}
+            uniforms={{ uColor: { value: new THREE.Color('#bbb') }, uOpacity: { value: 1.0 }, uFovScale, uAspect }}
             side={THREE.DoubleSide}
         />
     </T.Mesh>
@@ -50,7 +50,7 @@
         <T.ShaderMaterial
             vertexShader={gridVert}
             fragmentShader={gridFrag}
-            uniforms={{ uColor: { value: new THREE.Color(color) }, uOpacity: { value: 1.0 }, uFovScale }}
+            uniforms={{ uColor: { value: new THREE.Color(color) }, uOpacity: { value: 1.0 }, uFovScale, uAspect }}
             side={THREE.DoubleSide}
         />
     </T.Mesh>

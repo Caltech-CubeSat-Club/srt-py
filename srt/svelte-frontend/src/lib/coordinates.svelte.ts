@@ -9,7 +9,20 @@ import { SKY_DOME_RADIUS, PI, LATITUDE_DEG, LONGITUDE_DEG } from './constants';
 // sky-dome Cartesian vectors the renderer actually places things at. Not
 // time-dependent.
 export class AzEl {
-    constructor(public az_deg: number, public el_deg: number) {}
+    // $state on the fields themselves, not just wrapping an AzEl instance in
+    // $state(...) from outside - Svelte 5 only deep-proxies plain
+    // objects/arrays, not arbitrary class instances, so mutating
+    // someAzEl.az_deg = ... on an externally-$state-wrapped instance mutates
+    // the object but never notifies dependents. Declaring the fields with
+    // $state here makes every instance independently reactive regardless of
+    // how it's stored (this is what cursorAzEl in ui.svelte.ts relies on).
+    az_deg = $state(0);
+    el_deg = $state(0);
+
+    constructor(az_deg: number, el_deg: number) {
+        this.az_deg = az_deg;
+        this.el_deg = el_deg;
+    }
 
     toVector3(radius = SKY_DOME_RADIUS): THREE.Vector3 {
         const azRad = -this.az_deg * PI / 180; // Azimuth is clockwise

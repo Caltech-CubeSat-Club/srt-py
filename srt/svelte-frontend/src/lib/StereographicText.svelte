@@ -1,7 +1,7 @@
 <script lang="ts">
     import { Text } from '@threlte/extras';
     import { createDerivedMaterial } from 'troika-three-utils';
-    import { uFovScale } from '$lib/stores/projection.svelte';
+    import { uFovScale, uAspect } from '$lib/stores/projection.svelte';
     import stereographicChunk from '$lib/shaders/chunks/stereographic.glsl';
 
     interface Props {
@@ -50,7 +50,7 @@
         if (!textMesh || textMesh.material?.isStereographicText) return;
         textMesh.material = createDerivedMaterial(textMesh.material, {
             chained: true,
-            uniforms: { uFovScale, uTextBillboardScale },
+            uniforms: { uFovScale, uAspect, uTextBillboardScale },
             vertexDefs: `
                 ${stereographicChunk}
                 uniform float uTextBillboardScale;
@@ -59,11 +59,23 @@
                 vec2 glyphLocalXY = mix(aTroikaGlyphBounds.xy, aTroikaGlyphBounds.zw, position.xy) + uTextBillboardScale;
                 vec4 centerView = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
                 vec4 projectedCenter = stereographicProject(centerView.xyz);
-                gl_Position = projectedCenter + vec4(glyphLocalXY * uTextBillboardScale, 0.0, 0.0);
+                vec2 offset = glyphLocalXY * uTextBillboardScale;
+                offset.x /= uAspect;
+                gl_Position = projectedCenter + vec4(offset, 0.0, 0.0);
             `,
         });
         (textMesh.material as any).isStereographicText = true;
     }
 </script>
 
-<Text bind:ref={textMesh} {...rest} onsync={wireStereographicText} />
+<!--
+  frustumCulled defaults to true, and Three's CPU-side culling check is
+  entirely blind to our custom vertex shader - it tests the mesh's local
+  geometry bounding volume against the REAL camera's frustum (real fov/zoom/
+  aspect), not what our stereographic override actually puts on screen. Our
+  effective view is often much wider than the real camera's frustum, so
+  labels that are clearly on-screen via the shader still get silently culled
+  before the vertex shader even runs (see the same fix on ShaderObjects'
+  marker mesh).
+-->
+<Text bind:ref={textMesh} {...rest} frustumCulled={false} onsync={wireStereographicText} />

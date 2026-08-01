@@ -8,7 +8,7 @@
     import { AzEl } from '$lib/coordinates.svelte'
     import { daemonStatus } from '$lib/stores/daemonStatus.svelte';
     import { cursorAzEl } from '$lib/stores/ui.svelte';
-    import { uFovScale, projectToScreenNDC } from '$lib/stores/projection.svelte';
+    import { uFovScale, uAspect, projectToScreenNDC } from '$lib/stores/projection.svelte';
     import { SKY_DOME_RADIUS as radius } from '$lib/constants';
 
     const { camera } = useThrelte();
@@ -117,7 +117,7 @@
     const material = new THREE.ShaderMaterial({
         vertexShader: starsVert,
         fragmentShader: starsFrag,
-        uniforms: { uFovScale },
+        uniforms: { uFovScale, uAspect },
         transparent: true,
     });
 </script>

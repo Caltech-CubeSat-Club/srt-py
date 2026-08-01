@@ -5,7 +5,7 @@
     import { AzEl } from '$lib/coordinates.svelte';
     import { cursorAzEl } from '$lib/stores/ui.svelte';
     import { SKY_DOME_RADIUS as radius, HORIZON_TEXTURE, HORIZON_TEXTURE_ROTATION_DEG, HORIZON_TEXTURE_VERTICAL_OFFSET } from '$lib/constants';
-    import { uFovScale, inverseStereographicToViewDirection } from '$lib/stores/projection.svelte';
+    import { uFovScale, uAspect, inverseStereographicToViewDirection } from '$lib/stores/projection.svelte';
     import skyDomeVert from '$lib/shaders/skyDome.vert';
     import skyDomeFrag from '$lib/shaders/skyDome.frag';
 
@@ -51,7 +51,7 @@
 	const material = new THREE.ShaderMaterial({
 		vertexShader: skyDomeVert,
 		fragmentShader: skyDomeFrag,
-		uniforms: { map: { value: texture }, uFovScale },
+		uniforms: { map: { value: texture }, uFovScale, uAspect },
 		side: THREE.BackSide,
 		depthTest: false,
 		depthWrite: false,

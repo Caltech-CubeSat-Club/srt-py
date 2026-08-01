@@ -15,8 +15,12 @@ void main() {
 
   // billboard offset: apply the sprite shape directly in clip/NDC space,
   // scaled by angularSize and a pixel-size factor, since we're now past
-  // the nonlinear projection step rather than before it like the example
-  gl_Position = projectedCenter + vec4( position.xy * angularSize * uFovScale, 0.0, 0.0 );
+  // the nonlinear projection step rather than before it like the example.
+  // x gets the same /uAspect as stereographicProject's own x, so the
+  // billboard stays round instead of stretching on a non-square canvas.
+  vec2 offset = position.xy * angularSize * uFovScale;
+  offset.x /= uAspect;
+  gl_Position = projectedCenter + vec4( offset, 0.0, 0.0 );
 
   vUv = uv;
   vColor = objectColor;

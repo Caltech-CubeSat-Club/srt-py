@@ -3,7 +3,7 @@
   import { interactivity, CameraControls, type CameraControlsRef } from '@threlte/extras'
   import * as THREE from 'three'
   import { SKY_DOME_RADIUS as RADIUS, PI, BASE_FOV_DEG } from '$lib/constants';
-  import { setFov, uFovScale } from '$lib/stores/projection.svelte';
+  import { setFov, setAspect, uFovScale, uAspect } from '$lib/stores/projection.svelte';
   import gridVert from '$lib/shaders/grid.vert';
   import gridFrag from '$lib/shaders/grid.frag';
 
@@ -34,6 +34,10 @@
     const baseHalfFovRad = (BASE_FOV_DEG * PI / 180) / 2;
     const effectiveHalfFovRad = Math.atan(Math.tan(baseHalfFovRad) / camera.zoom);
     setFov((effectiveHalfFovRad * 2 * 180) / PI);
+    // Camera.aspect is real THREE.PerspectiveCamera state, kept up to date by
+    // Threlte on canvas resize - our custom shaders bypass projectionMatrix
+    // entirely, so they need this mirrored into uAspect the same way as FOV.
+    setAspect(camera.aspect);
   });
 </script>
 
@@ -73,7 +77,7 @@
   <T.ShaderMaterial
     vertexShader={gridVert}
     fragmentShader={gridFrag}
-    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale }}
+    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale, uAspect }}
     side={THREE.DoubleSide}
     transparent
   />
@@ -83,7 +87,7 @@
   <T.ShaderMaterial
     vertexShader={gridVert}
     fragmentShader={gridFrag}
-    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale }}
+    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale, uAspect }}
     side={THREE.DoubleSide}
     transparent
   />
@@ -93,7 +97,7 @@
   <T.ShaderMaterial
     vertexShader={gridVert}
     fragmentShader={gridFrag}
-    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale }}
+    uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale, uAspect }}
     side={THREE.DoubleSide}
     transparent
   />
