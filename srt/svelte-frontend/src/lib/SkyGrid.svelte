@@ -7,7 +7,7 @@
     import { uFovScale, uAspect } from '$lib/stores/projection.svelte';
     import gridVert from '$lib/shaders/grid.vert';
     import gridFrag from '$lib/shaders/grid.frag';
-    import { SKY_DOME_RADIUS as RADIUS, PI, LATITUDE_DEG } from '$lib/constants';
+    import { SKY_DOME_RADIUS as RADIUS, PI, LATITUDE_DEG, GRID_RING_THICKNESS } from '$lib/constants';
 
     let northPoleVector = $derived(new RaDec(0, 90).toAzEl(timeState.jd_ut).toVector3()); // North Pole is at ra=0, dec=90
 </script>
@@ -21,8 +21,8 @@
     <!-- +Z = North -->
     {@const dz = ringCenterVectorLength * Math.cos(lat) }
     {@const dy = ringCenterVectorLength * Math.sin(lat) }
-    <T.Mesh position={[0, dy, dz]} rotation={[-lat, 0, 0]} renderOrder={ringRenderOrder}>
-        <T.TorusGeometry args={[ringRadius, .75 / uFovScale.value, 8, 64]} />
+    <T.Mesh position={[0, dy, dz]} rotation={[-lat, 0, 0]} renderOrder={ringRenderOrder} frustumCulled={false}>
+        <T.TorusGeometry args={[ringRadius, GRID_RING_THICKNESS / uFovScale.value, 8, 64]} />
         <T.ShaderMaterial
             vertexShader={gridVert}
             fragmentShader={gridFrag}
@@ -37,10 +37,10 @@
     {@const ra = ra_deg * PI / 180}
     <!-- Get North Pole vector -->
     <!-- +Z = North -->
-    <T.Mesh position={[0, 0, 0]} rotation={[PI/2 - lat, - ra - lst_radians(timeState.jd_ut), PI/2]} renderOrder={ringRenderOrder}>
+    <T.Mesh position={[0, 0, 0]} rotation={[PI/2 - lat, - ra - lst_radians(timeState.jd_ut), PI/2]} renderOrder={ringRenderOrder} frustumCulled={false}>
         <T.TorusGeometry args={[
             RADIUS, //radius of torus
-            .75 / uFovScale.value, //radius of tube
+            GRID_RING_THICKNESS / uFovScale.value, //radius of tube
             8, //radial segments
             64, // tubular segments
             PI, // arc length
@@ -67,11 +67,11 @@
     {@render ra_ring(rightAscension, i === 0 ? '#f00' : '#555', -1.4 + i * 0.01)}
 {/each}
 
-<StereographicText
+<!-- <StereographicText
     text={'N'}
     position={[northPoleVector.x/1.1, northPoleVector.y/1.1, northPoleVector.z/1.1]}
     fontSize={30}
     color={'#f00'}
     anchorX={'left'}
     anchorY={'bottom'}
-/>
+/> -->

@@ -4,6 +4,7 @@
   import * as THREE from 'three'
   import { SKY_DOME_RADIUS as RADIUS, PI, BASE_FOV_DEG } from '$lib/constants';
   import { setFov, setAspect, uFovScale } from '$lib/stores/projection.svelte';
+  import { uiState } from '$lib/stores/ui.svelte';
 
   import SkyGrid from '$lib/SkyGrid.svelte';
   import AzElGrid from '$lib/AzElGrid.svelte';
@@ -66,14 +67,22 @@
 <T.AmbientLight intensity={0.5} />
 
 <!-- Sky -->
-<!-- <SkyGrid /> -->
-<AzElGrid />
-<BackgroundSphere />
+{#if uiState.raDecGridVisible}
+  <SkyGrid />
+{/if}
+{#if uiState.azElGridVisible}
+  <AzElGrid />
+{/if}
+{#if uiState.horizonTextureVisible}
+  <BackgroundSphere />
+{/if}
 <!-- <Objects /> -->
 <ShaderObjects />
 
 <!-- Horizon: mount elevation tracking limits -->
-<HorizonRings />
+{#if uiState.azElLimitsVisible}
+  <HorizonRings />
+{/if}
 
 <!-- Telescope position -->
 <TelescopeBeam />

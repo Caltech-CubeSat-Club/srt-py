@@ -113,3 +113,6 @@ rever/
 
 # DS store files anywhere
 .DS_Store
+
+.claude/
+**/CLAUDE.md

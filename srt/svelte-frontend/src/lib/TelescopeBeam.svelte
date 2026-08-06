@@ -8,9 +8,9 @@
     import beamVert from '$lib/shaders/beam.vert';
     import beamFrag from '$lib/shaders/beam.frag';
 
-    import { SKY_DOME_RADIUS as radius, PI, OBSERVATION_BAND_LAMBDAS } from '$lib/constants';
+    import { SKY_DOME_RADIUS as radius, OBSERVATION_BAND_LAMBDAS } from '$lib/constants';
 
-    let lambdaMeters = $state(OBSERVATION_BAND_LAMBDAS[uiState.observationBand || 'L']);
+    let lambdaMeters = $derived(OBSERVATION_BAND_LAMBDAS[uiState.observationBand || 'L']);
     let apertureMeters = $state(6.0);
     // Billboard quad edge (local position +/-0.5) sits at this many degrees
     // from the beam center - matches the script's plotted domain radius.
@@ -50,7 +50,7 @@
 	});
 </script>
 
-<T.Mesh position={beam_vector} renderOrder={1}>
+<T.Mesh position={beam_vector} renderOrder={1} frustumCulled={false}>
     <T.PlaneGeometry args={[1, 1]} />
     <T is={material} />
 </T.Mesh>

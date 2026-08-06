@@ -1,7 +1,40 @@
 <script lang="ts">
+  import { Toolbar } from 'bits-ui';
   import { daemonStatus, connection } from '$lib/stores/daemonStatus.svelte';
   import { timeState } from '$lib/stores/time.svelte';
+  import { uiState, type UIState } from '$lib/stores/ui.svelte';
   import type { DriverState, CalSts } from '$lib/generated/types';
+
+  const GRID_TOGGLES = [
+    { key: 'raDecGridVisible', label: 'RA/Dec Grid' },
+    { key: 'azElGridVisible', label: 'Az/El Grid' },
+    { key: 'horizonTextureVisible', label: 'Horizon' },
+    { key: 'azElLimitsVisible', label: 'El Limits' },
+  ] as const satisfies readonly { key: keyof UIState; label: string }[];
+
+  const BANDS = ['UHF', 'L', 'S', 'C'] as const satisfies readonly NonNullable<UIState['observationBand']>[];
+
+  const toggleClass =
+    'rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 data-[state=on]:border-blue-500 data-[state=on]:bg-blue-500 data-[state=on]:text-white data-[state=on]:hover:bg-blue-600';
+
+  function getVisibleGrids() {
+    return GRID_TOGGLES.filter(({ key }) => uiState[key]).map(({ key }) => key);
+  }
+
+  function setVisibleGrids(values: string[]) {
+    for (const { key } of GRID_TOGGLES) {
+      uiState[key] = values.includes(key);
+    }
+  }
+
+  function getBand() {
+    return uiState.observationBand ?? 'L';
+  }
+
+  function setBand(value: string) {
+    if (!value) return; // ignore deselect clicks - always keep exactly one band active
+    uiState.observationBand = value as UIState['observationBand'];
+  }
 
   // Color mapping for FSM states
   const stateColorMap: Record<string, string> = {
@@ -60,6 +93,23 @@
   <div class="mb-4">
     <h5 class="text-lg font-semibold text-gray-900">Antenna State</h5>
   </div>
+
+  <!-- View Toolbar -->
+  <Toolbar.Root class="mb-4 flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3">
+    <Toolbar.Group type="multiple" bind:value={getVisibleGrids, setVisibleGrids} class="flex flex-wrap gap-1">
+      {#each GRID_TOGGLES as { key, label } (key)}
+        <Toolbar.GroupItem value={key} class={toggleClass}>{label}</Toolbar.GroupItem>
+      {/each}
+    </Toolbar.Group>
+
+    <div class="mx-1 h-5 w-px bg-gray-200"></div>
+
+    <Toolbar.Group type="single" bind:value={getBand, setBand} class="flex gap-1">
+      {#each BANDS as band (band)}
+        <Toolbar.GroupItem value={band} class={toggleClass}>{band}</Toolbar.GroupItem>
+      {/each}
+    </Toolbar.Group>
+  </Toolbar.Root>
 
   <!-- Connection State -->
   <div class="mb-4">

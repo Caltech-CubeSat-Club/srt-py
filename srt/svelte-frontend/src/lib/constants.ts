@@ -14,3 +14,5 @@ export const OBSERVATION_BAND_LAMBDAS: Record<string, number> = {
     'S': 0.1,
     'C': 0.05,
 };
+
+export const GRID_RING_THICKNESS = 0.3;
