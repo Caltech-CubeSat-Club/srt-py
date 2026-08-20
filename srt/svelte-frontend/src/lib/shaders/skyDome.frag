@@ -1,4 +1,5 @@
 uniform sampler2D map;
+uniform float uOpacity;
 
 varying vec2 vUv;
 varying float vDenom;
@@ -14,4 +15,5 @@ void main() {
   // auto-called - without it linear values write straight to an sRGB-output
   // canvas and look washed out.
   gl_FragColor = linearToOutputTexel( texture2D( map, vUv ) );
+  gl_FragColor.a *= uOpacity;
 }

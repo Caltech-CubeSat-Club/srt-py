@@ -18,7 +18,7 @@ void main() {
   // the nonlinear projection step rather than before it like the example.
   // x gets the same /uAspect as stereographicProject's own x, so the
   // billboard stays round instead of stretching on a non-square canvas.
-  vec2 offset = position.xy * angularSize * uFovScale;
+  vec2 offset = position.xy * angularSize * max(2., uFovScale);
   offset.x /= uAspect;
   gl_Position = projectedCenter + vec4( offset, 0.0, 0.0 );
 

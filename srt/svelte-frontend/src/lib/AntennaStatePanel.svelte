@@ -3,19 +3,26 @@
   import { daemonStatus, connection } from '$lib/stores/daemonStatus.svelte';
   import { timeState } from '$lib/stores/time.svelte';
   import { uiState, type UIState } from '$lib/stores/ui.svelte';
+  import { UI_COLORS } from '$lib/constants';
   import type { DriverState, CalSts } from '$lib/generated/types';
 
   const GRID_TOGGLES = [
-    { key: 'raDecGridVisible', label: 'RA/Dec Grid' },
-    { key: 'azElGridVisible', label: 'Az/El Grid' },
-    { key: 'horizonTextureVisible', label: 'Horizon' },
-    { key: 'azElLimitsVisible', label: 'El Limits' },
-  ] as const satisfies readonly { key: keyof UIState; label: string }[];
+    { key: 'azElGridVisible', lines: ['AZ', 'EL'], color: UI_COLORS.azElGrid },
+    { key: 'raDecGridVisible', lines: ['RA', 'DEC'], color: UI_COLORS.raDecGrid },
+    { key: 'azElLimitsVisible', lines: ['EL', 'LIM'], color: UI_COLORS.elLimits },
+    { key: 'horizonTextureVisible', lines: ['SKY', 'LINE'], color: UI_COLORS.skyline },
+  ] as const satisfies readonly { key: keyof UIState; lines: [string, string]; color: string }[];
 
   const BANDS = ['UHF', 'L', 'S', 'C'] as const satisfies readonly NonNullable<UIState['observationBand']>[];
 
   const toggleClass =
-    'rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 data-[state=on]:border-blue-500 data-[state=on]:bg-blue-500 data-[state=on]:text-white data-[state=on]:hover:bg-blue-600';
+    'font-display flex h-11 w-11 flex-col items-center justify-center gap-0 rounded border-2 text-[16px] uppercase tracking-tighter leading-[1.0] transition-colors hover:opacity-80';
+
+  function toggleStyle(color: string, active: boolean) {
+    return active
+      ? `border-color:${color}; background-color:${color}; color:white;`
+      : `border-color:${color}; color:${color};`;
+  }
 
   function getVisibleGrids() {
     return GRID_TOGGLES.filter(({ key }) => uiState[key]).map(({ key }) => key);
@@ -97,8 +104,11 @@
   <!-- View Toolbar -->
   <Toolbar.Root class="mb-4 flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3">
     <Toolbar.Group type="multiple" bind:value={getVisibleGrids, setVisibleGrids} class="flex flex-wrap gap-1">
-      {#each GRID_TOGGLES as { key, label } (key)}
-        <Toolbar.GroupItem value={key} class={toggleClass}>{label}</Toolbar.GroupItem>
+      {#each GRID_TOGGLES as { key, lines, color } (key)}
+        <Toolbar.GroupItem value={key} class={toggleClass} style={toggleStyle(color, !!uiState[key])}>
+          <span>{lines[0]}</span>
+          <span>{lines[1]}</span>
+        </Toolbar.GroupItem>
       {/each}
     </Toolbar.Group>
 
@@ -106,7 +116,7 @@
 
     <Toolbar.Group type="single" bind:value={getBand, setBand} class="flex gap-1">
       {#each BANDS as band (band)}
-        <Toolbar.GroupItem value={band} class={toggleClass}>{band}</Toolbar.GroupItem>
+        <Toolbar.GroupItem value={band} class={toggleClass} style={toggleStyle(UI_COLORS.beam, getBand() === band)}>{band}</Toolbar.GroupItem>
       {/each}
     </Toolbar.Group>
   </Toolbar.Root>

@@ -21,7 +21,7 @@
     const DEFAULT_COLOR = new THREE.Color('#f59e0b');
     // stars.vert scales the base [-0.5,0.5] quad by angularSize * uFovScale directly
     // in clip space, so this is NDC half-width per unit, not a real angular/pixel size.
-    const MARKER_ANGULAR_SIZE = 0.015;
+    const MARKER_ANGULAR_SIZE_1DEG = 0.0175;
 
     let object_locs = $derived(daemonStatus.object_locs ?? {});
     let objectNames = $derived(Object.keys(object_locs));
@@ -103,7 +103,7 @@
             const [az, el] = object_locs[name];
             const pos = new AzEl(az, el).toVector3(radius);
             translateAttr.setXYZ(i, pos.x, pos.y, pos.z);
-            sizeAttr.setX(i, MARKER_ANGULAR_SIZE);
+            sizeAttr.setX(i, (name === "Sun" || name === "Moon") ? MARKER_ANGULAR_SIZE_1DEG * 0.5 : MARKER_ANGULAR_SIZE_1DEG * 0.25);
 
             const color = name === selectedObject ? SELECTED_COLOR : DEFAULT_COLOR;
             colorAttr.setXYZ(i, color.r, color.g, color.b);

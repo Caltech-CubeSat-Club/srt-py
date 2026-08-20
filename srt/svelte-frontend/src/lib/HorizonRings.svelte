@@ -5,11 +5,11 @@
     import { uFovScale, uAspect } from '$lib/stores/projection.svelte';
     import gridVert from '$lib/shaders/grid.vert';
     import gridFrag from '$lib/shaders/grid.frag';
-    import { SKY_DOME_RADIUS as RADIUS, PI } from '$lib/constants';
+    import { SKY_DOME_RADIUS as RADIUS, PI, UI_COLORS } from '$lib/constants';
 
     // daemonStatus.el_limits is [lowerBoundDeg, upperBoundDeg] - the mount's
     // enforced elevation tracking limits, shown as two flat rings on the sky.
-    // Not to be confused with BackgroundSphere's HORIZON_TEXTURE (a
+    // Not to be confused with HorizonTexture's HORIZON_TEXTURE (a
     // photographic panorama) or daemonStatus.horizon_points (a real terrain
     // obstruction profile) - this is just the mount's own safety limits.
     const DEFAULT_EL_LIMITS: [number, number] = [15, 81];
@@ -23,7 +23,7 @@
         <T.ShaderMaterial
             vertexShader={gridVert}
             fragmentShader={gridFrag}
-            uniforms={{ uColor: { value: new THREE.Color('#f00') }, uOpacity: { value: 0.8 }, uFovScale, uAspect }}
+            uniforms={{ uColor: { value: new THREE.Color(UI_COLORS.elLimits) }, uOpacity: { value: 0.8 }, uFovScale, uAspect }}
             side={THREE.DoubleSide}
             transparent
         />

@@ -1,15 +1,19 @@
 <script lang="ts">
     import * as THREE from 'three'
     import { T } from '@threlte/core'
-    import StereographicText from '$lib/StereographicText.svelte'
+    import { uiState } from '$lib/stores/ui.svelte'
     import { RaDec, lst_radians } from '$lib/coordinates.svelte'
     import { timeState } from '$lib/stores/time.svelte';
     import { uFovScale, uAspect } from '$lib/stores/projection.svelte';
     import gridVert from '$lib/shaders/grid.vert';
     import gridFrag from '$lib/shaders/grid.frag';
-    import { SKY_DOME_RADIUS as RADIUS, PI, LATITUDE_DEG, GRID_RING_THICKNESS } from '$lib/constants';
+    import { SKY_DOME_RADIUS as RADIUS, PI, LATITUDE_DEG, GRID_RING_THICKNESS, UI_COLORS } from '$lib/constants';
 
-    let northPoleVector = $derived(new RaDec(0, 90).toAzEl(timeState.jd_ut).toVector3()); // North Pole is at ra=0, dec=90
+    const uOpacity = {
+        get value() {
+            return uiState.raDecGridVisible ? 0.5 : 0.0;
+        }
+    }
 </script>
 
 {#snippet dec_ring(dec_deg: number, ringRenderOrder: number)}
@@ -26,8 +30,9 @@
         <T.ShaderMaterial
             vertexShader={gridVert}
             fragmentShader={gridFrag}
-            uniforms={{ uColor: { value: new THREE.Color('#bbb') }, uOpacity: { value: 1.0 }, uFovScale, uAspect }}
+            uniforms={{ uColor: { value: new THREE.Color(UI_COLORS.raDecGrid) }, uOpacity, uFovScale, uAspect }}
             side={THREE.DoubleSide}
+            transparent
         />
     </T.Mesh>
 {/snippet}
@@ -50,8 +55,9 @@
         <T.ShaderMaterial
             vertexShader={gridVert}
             fragmentShader={gridFrag}
-            uniforms={{ uColor: { value: new THREE.Color(color) }, uOpacity: { value: 1.0 }, uFovScale, uAspect }}
+            uniforms={{ uColor: { value: new THREE.Color(color) }, uOpacity, uFovScale, uAspect }}
             side={THREE.DoubleSide}
+            transparent
         />
     </T.Mesh>
 {/snippet}
@@ -64,7 +70,7 @@
 
 {#each Array.from({ length: 24 }) as _, i}
     {@const rightAscension = (i + 1) * 15}
-    {@render ra_ring(rightAscension, i === 0 ? '#f00' : '#555', -1.4 + i * 0.01)}
+    {@render ra_ring(rightAscension, UI_COLORS.raDecGrid, -1.4 + i * 0.01)}
 {/each}
 
 <!-- <StereographicText

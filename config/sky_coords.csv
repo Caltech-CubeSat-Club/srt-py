@@ -1,7 +1,6 @@
 coordinate_system,coordinate_a,coordinate_b,name
 fk4,05 31 30,21 58 00,Crab
 fk4,05 32 48,-5 27 00,Orion
-fk4,23 21 12,58 44 00,Cass
 icrs,23 23 26,58 48 41,CassA
 fk4,17 42 54,-28 50 00,SgrA
 fk4,18 17 30,-16 18 00,M17
@@ -11,5 +10,5 @@ fk4,05 40 00,29 00 00,G180
 fk4,12 48 00,28 00 00,GNpole
 fk4,00 39 00,40 30 00,Androm
 fk4,00 00 00,90 00 00,NPole
-galactic,10,1,RC_CLOUD
+icrs,13 25 27,-43 01 08,CentA
 galactic,0,0,GC

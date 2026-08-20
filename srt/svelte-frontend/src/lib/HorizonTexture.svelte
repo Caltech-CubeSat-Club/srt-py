@@ -3,7 +3,7 @@
     import { interactivity } from '@threlte/extras';
 	import * as THREE from 'three';
     import { AzEl } from '$lib/coordinates.svelte';
-    import { cursorAzEl } from '$lib/stores/ui.svelte';
+    import { cursorAzEl, uiState } from '$lib/stores/ui.svelte';
     import { SKY_DOME_RADIUS as radius, HORIZON_TEXTURE, HORIZON_TEXTURE_ROTATION_DEG, HORIZON_TEXTURE_VERTICAL_OFFSET } from '$lib/constants';
     import { uFovScale, uAspect, inverseStereographicToViewDirection } from '$lib/stores/projection.svelte';
     import skyDomeVert from '$lib/shaders/skyDome.vert';
@@ -42,6 +42,13 @@
 	texture.wrapS = THREE.ClampToEdgeWrapping;
 	texture.wrapT = THREE.ClampToEdgeWrapping;
 	texture.colorSpace = THREE.SRGBColorSpace; // Ensure correct color space
+
+	const uOpacity = {
+		get value() {
+			return uiState.horizonTextureVisible ? 0.5 : 0.0;
+		}
+	}
+
 	// Every stereographic-projected material writes a fixed gl_Position.z (no
 	// real depth concept in this projection - see chunks/stereographic.glsl),
 	// so normal depth testing against it is meaningless and, worse, this sphere
@@ -51,10 +58,15 @@
 	const material = new THREE.ShaderMaterial({
 		vertexShader: skyDomeVert,
 		fragmentShader: skyDomeFrag,
-		uniforms: { map: { value: texture }, uFovScale, uAspect },
+		uniforms: { map: { value: texture }, uFovScale, uAspect, uOpacity },
 		side: THREE.BackSide,
 		depthTest: false,
 		depthWrite: false,
+		// Needed for skyDome.frag's alpha fade to actually blend against
+		// whatever's behind it (the scene's own clear color, since this
+		// sphere draws first/furthest-back) instead of writing fully opaque
+		// regardless of the alpha it outputs.
+		transparent: true,
 	});
 
     interactivity();

@@ -2,9 +2,16 @@
     import * as THREE from 'three'
     import { T } from '@threlte/core'
     import { uFovScale, uAspect } from '$lib/stores/projection.svelte';
+    import { uiState } from '$lib/stores/ui.svelte';
     import gridVert from '$lib/shaders/grid.vert';
     import gridFrag from '$lib/shaders/grid.frag';
-    import { SKY_DOME_RADIUS as RADIUS, PI, GRID_RING_THICKNESS } from '$lib/constants';
+    import { SKY_DOME_RADIUS as RADIUS, PI, GRID_RING_THICKNESS, UI_COLORS } from '$lib/constants';
+
+    const uOpacity = {
+        get value() {
+            return uiState.azElGridVisible ? 1.0 : 0.0;
+        }
+    }
 </script>
 
 {#snippet el_ring(el_deg: number, ringRenderOrder: number)}
@@ -14,8 +21,9 @@
         <T.ShaderMaterial
             vertexShader={gridVert}
             fragmentShader={gridFrag}
-            uniforms={{ uColor: { value: new THREE.Color('#4ade80') }, uOpacity: { value: 1.0 }, uFovScale, uAspect }}
+            uniforms={{ uColor: { value: new THREE.Color(UI_COLORS.azElGrid) }, uOpacity, uFovScale, uAspect }}
             side={THREE.DoubleSide}
+            transparent
         />
     </T.Mesh>
 {/snippet}
@@ -35,8 +43,9 @@
         <T.ShaderMaterial
             vertexShader={gridVert}
             fragmentShader={gridFrag}
-            uniforms={{ uColor: { value: new THREE.Color(color) }, uOpacity: { value: 1.0 }, uFovScale, uAspect }}
+            uniforms={{ uColor: { value: new THREE.Color(color) }, uOpacity, uFovScale, uAspect }}
             side={THREE.DoubleSide}
+            transparent
         />
     </T.Mesh>
 {/snippet}
@@ -48,6 +57,6 @@
 {/each}
 
 {#each Array.from({ length: 24 }) as _, i}
-    {@const azimuth = (i + 1) * 15}
-    {@render az_ring(azimuth, '#22c55e', -1.4 + i * 0.01)}
+    {@const azimuth = i * 15}
+    {@render az_ring(azimuth, UI_COLORS.azElGrid, -1.4 + i * 0.01)}
 {/each}

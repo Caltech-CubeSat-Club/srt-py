@@ -8,7 +8,7 @@
     import beamVert from '$lib/shaders/beam.vert';
     import beamFrag from '$lib/shaders/beam.frag';
 
-    import { SKY_DOME_RADIUS as radius, OBSERVATION_BAND_LAMBDAS } from '$lib/constants';
+    import { SKY_DOME_RADIUS as radius, OBSERVATION_BAND_LAMBDAS, UI_COLORS } from '$lib/constants';
 
     let lambdaMeters = $derived(OBSERVATION_BAND_LAMBDAS[uiState.observationBand || 'L']);
     let apertureMeters = $state(6.0);
@@ -31,6 +31,7 @@
     const uApertureMeters = { get value() { return apertureMeters; } };
     const uEdgeThetaRad = { get value() { return edgeThetaRad; } };
     const uAngularSize = { get value() { return beamAngularSize; } };
+    const uColor = { value: new THREE.Color(UI_COLORS.beam) };
 
     let telescopeAzEl = $derived(
         daemonStatus.rotor
@@ -43,7 +44,7 @@
 	const material = new THREE.ShaderMaterial({
 		vertexShader: beamVert,
 		fragmentShader: beamFrag,
-		uniforms: { uLambdaMeters, uApertureMeters, uEdgeThetaRad, uAngularSize, uFovScale, uAspect },
+		uniforms: { uLambdaMeters, uApertureMeters, uEdgeThetaRad, uAngularSize, uColor, uFovScale, uAspect },
 		transparent: true,
 		depthTest: false,
 		depthWrite: false,

@@ -8,6 +8,7 @@ varying vec2 vUv;
 uniform float uLambdaMeters;
 uniform float uApertureMeters;
 uniform float uEdgeThetaRad;
+uniform vec3 uColor;
 const float PI = 3.14159265358979;
 
 // Numerical Recipes' rational-polynomial approximation of the Bessel
@@ -49,5 +50,5 @@ void main() {
   if ( intensity < 0.001 ) discard;
 
   // see skyDome.frag - linearToOutputTexel() must be called explicitly here too.
-  gl_FragColor = linearToOutputTexel( vec4( 0.0, 1.0, 0.0, clamp( intensity, 0.0, 1.0 ) ) );
+  gl_FragColor = linearToOutputTexel( vec4( uColor, clamp( intensity, 0.0, 1.0 ) ) );
 }

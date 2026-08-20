@@ -65,6 +65,56 @@ export class RaDec {
     }
 }
 
+// Galactic coordinates - also fixed on the celestial sphere, just oriented
+// to the Milky Way's own disk/center rather than Earth's equator. Only
+// converts to RaDec directly; toAzEl is a convenience that chains through
+// it, exactly like RaDec.toAzEl chains through raDecToAzElDegrees.
+export class Galactic {
+    constructor(public l_deg: number, public b_deg: number) {}
+
+    toRaDec(): RaDec {
+        const [ra_deg, dec_deg] = galacticToEquatorialDegrees(this.l_deg, this.b_deg);
+        return new RaDec(ra_deg, dec_deg);
+    }
+
+    toAzEl(jd_ut: number, lat_deg = LATITUDE_DEG, lon_deg = LONGITUDE_DEG): AzEl {
+        return this.toRaDec().toAzEl(jd_ut, lat_deg, lon_deg);
+    }
+}
+
+// IAU-defined orientation of the Galactic coordinate system relative to
+// equatorial coordinates: RA/Dec of the north galactic pole, and the
+// galactic longitude of the north celestial pole. Formally defined in B1950
+// but these J2000 numbers (as also used by e.g. Astropy's Galactic frame)
+// are accurate to a small fraction of a degree, plenty for placing a sky
+// texture.
+const GALACTIC_POLE_RA_DEG = 192.85948;
+const GALACTIC_POLE_DEC_DEG = 27.12825;
+const GALACTIC_LON_OF_NCP_DEG = 122.93192;
+
+// All input and output angles are in radians.
+export function galacticToEquatorial(l: number, b: number): [ra: number, dec: number] {
+    const raNGP = GALACTIC_POLE_RA_DEG * PI / 180;
+    const decNGP = GALACTIC_POLE_DEC_DEG * PI / 180;
+    const lNCP = GALACTIC_LON_OF_NCP_DEG * PI / 180;
+    const dLon = lNCP - l;
+
+    const dec = Math.asin(Math.sin(decNGP) * Math.sin(b) + Math.cos(decNGP) * Math.cos(b) * Math.cos(dLon));
+
+    const y = Math.cos(b) * Math.sin(dLon);
+    const x = Math.cos(decNGP) * Math.sin(b) - Math.sin(decNGP) * Math.cos(b) * Math.cos(dLon);
+    let ra = Math.atan2(y, x) + raNGP;
+    ra %= 2 * PI;
+    if (ra < 0) { ra += 2 * PI; }
+
+    return [ra, dec];
+}
+
+export function galacticToEquatorialDegrees(l_deg: number, b_deg: number): [ra_deg: number, dec_deg: number] {
+    const [ra, dec] = galacticToEquatorial(l_deg * PI / 180, b_deg * PI / 180);
+    return [ra * 180 / PI, dec * 180 / PI];
+}
+
 //All input and output angles are in radians, jd is Julian Date in UTC
 export function raDecToAzEl(ra: number, dec: number, lat: number, lon: number, jd_ut: number): [az: number, el: number, lst: number, HA: number] {
     //Meeus 13.5 and 13.6, modified so West longitudes are negative and 0 is North

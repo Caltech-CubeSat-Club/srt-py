@@ -9,7 +9,8 @@
   import SkyGrid from '$lib/SkyGrid.svelte';
   import AzElGrid from '$lib/AzElGrid.svelte';
   import ShaderObjects from '$lib/ShaderObjects.svelte';
-  import BackgroundSphere from '$lib/BackgroundSphere.svelte';
+  import HorizonTexture from '$lib/HorizonTexture.svelte';
+  import SkyMaps from '$lib/SkyMaps.svelte';
   import TelescopeBeam from '$lib/TelescopeBeam.svelte';
   import HorizonRings from '$lib/HorizonRings.svelte';
 
@@ -67,15 +68,10 @@
 <T.AmbientLight intensity={0.5} />
 
 <!-- Sky -->
-{#if uiState.raDecGridVisible}
-  <SkyGrid />
-{/if}
-{#if uiState.azElGridVisible}
-  <AzElGrid />
-{/if}
-{#if uiState.horizonTextureVisible}
-  <BackgroundSphere />
-{/if}
+<SkyGrid />
+<AzElGrid />
+<HorizonTexture />
+<SkyMaps />
 <!-- <Objects /> -->
 <ShaderObjects />
 
