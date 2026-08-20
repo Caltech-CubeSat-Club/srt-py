@@ -27,13 +27,27 @@ from srt.daemon.telescope_types import (
     SpectrumConfig,
     SpectrumFrame,
     DaemonStatus,
-    DaemonConfig,
+    DaemonConfig
+)
+
+from srt.daemon.command_types import (
+    TelescopeCommand,
+    ObservationPlan
 )
 
 OUTPUT_DIR = SRT_ROOT / "svelte-frontend" / "src" / "lib" / "generated"
 SCHEMA_TMP_DIR = SRT_ROOT / ".schema-tmp"
 
-MODELS = [LprParams, RotorState, SpectrumConfig, SpectrumFrame, DaemonStatus, DaemonConfig]
+MODELS = [
+    LprParams, 
+    RotorState, 
+    SpectrumConfig, 
+    SpectrumFrame, 
+    DaemonStatus, 
+    DaemonConfig, 
+    TelescopeCommand, 
+    ObservationPlan
+]
 
 
 def _convert_prefix_items(node):

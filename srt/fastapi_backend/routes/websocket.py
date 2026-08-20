@@ -20,7 +20,7 @@ shared broadcaster; it never touches ZMQ directly.
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .auth import get_current_user_ws
-from ..zmq_bridge.bridge import status_broadcaster
+from ..zmq_bridge.bridge import status_broadcaster, command_listener
 
 router = APIRouter()
 
@@ -61,3 +61,9 @@ async def status_ws(websocket: WebSocket, token: str | None = None):
         pass
     finally:
         status_broadcaster.unregister(websocket)
+
+
+# TODO
+@router.websocket("/ws/command")
+async def command_ws(websocket: WebSocket, token: str | None = None):
+    ...
