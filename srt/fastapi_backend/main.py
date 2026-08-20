@@ -11,6 +11,7 @@ from pathlib import Path
 from .routes import auth, websocket
 from .zmq_bridge.bridge import status_broadcaster
 
+# TODO @danichua -- add command_listener here
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Runs once before the app starts accepting requests.
