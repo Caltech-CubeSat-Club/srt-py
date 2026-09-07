@@ -17,12 +17,18 @@ tab. This route just registers/unregisters each WebSocket with that
 shared broadcaster; it never touches ZMQ directly.
 """
 
+import json
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import TypeAdapter, ValidationError
 
 from .auth import get_current_user_ws
-from ..zmq_bridge.bridge import status_broadcaster, command_listener
+from ..zmq_bridge.bridge import status_broadcaster
+from ...daemon.command_types import TelescopeCommand
 
 router = APIRouter()
+_command_adapter = TypeAdapter(TelescopeCommand)
 
 
 @router.websocket("/ws/status")
@@ -63,7 +69,39 @@ async def status_ws(websocket: WebSocket, token: str | None = None):
         status_broadcaster.unregister(websocket)
 
 
-# TODO
 @router.websocket("/ws/command")
 async def command_ws(websocket: WebSocket, token: str | None = None):
-    ...
+    await get_current_user_ws(token)
+    await websocket.accept()
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({
+                    "ok": False,
+                    "error": "Invalid JSON",
+                }))
+                continue
+
+            try:
+                cmd = _command_adapter.validate_python(data)
+            except ValidationError as e:
+                await websocket.send_text(json.dumps({
+                    "ok": False,
+                    "error": e.errors(),
+                }))
+                continue
+
+            logging.info("Received command: %s", cmd)
+
+            await websocket.send_text(json.dumps({
+                "ok": True,
+                "command": data.get("command"),
+            }))
+
+    except WebSocketDisconnect:
+        pass
