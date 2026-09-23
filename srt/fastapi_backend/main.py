@@ -9,14 +9,16 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from .routes import auth, websocket
-from .zmq_bridge.bridge import status_broadcaster
+from .zmq_bridge.bridge import command_listener, status_broadcaster
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Runs once before the app starts accepting requests.
     await status_broadcaster.start()
+    await command_listener.start()
     yield
     # Runs once on shutdown, after the app stops accepting new requests.
+    await command_listener.stop()
     await status_broadcaster.stop()
 
 app = FastAPI(title="SRT Dashboard", lifespan=lifespan)

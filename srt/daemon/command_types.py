@@ -43,8 +43,13 @@ class PointAtOffset(BaseModel):
         description="Elevation offset in degrees"
     )
 
-class SpectrumConfig(BaseModel):
-    """Configure spectrum analyzer settings."""
+class SpectrumConfigCommand(BaseModel):
+    """Configure spectrum analyzer settings.
+
+    Suffixed to avoid colliding with telescope_types.SpectrumConfig, which
+    is the analyzer's full live config. Same name in both modules silently
+    clobbered one of them in the generated TS types.
+    """
 
     command: Literal["spectrum_config"] = "spectrum_config"
     
@@ -117,7 +122,7 @@ TelescopeCommand = Annotated[
         FindObjectLocation,
         PointAtAzEl,
         PointAtOffset,
-        SpectrumConfig,
+        SpectrumConfigCommand,
         Wait,
         WaitUntil,
         Stow,

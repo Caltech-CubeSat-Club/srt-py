@@ -3,12 +3,10 @@ WebSocket endpoint streaming telescope status to connected browser
 clients.
 
 ARCHITECTURE: there is exactly one daemon-side publisher (ZMQ PUB on
-port 5555) sending one DaemonStatus JSON blob per tick — confirmed
-from the real daemon.py's update_status() and the existing Dash
+port 5555) sending one DaemonStatus JSON blob per tick — see 
+daemon.py's update_status() and the existing Dash
 dashboard's status_fetcher.py, which does exactly this with one
-ZMQ SUB + DaemonStatus.from_dict(). This is NOT split into separate
-rotor/spectrum streams — that was an earlier draft's invented
-two-publisher design that never matched the real system.
+ZMQ SUB. 
 
 ZMQ <-> Pydantic conversion happens exactly once per tick, in
 zmq_bridge.bridge.StatusBroadcaster — a single background task shared
@@ -17,12 +15,19 @@ tab. This route just registers/unregisters each WebSocket with that
 shared broadcaster; it never touches ZMQ directly.
 """
 
+import json
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import TypeAdapter, ValidationError
 
 from .auth import get_current_user_ws
-from ..zmq_bridge.bridge import status_broadcaster
+from ..zmq_bridge.bridge import CommandError, status_broadcaster, command_listener
+from ...daemon.command_types import ObservationPlan, TelescopeCommand
 
 router = APIRouter()
+_command_adapter = TypeAdapter(TelescopeCommand)
+_plan_adapter = TypeAdapter(ObservationPlan)
 
 
 @router.websocket("/ws/status")
@@ -61,3 +66,60 @@ async def status_ws(websocket: WebSocket, token: str | None = None):
         pass
     finally:
         status_broadcaster.unregister(websocket)
+
+
+@router.websocket("/ws/command")
+async def command_ws(websocket: WebSocket, token: str | None = None):
+    await get_current_user_ws(token)
+    await websocket.accept()
+
+    command_listener.register(websocket)
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({
+                    "ok": False,
+                    "error": "Invalid JSON",
+                }))
+                continue
+
+            # A "commands" list means ObservationPlan, otherwise a single
+            # command — by shape, since ObservationPlan has no discriminator.
+            try:
+                if isinstance(data, dict) and "commands" in data:
+                    plan = _plan_adapter.validate_python(data)
+                    lines = await command_listener.submit_plan(plan)
+                else:
+                    cmd = _command_adapter.validate_python(data)
+                    lines = [await command_listener.submit(cmd)]
+            except ValidationError as e:
+                await websocket.send_text(json.dumps({
+                    "ok": False,
+                    "error": e.errors(),
+                }))
+                continue
+            except CommandError as e:
+                # Normal outcome for operator input, not a server fault —
+                # keep the socket open.
+                await websocket.send_text(json.dumps({
+                    "ok": False,
+                    "error": str(e),
+                }))
+                continue
+
+            # Echo the daemon-language text back — it reappears in the status
+            # stream's queued_item/error_logs, so the client can correlate.
+            await websocket.send_text(json.dumps({
+                "ok": True,
+                "sent": lines,
+            }))
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        command_listener.unregister(websocket)
