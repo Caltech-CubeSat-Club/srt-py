@@ -38,7 +38,7 @@ from ...daemon.command_types import (
     PointAtAzEl,
     PointAtObject,
     PointAtOffset,
-    SpectrumConfig,
+    SpectrumConfigCommand,
     SpectrumStart,
     SpectrumStop,
     Stow,
@@ -163,7 +163,7 @@ def encode_command(cmd: TelescopeCommand) -> str:
         return f"azel {cmd.azimuth:.6f} {cmd.elevation:.6f}"
     if isinstance(cmd, PointAtOffset):
         return f"offset {cmd.azimuth_offset:.6f} {cmd.elevation_offset:.6f}"
-    if isinstance(cmd, SpectrumConfig):
+    if isinstance(cmd, SpectrumConfigCommand):
         fields = cmd.model_dump(exclude_none=True, exclude={"command"})
         if not fields:  # daemon would no-op silently
             raise CommandRejected("spectrum_config with no fields set")
