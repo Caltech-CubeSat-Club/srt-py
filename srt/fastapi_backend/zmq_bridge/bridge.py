@@ -271,13 +271,7 @@ class CommandListener:
 
     async def _send_estop(self) -> str:
         """Push to the controller's e-stop socket (payload ignored; any
-        message fires it). Skips `self._lock` — an e-stop queued behind a
-        40-step plan send isn't an e-stop.
-
-        !! SAFETY GAP, not fixed here: `Moore6mController._estop_loop` calls
-        spa() only, while its own GUI button calls spa() AND
-        set_safe_mode(True). Only the latter blocks further motion, so this
-        halts the dish without latching — the next queued command re-slews.
+        message fires it). Skips `self._lock`. Raises DaemonUnreachable if the controller isn't connected.
         """
         if self._estop_socket is None:
             raise DaemonUnreachable("CommandListener.start() was never called")
