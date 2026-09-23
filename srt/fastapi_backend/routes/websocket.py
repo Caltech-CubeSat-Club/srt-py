@@ -88,10 +88,8 @@ async def command_ws(websocket: WebSocket, token: str | None = None):
                 }))
                 continue
 
-            # A payload with a "commands" list is an ObservationPlan; a bare
-            # object is a single command. Distinguished by shape rather than
-            # by a wrapper field, since ObservationPlan has no discriminator
-            # of its own and `commands` is required + min_length=1.
+            # A "commands" list means ObservationPlan, otherwise a single
+            # command — by shape, since ObservationPlan has no discriminator.
             try:
                 if isinstance(data, dict) and "commands" in data:
                     plan = _plan_adapter.validate_python(data)
@@ -106,17 +104,16 @@ async def command_ws(websocket: WebSocket, token: str | None = None):
                 }))
                 continue
             except CommandError as e:
-                # Rejected or undeliverable — a normal outcome for operator
-                # input, not a server fault, so the socket stays open.
+                # Normal outcome for operator input, not a server fault —
+                # keep the socket open.
                 await websocket.send_text(json.dumps({
                     "ok": False,
                     "error": str(e),
                 }))
                 continue
 
-            # Echo the exact daemon-language string(s) back: that text is what
-            # will appear in the daemon's own `queued_item` and error_logs, so
-            # the client can correlate its request with the status stream.
+            # Echo the daemon-language text back — it reappears in the status
+            # stream's queued_item/error_logs, so the client can correlate.
             await websocket.send_text(json.dumps({
                 "ok": True,
                 "sent": lines,

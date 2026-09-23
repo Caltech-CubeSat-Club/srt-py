@@ -18,8 +18,6 @@ async def lifespan(app: FastAPI):
     await command_listener.start()
     yield
     # Runs once on shutdown, after the app stops accepting new requests.
-    # Stopped in reverse order of startup; both are idempotent enough that
-    # ordering only matters for log tidiness.
     await command_listener.stop()
     await status_broadcaster.stop()
 
