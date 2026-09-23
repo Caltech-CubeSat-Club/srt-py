@@ -3,12 +3,10 @@ WebSocket endpoint streaming telescope status to connected browser
 clients.
 
 ARCHITECTURE: there is exactly one daemon-side publisher (ZMQ PUB on
-port 5555) sending one DaemonStatus JSON blob per tick — confirmed
-from the real daemon.py's update_status() and the existing Dash
+port 5555) sending one DaemonStatus JSON blob per tick — see 
+daemon.py's update_status() and the existing Dash
 dashboard's status_fetcher.py, which does exactly this with one
-ZMQ SUB + DaemonStatus.from_dict(). This is NOT split into separate
-rotor/spectrum streams — that was an earlier draft's invented
-two-publisher design that never matched the real system.
+ZMQ SUB. 
 
 ZMQ <-> Pydantic conversion happens exactly once per tick, in
 zmq_bridge.bridge.StatusBroadcaster — a single background task shared
@@ -24,11 +22,12 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import TypeAdapter, ValidationError
 
 from .auth import get_current_user_ws
-from ..zmq_bridge.bridge import status_broadcaster
-from ...daemon.command_types import TelescopeCommand
+from ..zmq_bridge.bridge import CommandError, status_broadcaster, command_listener
+from ...daemon.command_types import ObservationPlan, TelescopeCommand
 
 router = APIRouter()
 _command_adapter = TypeAdapter(TelescopeCommand)
+_plan_adapter = TypeAdapter(ObservationPlan)
 
 
 @router.websocket("/ws/status")
@@ -74,6 +73,8 @@ async def command_ws(websocket: WebSocket, token: str | None = None):
     await get_current_user_ws(token)
     await websocket.accept()
 
+    command_listener.register(websocket)
+
     try:
         while True:
             raw = await websocket.receive_text()
@@ -87,21 +88,41 @@ async def command_ws(websocket: WebSocket, token: str | None = None):
                 }))
                 continue
 
+            # A payload with a "commands" list is an ObservationPlan; a bare
+            # object is a single command. Distinguished by shape rather than
+            # by a wrapper field, since ObservationPlan has no discriminator
+            # of its own and `commands` is required + min_length=1.
             try:
-                cmd = _command_adapter.validate_python(data)
+                if isinstance(data, dict) and "commands" in data:
+                    plan = _plan_adapter.validate_python(data)
+                    lines = await command_listener.submit_plan(plan)
+                else:
+                    cmd = _command_adapter.validate_python(data)
+                    lines = [await command_listener.submit(cmd)]
             except ValidationError as e:
                 await websocket.send_text(json.dumps({
                     "ok": False,
                     "error": e.errors(),
                 }))
                 continue
+            except CommandError as e:
+                # Rejected or undeliverable — a normal outcome for operator
+                # input, not a server fault, so the socket stays open.
+                await websocket.send_text(json.dumps({
+                    "ok": False,
+                    "error": str(e),
+                }))
+                continue
 
-            logging.info("Received command: %s", cmd)
-
+            # Echo the exact daemon-language string(s) back: that text is what
+            # will appear in the daemon's own `queued_item` and error_logs, so
+            # the client can correlate its request with the status stream.
             await websocket.send_text(json.dumps({
                 "ok": True,
-                "command": data.get("command"),
+                "sent": lines,
             }))
 
     except WebSocketDisconnect:
         pass
+    finally:
+        command_listener.unregister(websocket)
