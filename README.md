@@ -23,7 +23,7 @@ pnpm install
 SRT_DEV_PYTHON_PATH="/path/to/your/conda/env/bin/python"
 ```
 
-You can copy the `.env.example` file and modify it accordingly. You can get the path to your conda environment by running:
+The easiest way is to copy the `.env.example` file and modify it accordingly. You can get the path to your conda environment by running:
 
 ```bash
 conda run -n srt-dev python -c "import sys;print(sys.executable)"

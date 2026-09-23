@@ -1,21 +1,23 @@
+# Runtime + dev environment. Verify with: python scripts/check_env_deps.py
 name: srt-dev
 channels:
   - conda-forge
 dependencies:
   - astroplan
   - astropy
+  - astroquery
   - fastapi
+  - matplotlib
   - numpy
-  - pandas
   - parse
   - pip
-  - pydantic
-  - pydantic-core
+  - pydantic>=2
   - pyjwt
+  - pytest
   - pyserial
   - python=3.10
-  - python-dotenv
   - pyvisa
+  - pyyaml
   - pyzmq
   - scipy
   - starlette

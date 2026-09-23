@@ -7,7 +7,9 @@ import path from 'node:path';
 import 'dotenv/config';
 import glsl from 'vite-plugin-glsl';
 
-const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../');
+// Resolves to srt/, not the repo root — this file lives at
+// srt/svelte-frontend/vite.config.ts.
+const SRT_DIR = path.resolve(fileURLToPath(import.meta.url), '../../');
 
 /**
  * Regenerates frontend/src/lib/generated/types.ts from the Pydantic
@@ -24,8 +26,8 @@ function pydanticTypeGen(): Plugin {
 		buildStart() {
 			if (process.env.SKIP_TYPE_GEN) return;
 			try {
-				execSync('$SRT_DEV_PYTHON_PATH scripts/generate_ts_types.py', {
-					cwd: REPO_ROOT,
+				execSync('$SRT_DEV_PYTHON_PATH tools/generate_ts_types.py', {
+					cwd: SRT_DIR,
 					stdio: 'inherit'
 				});
 			} catch (err) {

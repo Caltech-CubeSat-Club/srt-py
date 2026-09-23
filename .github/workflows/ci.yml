@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  python:
+    name: deps + tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0} # -l so micromamba's env activation applies
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      # Catches an import that only works because something else pulled the
+      # package in transitively (this is how pyyaml went missing).
+      - name: environment.yml covers every import
+        run: python scripts/check_env_deps.py
+
+      - name: pytest
+        run: pytest -q
+
+  types:
+    name: generated types are current
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10 # lockfileVersion 9.0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: srt/svelte-frontend/pnpm-lock.yaml
+
+      # json-schema-to-typescript is a declared dependency, so the generator's
+      # `pnpx` call resolves locally rather than hitting the network.
+      - name: pnpm install
+        working-directory: srt/svelte-frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: regenerate
+        run: python srt/tools/generate_ts_types.py
+
+      # The generator crashed unnoticed from August to September because
+      # nothing ran it except a developer starting the dev server.
+      - name: types.ts matches the Pydantic models
+        run: |
+          if ! git diff --exit-code -- srt/svelte-frontend/src/lib/generated/types.ts; then
+            echo "::error::types.ts is stale — run srt/tools/generate_ts_types.py and commit the result."
+            exit 1
+          fi
