@@ -31,6 +31,14 @@
   // stereographic-projection materials bypass that matrix entirely and read
   // uFovScale instead (see projection.svelte.ts). Without this, scroll-to-zoom
   // would move the real camera.zoom while every custom-shader layer stayed put.
+  //
+  // This task has a second, load-bearing side effect: Threlte renders
+  // on-demand by default, only redrawing when something calls invalidate().
+  // A useTask defaults to autoInvalidate, and Threlte keeps the loop running
+  // while any such task exists - so this one task is why nothing else in the
+  // app has to invalidate() manually after mutating a raw Three object. If
+  // this task is ever removed or gated behind a condition, expect updates to
+  // stop reaching the screen in places that look unrelated.
   useTask(() => {
     if (!camera) return;
     const baseHalfFovRad = (BASE_FOV_DEG * PI / 180) / 2;

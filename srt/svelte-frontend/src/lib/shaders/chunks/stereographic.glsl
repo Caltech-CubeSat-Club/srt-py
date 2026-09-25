@@ -1,3 +1,8 @@
+// Both functions below return gl_Position.z = 0: there is no meaningful
+// "distance" in this projection, so depth is fictional. Never rely on the
+// depth test between stereographic layers - set depthTest/depthWrite false
+// and control stacking with explicit renderOrder (more negative = further
+// back), and give sibling meshes DISTINCT values (see SkyGrid.svelte).
 uniform float uFovScale;
 // Camera aspect ratio (width/height). NDC space always spans -1..1 in both
 // axes regardless of the canvas's actual dimensions, so without this, the

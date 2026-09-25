@@ -122,6 +122,10 @@
     });
 </script>
 
+<!-- frustumCulled={false} is required, not tidiness: the instances are placed
+     entirely by stars.vert, so Three's CPU-side cull test (local bounds vs the
+     real camera frustum) has no idea where they actually end up. See
+     StereographicText.svelte for the full version. -->
 <T.Mesh frustumCulled={false}>
     <T is={geometry} />
     <T is={material} />

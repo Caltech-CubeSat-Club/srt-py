@@ -14,6 +14,22 @@
             return uiState.raDecGridVisible ? 0.5 : 0.0;
         }
     }
+
+    // Every ring below gets its OWN renderOrder (the `+ i * 0.01`), not one
+    // shared value for the layer. gl_Position.z is fixed at 0 under this
+    // projection so there's no real depth to sort by - Three falls back to
+    // object/material id to break ties between equal renderOrders, and that
+    // order isn't stable across recompiles/HMR, which showed up as rings
+    // flickering against each other where they cross on screen.
+    //
+    // frustumCulled={false} for the reason spelled out in
+    // StereographicText.svelte: Three tests local geometry bounds against the
+    // REAL camera frustum, which knows nothing about our vertex shader, so
+    // on-screen rings get culled before the shader ever runs.
+    //
+    // TODO: these ranges collide with AzElGrid's (dec rings -1.90..-1.49 vs
+    // its el rings -1.90..-1.56), so with both grids visible some pairs share
+    // a renderOrder again and the tiebreak problem comes back.
 </script>
 
 {#snippet dec_ring(dec_deg: number, ringRenderOrder: number)}

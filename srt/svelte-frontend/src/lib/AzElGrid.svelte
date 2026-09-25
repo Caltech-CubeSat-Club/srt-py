@@ -12,6 +12,14 @@
             return uiState.azElGridVisible ? 1.0 : 0.0;
         }
     }
+
+    // Observer-fixed, so unlike SkyGrid there's no LST rotation and no
+    // latitude tilt: el rings are flat rings repeated up the sky, and az
+    // meridians are SkyGrid's ra_ring with the latitude and LST terms
+    // dropped.
+    //
+    // Per-ring renderOrder and frustumCulled={false} are here for the same
+    // reasons as SkyGrid - see the comment there.
 </script>
 
 {#snippet el_ring(el_deg: number, ringRenderOrder: number)}
