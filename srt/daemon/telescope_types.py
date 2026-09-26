@@ -340,6 +340,41 @@ class SpectrumConfig(BaseModel):
         return self
 
 
+# Shared vocabulary lives in common.py — the bottom of the graph.
+from .common import Band, CommandState, OutputFormat  # noqa: F401  (re-export)
+
+
+class FrameMetadata(BaseModel):
+    """Where the dish was and what it was doing when a frame was taken.
+
+    Without this a frame is unreducible: it has power vs frequency and no
+    record of what was being looked at. Everything here has to be captured
+    per integration, not per observation, because the dish is tracking
+    throughout.
+
+    Optional on SpectrumFrame because the driver free-runs outside any
+    observation — frames from the idle acquisition loop legitimately have no
+    observing context.
+    """
+
+    azimuth_deg: float
+    elevation_deg: float
+
+    # Which leg of a switching cycle. Y-factor reduction is impossible
+    # without it, and it cannot be reconstructed afterwards from pointing
+    # alone once the dish has moved on.
+    role: Literal["source", "reference", "calibration"] = "source"
+
+    object_id: Optional[str] = None
+    band: Optional[Band] = None
+
+    # An az-el mount rotates the feed relative to the sky while tracking, so
+    # a fixed source rotates through the beam's polarization axes over a long
+    # integration. Uncorrected, that gain drift is indistinguishable from the
+    # source's flux actually changing.
+    parallactic_angle_deg: Optional[float] = None
+
+
 class SpectrumFrame(BaseModel):
     """One acquired and processed spectrum snapshot."""
 
@@ -351,6 +386,7 @@ class SpectrumFrame(BaseModel):
     config: SpectrumConfig = Field(default_factory=SpectrumConfig)
     avg_count: int = 1
     connected: bool = False
+    metadata: Optional[FrameMetadata] = None
 
     @model_validator(mode="after")
     def _check_array_lengths_match(self) -> "SpectrumFrame":
@@ -390,114 +426,6 @@ class SerialCommunication(BaseModel):
     time: str
     direction: Literal["sent", "recv"]
     payload: str
-
-
-class CommandHistoryEntry(BaseModel):
-    """One completed command's timing/result record. Shape confirmed
-    from moore6m_driver.py's _record_command_history."""
-
-    time: str
-    command: str
-    expected: Optional[str] = None
-    response: str
-    retries: int
-    success: bool
-    error: str
-    queue_wait_ms: float
-    duration_ms: float
-    total_ms: float
-
-
-class ObservationEvent(BaseModel):
-    """One observation lifecycle event. Shape confirmed from
-    daemon.py's _record_observation_event. `metadata` is left as a
-    loose dict since its contents vary by event type (sequence,
-    object, target_azel, point_index, point_total, end_reason, etc.
-    — see get_observation_events_csv for the full set of keys ever
-    read back out of it)."""
-
-    time: str
-    event: str
-    metadata: dict = Field(default_factory=dict)
-
-
-class DaemonStatus(BaseModel):
-    """Complete snapshot published by the daemon on each status tick.
-
-    Strict conversion: no legacy flat-key emission (rotor_diagnostics /
-    rotor_fsm_status), no dual-format from_dict. Use model_dump_json()
-    to serialize and model_validate_json() to parse — both ends of the
-    ZMQ/WebSocket boundary should be updated together.
-    """
-
-    # ---- Rotor ----
-    rotor: RotorState = Field(default_factory=RotorState)
-
-    # ---- Spectrum ----
-    spectrum: Optional[SpectrumFrame] = Field(default_factory=SpectrumFrame)
-
-    # ---- Antenna geometry ----
-    beam_width: float = 0.0
-    az_limits: tuple[float, float] = (0.0, 360.0)
-    el_limits: tuple[float, float] = (0.0, 90.0)
-    stow_loc: tuple[float, float] = (180.0, 81.0)
-    cal_loc: tuple[float, float] = (0.0, 0.0)
-    horizon_points: list[tuple[float, float]] = Field(default_factory=list)
-
-    # ---- Location ----
-    location: Location = Field(default_factory=Location)
-
-    # ---- Ephemeris ----
-    object_locs: dict[str, tuple[float, float]] = Field(default_factory=dict)
-    object_time_locs: dict[int, dict[str, tuple[float, float]]] = Field(default_factory=dict)
-    vlsr: dict[str, float] = Field(default_factory=dict)
-
-    # ---- Pointing ----
-    motor_offsets: tuple[float, float] = (0.0, 0.0)
-    pointing_error_history: list[dict[str, float]] = Field(default_factory=list)
-    amp_current_history: list[dict[str, Union[float, AmpCurrent]]] = Field(default_factory=list)
-
-    # ---- Command queue ----
-    queued_item: str = "None"
-    queue_size: int = 0
-
-    # ---- Logs and events ----
-    # log_message() appends (iso_timestamp, message) tuples, not bare
-    # strings — confirmed from daemon.py's actual self.command_error_logs
-    # usage. The list[str] guess was wrong; fixed after seeing log_message.
-    error_logs: list[tuple[str, str]] = Field(default_factory=list)
-    observation_events: list[ObservationEvent] = Field(default_factory=list)
-    serial_communications: list[SerialCommunication] = Field(default_factory=list)
-    command_history: list[CommandHistoryEntry] = Field(default_factory=list)
-
-    # ---- Observation data ----
-    n_point_data: list = Field(default_factory=list)
-    beam_switch_data: list = Field(default_factory=list)
-    cal_values: list[float] = Field(default_factory=list)
-
-    # ---- System ----
-    emergency_contact: Optional[EmergencyContact] = None
-    time: float = Field(default_factory=_time.time)
-
-    # ------------------------------------------------------------------
-    # Convenience accessors
-    # ------------------------------------------------------------------
-
-    @property
-    def az(self) -> float:
-        return self.rotor.az
-
-    @property
-    def el(self) -> float:
-        return self.rotor.el
-
-    @property
-    def calibrated(self) -> bool:
-        return self.rotor.calibrated
-
-    @property
-    def lpr(self) -> LprParams:
-        return self.rotor.lpr
 
 
 # ---------------------------------------------------------------------------

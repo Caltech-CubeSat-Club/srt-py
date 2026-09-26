@@ -29,11 +29,10 @@ import zmq.asyncio
 from pydantic import ValidationError
 from starlette.websockets import WebSocket
 
-from ...daemon.telescope_types import DaemonStatus
+from ...daemon.status import DaemonStatus
 from ...daemon.command_types import (
     CalibrateEncoders,
     EmergencyStop,
-    FindObjectLocation,
     ObservationPlan,
     PointAtAzEl,
     PointAtObject,
@@ -157,8 +156,6 @@ def encode_command(cmd: TelescopeCommand) -> str:
     """
     if isinstance(cmd, PointAtObject):
         return cmd.object_id
-    if isinstance(cmd, FindObjectLocation):
-        return f"object {cmd.object_id}"
     if isinstance(cmd, PointAtAzEl):
         return f"azel {cmd.azimuth:.6f} {cmd.elevation:.6f}"
     if isinstance(cmd, PointAtOffset):
@@ -184,8 +181,14 @@ def encode_command(cmd: TelescopeCommand) -> str:
     if isinstance(cmd, EmergencyStop):  # guard; `submit` intercepts it first
         raise CommandRejected("EmergencyStop belongs on the e-stop socket, not the queue")
 
-    # Only reachable if someone extends TelescopeCommand and forgets this.
-    raise CommandRejected(f"no daemon encoding for command type {type(cmd).__name__}")
+    # Reached by the observation commands (ObserveObject, GridScan, ...),
+    # which carry nested settings and can't be expressed in the daemon's text
+    # language at all - they need the JSON command path. Also reached if
+    # someone extends TelescopeCommand and forgets this function.
+    raise CommandRejected(
+        f"{type(cmd).__name__} has no text encoding; observation commands "
+        f"require the JSON command path"
+    )
 
 
 class CommandListener:
@@ -331,7 +334,7 @@ class CommandListener:
         if status is None:
             return
 
-        if isinstance(cmd, (PointAtObject, FindObjectLocation)):
+        if isinstance(cmd, PointAtObject):
             # The daemon matches a single whitespace token against
             # ephemeris_locations, so a spaced id vanishes as "Command Not
             # Identified". sky_coords.csv is space-free, but unenforced.

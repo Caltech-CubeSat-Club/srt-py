@@ -13,7 +13,7 @@ from typing import get_args
 import pytest
 
 from srt.daemon import command_types as ct
-from srt.daemon.telescope_types import DaemonStatus
+from srt.daemon.status import DaemonStatus
 from srt.fastapi_backend.zmq_bridge import bridge
 from srt.fastapi_backend.zmq_bridge.bridge import (
     CommandRejected,
@@ -25,7 +25,6 @@ from srt.fastapi_backend.zmq_bridge.bridge import (
 # Verified against daemon.py's srt_daemon_main dispatch chain.
 CASES = [
     (ct.PointAtObject(object_id="CassA"), "CassA"),
-    (ct.FindObjectLocation(object_id="M17"), "object M17"),
     (ct.PointAtAzEl(azimuth=120.5, elevation=45.0), "azel 120.500000 45.000000"),
     (ct.PointAtOffset(azimuth_offset=-0.25, elevation_offset=0.5), "offset -0.250000 0.500000"),
     (ct.Wait(duration_seconds=5), "wait 5.000000"),
@@ -56,13 +55,53 @@ def test_encoding_survives_the_daemon_tokenizer(cmd, _expected):
     assert "  " not in line
 
 
+# Commands with no text encoding. They carry nested settings objects, which
+# the daemon's whitespace language can't express, so they travel as JSON.
+# One union covers both; only the transport differs.
+JSON_ONLY = [
+    ct.ObserveObject(object_id="CassA", band="L", total_time_seconds=60),
+    ct.ParkedScan(azimuth=120.0, elevation=45.0, band="L", total_time_seconds=60),
+    ct.GridScan(
+        center_object_id="CassA",
+        ra_span_deg=1.0,
+        dec_span_deg=1.0,
+        resolution_deg=0.5,
+        band="L",
+    ),
+    ct.HotColdTest(band="L"),
+]
+
+
 def test_every_command_type_is_covered():
-    """Fails when someone adds a command to the union without adding it
-    here — which is also the moment they'd forget encode_command."""
+    """Fails when someone adds a command to the union without deciding how it
+    ships — which is also the moment they'd forget encode_command."""
     union = get_args(ct.TelescopeCommand)[0]  # Annotated[Union[...], Field]
     members = set(get_args(union))
-    covered = {type(cmd) for cmd, _ in CASES} | {ct.EmergencyStop}
+    covered = (
+        {type(cmd) for cmd, _ in CASES}
+        | {ct.EmergencyStop}
+        | {type(cmd) for cmd in JSON_ONLY}
+    )
     assert covered == members, f"uncovered: {members - covered}"
+
+
+@pytest.mark.parametrize("cmd", JSON_ONLY, ids=lambda c: type(c).__name__)
+def test_observation_commands_refuse_text_encoding(cmd):
+    """Must reject rather than silently emit something the daemon would
+    parse as a different command."""
+    with pytest.raises(CommandRejected, match="JSON"):
+        encode_command(cmd)
+
+
+def test_observation_commands_need_exactly_one_stop_condition():
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ct.ObserveObject(object_id="CassA", band="L")  # neither
+    with pytest.raises(ValidationError):
+        ct.ObserveObject(
+            object_id="CassA", band="L", total_time_seconds=60, desired_snr=5
+        )  # both
 
 
 def test_emergency_stop_is_never_encoded():

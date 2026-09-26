@@ -34,7 +34,6 @@ ALIAS = {
 
 # Declared but never imported by name, and legitimately so.
 NOT_IMPORTED_BY_NAME = {
-    "uvloop",        # uvicorn picks it up at runtime if installed
     "pip", "python", "conda-forge", "-e",
 }
 

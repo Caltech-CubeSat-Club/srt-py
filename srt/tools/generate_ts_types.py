@@ -29,13 +29,22 @@ from srt.daemon.telescope_types import (
     RotorState,
     SpectrumConfig,
     SpectrumFrame,
-    DaemonStatus,
     DaemonConfig
 )
+
+from srt.daemon.status import DaemonStatus
 
 from srt.daemon.command_types import (
     TelescopeCommand,
     ObservationPlan
+)
+
+from srt.daemon.scheduling import Timeline, Span
+from srt.daemon.radio_control.driver import DriverCapabilities, SpectrumSettings
+from srt.daemon.observing.settings import (
+    DataProcessingSettings,
+    ObservingSettings,
+    Radiometry,
 )
 
 OUTPUT_DIR = SRT_ROOT / "svelte-frontend" / "src" / "lib" / "generated"
@@ -54,6 +63,14 @@ MODELS: list[tuple[str, Any]] = [
     ("DaemonConfig", DaemonConfig),
     ("TelescopeCommand", TelescopeCommand),
     ("ObservationPlan", ObservationPlan),
+    ("SpectrumSettings", SpectrumSettings),
+    ("DataProcessingSettings", DataProcessingSettings),
+    ("ObservingSettings", ObservingSettings),
+    ("Radiometry", Radiometry),
+    ("DriverCapabilities", DriverCapabilities),
+    # The timeline the plan editor draws: one row per resource.
+    ("Span", Span),
+    ("Timeline", Timeline),
 ]
 
 

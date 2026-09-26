@@ -9,7 +9,7 @@ from datetime import timedelta, datetime, timezone
 from threading import Thread
 from queue import Queue
 from collections import deque
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple, Union, cast
 from pathlib import Path
 from operator import add
 
@@ -22,7 +22,8 @@ from srt.daemon.rotor_control.testing_driver import TestingDriver
 
 from .rotor_control import make_driver
 from .radio_control import SiglentDriver
-from .telescope_types import AmpCurrent, Location, LprParams, DaemonStatus, DaemonConfig, RotorState, SpectrumConfig, SpectrumFrame
+from .telescope_types import AmpCurrent, Location, LprParams, DaemonConfig, RotorState, SpectrumConfig, SpectrumFrame
+from .status import DaemonStatus
 from .utilities.object_tracker import EphemerisTracker
 from .utilities.functions import azel_within_range
 
@@ -78,8 +79,8 @@ class SmallRadioTelescopeDaemon:
         self.rotor_location: tuple[float, float] = current_azel
         self.rotor_destination: tuple[float, float] = current_azel
         self.rotor_offsets = (0.0, 0.0)
-        self.rotor_cmd_location: tuple[float, float] = tuple(
-            map(add, self.rotor_destination, self.rotor_offsets)
+        self.rotor_cmd_location: tuple[float, float] = cast(tuple[float, float],
+            tuple(map(add, self.rotor_destination, self.rotor_offsets))
         )
 
         # Create Object for Keeping Track of What Commands Are Running or Have Failed
@@ -131,78 +132,6 @@ class SmallRadioTelescopeDaemon:
         self.command_error_logs.append((local_iso, message))
         print(message)
 
-    def _record_observation_event(self, event_type, metadata=None):
-        event = {
-            "time": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "event": event_type,
-            "metadata": metadata or {},
-        }
-        self.observation_events.append(event)
-
-    def _begin_observation(self, metadata):
-        # A new observation boundary implies previous observation ended by motion.
-        self._end_active_observation("move_away")
-        self._record_observation_event("settled_on_pointing", dict(metadata))
-        self._record_observation_event("observation_begin", dict(metadata))
-        self.active_observation = {
-            "metadata": dict(metadata),
-            "start_time": time(),
-        }
-
-    def _end_active_observation(self, reason):
-        if self.active_observation is None:
-            return
-        end_meta = dict(self.active_observation.get("metadata", {}))
-        end_meta["end_reason"] = reason
-        self._record_observation_event("observation_end", end_meta)
-        self.active_observation = None
-
-    def get_observation_events_csv(self):
-        """Export observation events as CSV string.
-        
-        Returns
-        -------
-        str
-            CSV formatted string with headers and observation event data
-        """
-        import csv
-        from io import StringIO
-        
-        output = StringIO()
-        
-        # Get list of observation events
-        events = list(self.observation_events)
-        if not events:
-            return ""
-        
-        # Flatten the data for CSV
-        rows = []
-        fieldnames = [
-            "time", "event", "sequence", "object", "target_azel_az",
-            "target_azel_el", "end_reason", "point_index", "point_total"
-        ]
-        
-        for event in events:
-            row = {
-                "time": event.get("time", ""),
-                "event": event.get("event", ""),
-                "sequence": event.get("metadata", {}).get("sequence", ""),
-                "object": event.get("metadata", {}).get("object", ""),
-                "target_azel_az": event.get("metadata", {}).get("target_azel", ("", ""))[0],
-                "target_azel_el": event.get("metadata", {}).get("target_azel", ("", ""))[1],
-                "end_reason": event.get("metadata", {}).get("end_reason", ""),
-                "point_index": event.get("metadata", {}).get("point_index", ""),
-                "point_total": event.get("metadata", {}).get("point_total", ""),
-            }
-            rows.append(row)
-        
-        # Write CSV
-        writer = csv.DictWriter(output, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-        
-        return output.getvalue()
-
     def _wait_for_rotor_target(self, settle_time=0.0):
         """Wait for rotor to reach the current command location and settle."""
         if self.rotor._state.safe_mode:
@@ -246,7 +175,6 @@ class SmallRadioTelescopeDaemon:
         return True
 
     def n_point_scan(self, object_id):
-        # TODO: revisit @danichua
         """Runs an N-Point (25) Scan About an Object
 
         Parameters
@@ -270,7 +198,6 @@ class SmallRadioTelescopeDaemon:
         scan_center = self.ephemeris_locations[object_id]
         np_sides = [5, 5]
         for scan in range(N_pnt_default):
-            self._end_active_observation("move_away")
             scan_center = self.ephemeris_locations[object_id]
             self.log_message(
                 "{0} of {1} point scan.".format(scan, N_pnt_default))
@@ -304,7 +231,6 @@ class SmallRadioTelescopeDaemon:
             rotor_loc.append(self.rotor_location)
             
             sleep(max(0.0, float(self.config.OBSERVATION_DWELL_TIME)))
-        self._end_active_observation("sequence_complete")
                 
         maxdiff = (az_dif, el_dif)
         self.n_point_data = [scan_center, maxdiff,
@@ -315,7 +241,6 @@ class SmallRadioTelescopeDaemon:
         self.ephemeris_cmd_location = object_id
 
     def beam_switch(self, object_id):
-        # TODO: revisit @danichua
         """Swings Antenna Across Object
 
         Parameters
@@ -336,7 +261,6 @@ class SmallRadioTelescopeDaemon:
         rotor_loc = []
         pwr_list = []
         for j in range(0, 3 * self.config.NUM_BEAMSWITCHES):
-            self._end_active_observation("move_away")
             new_rotor_destination = self.ephemeris_locations[object_id]
             az_dif_scalar = np.cos(new_rotor_destination[1] * np.pi / 180.0)
             az_dif = (j % 3 - 1) * self.config.BEAMWIDTH / az_dif_scalar
@@ -359,7 +283,6 @@ class SmallRadioTelescopeDaemon:
             rotor_loc.append(self.rotor_location)
             
             sleep(max(0.0, float(self.config.OBSERVATION_DWELL_TIME)))
-        self._end_active_observation("sequence_complete")
                 
         self.rotor_offsets = (0.0, 0.0)
         self.ephemeris_cmd_location = object_id
@@ -384,7 +307,6 @@ class SmallRadioTelescopeDaemon:
         cur_vlsr = self.ephemeris_vlsr[object_id]
         self.current_vlsr = cur_vlsr
         new_rotor_cmd_location = self.ephemeris_locations[object_id]
-        self._end_active_observation("move_away")
         if (
             self.rotor.az_limits.lower_bound <= new_rotor_cmd_location[0] <= self.rotor.az_limits.upper_bound
             and self.rotor.el_limits.lower_bound <= new_rotor_cmd_location[1] <= self.rotor.el_limits.upper_bound
@@ -392,17 +314,6 @@ class SmallRadioTelescopeDaemon:
             self.ephemeris_cmd_location = object_id
             self.rotor_destination = new_rotor_cmd_location
             self.rotor_cmd_location = new_rotor_cmd_location
-            if self._wait_for_rotor_target():
-                self._begin_observation(
-                    {
-                        "sequence": "point_object",
-                        "object": object_id,
-                        "target_azel": [
-                            float(self.rotor_cmd_location[0]),
-                            float(self.rotor_cmd_location[1]),
-                        ],
-                    }
-                )
         else:
             self.log_message(f"Object {object_id} Not in Motor Bounds")
             self.ephemeris_cmd_location = None
@@ -433,23 +344,12 @@ class SmallRadioTelescopeDaemon:
 
         new_rotor_destination = (az, el)
         new_rotor_cmd_location = new_rotor_destination
-        self._end_active_observation("move_away")
         if (
             self.rotor.az_limits.lower_bound <= new_rotor_cmd_location[0] <= self.rotor.az_limits.upper_bound
             and self.rotor.el_limits.lower_bound <= new_rotor_cmd_location[1] <= self.rotor.el_limits.upper_bound
         ):
             self.rotor_destination = new_rotor_destination
             self.rotor_cmd_location = new_rotor_cmd_location
-            if self._wait_for_rotor_target():
-                self._begin_observation(
-                    {
-                        "sequence": "point_azel",
-                        "target_azel": [
-                            float(self.rotor_cmd_location[0]),
-                            float(self.rotor_cmd_location[1]),
-                        ],
-                    }
-                )
         else:
             self.log_message(
                 f"Object at {new_rotor_cmd_location} Not in Motor Bounds")
@@ -476,25 +376,13 @@ class SmallRadioTelescopeDaemon:
         new_rotor_cmd_location = tuple(
             map(add, self.rotor_destination, new_rotor_offsets)
         )
-        self._end_active_observation("move_away")
         if (
             self.rotor.az_limits.lower_bound <= new_rotor_cmd_location[0] <= self.rotor.az_limits.upper_bound
             and self.rotor.el_limits.lower_bound <= new_rotor_cmd_location[1] <= self.rotor.el_limits.upper_bound
         ):
             self.rotor_offsets = new_rotor_offsets
-            self.rotor_cmd_location = new_rotor_cmd_location
+            self.rotor_cmd_location = cast(tuple[float, float], new_rotor_cmd_location)
             if self._wait_for_rotor_target():
-                self._begin_observation(
-                    {
-                        "sequence": "offset_point",
-                        "target_azel": [
-                            float(self.rotor_cmd_location[0]),
-                            float(self.rotor_cmd_location[1]),
-                        ],
-                        "offset": [float(az_off), float(el_off)],
-                        **(observation_context or {}),
-                    }
-                )
                 return True
             return False
         else:
@@ -512,7 +400,6 @@ class SmallRadioTelescopeDaemon:
             self.log_message("Motion disabled (safe mode): ignoring stow command")
             return
         self.ephemeris_cmd_location = None
-        self._end_active_observation("move_away")
         self.rotor_offsets: tuple[float, float] = (0.0, 0.0)
         self.rotor_destination: tuple[float, float] = self.config.STOW_LOCATION.to_tuple()
         self.rotor_cmd_location: tuple[float, float] = self.config.STOW_LOCATION.to_tuple()
@@ -523,7 +410,6 @@ class SmallRadioTelescopeDaemon:
         if self.rotor._state.safe_mode:
             self.log_message("Encoder calibration is unavailable while motion is not allowed")
             return
-        self._end_active_observation("encoder_calibration")
         if not hasattr(self.rotor, "calibrate"):
             self.log_message("Encoder calibration is unavailable for this motor backend")
             return
@@ -564,7 +450,6 @@ class SmallRadioTelescopeDaemon:
         self.rotor_offsets = (0.0, 0.0)
 
         new_rotor_cmd_location = (az, el)
-        self._end_active_observation("move_away")
         if (
             self.rotor.az_limits.lower_bound <= new_rotor_cmd_location[0] <= self.rotor.az_limits.upper_bound
             and self.rotor.el_limits.lower_bound <= new_rotor_cmd_location[1] <= self.rotor.el_limits.upper_bound
@@ -572,17 +457,6 @@ class SmallRadioTelescopeDaemon:
             self.ephemeris_cmd_location = name
             self.rotor_destination = new_rotor_cmd_location
             self.rotor_cmd_location = new_rotor_cmd_location
-            if self._wait_for_rotor_target():
-                self._begin_observation(
-                    {
-                        "sequence": "find_object_location",
-                        "object": name,
-                        "target_azel": [
-                            float(self.rotor_cmd_location[0]),
-                            float(self.rotor_cmd_location[1]),
-                        ],
-                    }
-                )
         else:
             self.log_message(f"Object {name} Not in Motor Bounds")
             self.ephemeris_cmd_location = None
@@ -632,13 +506,11 @@ class SmallRadioTelescopeDaemon:
                     and self.rotor.el_limits.lower_bound <= new_rotor_cmd_location[1] <= self.rotor.el_limits.upper_bound
                 ):
                     self.rotor_destination = new_rotor_destination
-                    self.rotor_cmd_location = new_rotor_cmd_location
+                    self.rotor_cmd_location = cast(tuple[float, float], new_rotor_cmd_location)
                 else:
                     self.log_message(
                         f"Object {self.ephemeris_cmd_location} moved out of motor bounds"
                     )
-                    if self.config.END_OBSERVATION_ON_OOB:
-                        self._end_active_observation("object_out_of_bounds")
 
                     if self.config.STOW_ON_OOB:
                         self.log_message("Object out of bounds: commanding stow")
@@ -750,7 +622,6 @@ class SmallRadioTelescopeDaemon:
                     queued_item = self.current_queue_item,
                     queue_size = self.command_queue.qsize(),
                     error_logs = self.command_error_logs[-100:],
-                    observation_events = list(self.observation_events)[-100:],
                     serial_communications = serial_comms,
                     command_history = cmd_history,
                     n_point_data = self.n_point_data,
@@ -828,6 +699,7 @@ class SmallRadioTelescopeDaemon:
         status_thread.start()
 
         while self.keep_running:
+            # MAIN DAEMON LOOP
             try:
                 # Await Command for the SRT
                 self.current_queue_item = "None"
@@ -918,6 +790,8 @@ class SmallRadioTelescopeDaemon:
                 self.log_message(str(e))
             except ConnectionRefusedError as e:
                 self.log_message(str(e))
+
+            # END MAIN DAEMON LOOP
 
         try:
             self.spectrum_driver.stop()
