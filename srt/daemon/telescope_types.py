@@ -10,11 +10,11 @@ correctness over backward compatibility with old ZMQ payload shapes.
 
 from __future__ import annotations
 
-import time as _time
+import math
 from enum import Enum
-from typing import Optional, Literal, Union
+from typing import Annotated, Optional, Literal, Union, cast
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # ---------------------------------------------------------------------------
 # LPR parameters
@@ -47,12 +47,12 @@ _LPR_PARAM_ORDER: tuple[str, ...] = (
 class LprParams(BaseModel):
     """Servo controller loop parameters loaded by the LPR command.
 
-    All 37 values default to None, meaning "not yet loaded from config".
+    All 37 values default to None, meaning "not yet loaded".
     The dashboard antenna page shows — for None values.
 
-    Values are set from config at startup via
-    LprParams.model_validate(config_dict["MOTOR_LPR_PARAMS"]).
-    to_command_string() renders the full LPR,v1,v2,... string so
+    Assembled by from_parts() from the runtime-editable tuning
+    (RuntimeSettings.lpr) and the static encoder geometry
+    (DaemonConfig.MOTOR_ENCODER_PARAMS). to_command_string() renders the full LPR,v1,v2,... string so
     moore6m_serial.py never needs to hardcode the values.
 
     VALIDATION POLICY (applies to all models in this file): strict
@@ -66,70 +66,106 @@ class LprParams(BaseModel):
     trust it internally afterward.
     """
 
-    # Outer position loop gains
+    # A typo'd name in a settings edit should fail, not vanish.
+    model_config = ConfigDict(extra="forbid")
+
+    # Meanings come from the controller's own source, recovered from the
+    # Servo Automation Workbench project: 6m_docs/6mv105c.saw, as text in
+    # 6m_docs/memos/2026-03-28-6mv105c-plaintext-strings.txt (procedures
+    # TaskPositionLoop, GetData, SetTorque, CmdLPR); the reverse-engineering
+    # memo alongside it has the equations and a glossary.
+    #
+    # The loop runs every 0.005 s. Per tick, per axis:
+    #   command pre-filter  smooths CmdAz into CppAz, producing a rate Azu
+    #   position PI + FF    CmdVel = Kpp*err + Kpi*∫err + Kff*Azu  (antenna deg/s)
+    #   axis → motor        CmdVel *= Ar, then Amax/Vmax limits    (motor deg/s)
+    #   velocity PI         CmdTorque = Kvp*velerr + Kvi*∫velerr   (DAC counts)
+    #   torque clamp        Tmin..Tmax, then Tbias split across the two az motors
+
+    # Command pre-filter gains (1/s). The filter tracks the raw command with
+    # a rate of Kp*lag plus the command's own rate; Kp is Ko while the lag
+    # exceeds e, Kv once within it — a stiffer gain for slews, a gentler one
+    # for tracking.
     pAzKo: Optional[float] = None
     pElKo: Optional[float] = None
-
-    # Velocity observer gains
     pAzKv: Optional[float] = None
     pElKv: Optional[float] = None
 
-    # Position error deadbands (antenna deg)
+    # Pre-filter lag threshold (antenna deg) switching Kp between Ko and Kv.
+    # Not a pointing deadband.
     pAze: Optional[float] = None
     pEle: Optional[float] = None
 
-    # Acceleration limits (antenna deg/s²)
+    # Acceleration limits (antenna deg/s²). Applied to the motor velocity
+    # command as Amax*Ar, and to the pre-filter at 0.8*Amax.
     pAzAmax: Optional[float] = None
     pElAmax: Optional[float] = None
 
-    # Velocity ceilings (antenna deg/s) — raise to allow faster slews
+    # Velocity ceilings (antenna deg/s) — raise to allow faster slews.
+    # Applied as Vmax*Ar to the motor command, and at 0.9*Vmax to the
+    # pre-filter.
     pAzVmax: Optional[float] = None
     pElVmax: Optional[float] = None
 
-    # Position integrator anti-windup clamps
+    # Position integrator anti-windup clamps (deg·s): ∫err is clipped to ±Imax.
     pAzImax: Optional[float] = None
     pElImax: Optional[float] = None
 
-    # Position loop P and I gains
+    # Position loop P and I gains: antenna deg/s per deg of error, and per
+    # deg·s of integrated error.
     pAzKpp: Optional[float] = None
     pElKpp: Optional[float] = None
     pAzKpi: Optional[float] = None
     pElKpi: Optional[float] = None
 
-    # Velocity loop P and I gains — reduce pAzKvp to fix azimuth overshoot
+    # Velocity loop P and I gains, motor deg/s error → DAC torque counts —
+    # reduce pAzKvp to fix azimuth overshoot. The velocity integrator is
+    # unclamped.
     pAzKvp: Optional[float] = None
     pElKvp: Optional[float] = None
     pAzKvi: Optional[float] = None
     pElKvi: Optional[float] = None
 
-    # Feedforward gains
+    # Feedforward of the pre-filter's rate (Azu) into the velocity command.
+    # Dimensionless; 1.0 passes the planned rate straight through.
     pAzKff: Optional[float] = None
     pElKff: Optional[float] = None
 
-    # Torque limits (DAC counts, ±2047 max)
+    # Torque command limits (DAC counts; 2047 = 10 V at the DAC).
     pAzTmax: Optional[float] = None
     pElTmax: Optional[float] = None
     pAzTmin: Optional[float] = None
     pElTmin: Optional[float] = None
 
-    # Torque sign correction and Y/Z bias
+    # Torque sign. Loaded and displayed, but nothing in the recovered source
+    # reads it — the sign reversal in TaskPositionLoop is commented out.
     pAzTsgn: Optional[float] = None
     pElTsgn: Optional[float] = None
+
+    # Anti-backlash bias (DAC counts). Azimuth is driven by two motors; one
+    # gets torque + Tbias and the other torque − Tbias, so they preload the
+    # gear train against each other instead of both letting go at zero.
     pAzTbias: Optional[float] = None
 
-    # Encoder counts per revolution (antenna axis)
+    # Antenna-axis encoder counts per revolution. Position is
+    # counts * 360/Ecr; 144000 on the 6 m, i.e. 400 counts/deg.
     pAzEcr: Optional[float] = None
     pElEcr: Optional[float] = None
 
-    # Encoder counts per revolution (motor axis)
+    # Motor encoder counts per revolution, for motor velocity from count
+    # deltas: 360*ΔC / (0.005 * MEcr). 20000 on the 6 m.
     pAzMEcr: Optional[float] = None
     pElMEcr: Optional[float] = None
 
-    # Encoder phase offsets (deg) — critical for calibration accuracy
+    # Encoder phase offsets (deg) — critical for calibration accuracy. CLE
+    # uses them to reconstruct absolute position from the index pulse:
+    # round(400*(Theta − Epo)) + position − index position. The 400 is
+    # hardcoded in the controller, so these assume Ecr = 144000.
     pAzEpo: Optional[float] = None
     pElEpo: Optional[float] = None
 
-    # Axis ratios (motor deg/s per antenna deg/s)
+    # Axis ratios: motor deg per antenna deg (gear ratio). 1522.5 az and
+    # 19749 el on the 6 m.
     pAzAr: Optional[float] = None
     pElAr: Optional[float] = None
 
@@ -173,6 +209,74 @@ class LprParams(BaseModel):
     def param_order(cls) -> tuple[str, ...]:
         """The ordered list of parameter names for table display."""
         return _LPR_PARAM_ORDER
+
+    @classmethod
+    def from_parts(cls, tuning: "LprTuning", encoder: "LprEncoderParams") -> "LprParams":
+        """Reassemble the full set from its runtime and static halves."""
+        return cls(**tuning.model_dump(), **encoder.model_dump())
+
+
+class LprEncoderParams(BaseModel):
+    """The encoder-geometry slice of LPR: counts per revolution and phase
+    offsets. Calibration results rather than tuning, so static config
+    (DaemonConfig.MOTOR_ENCODER_PARAMS) — a bad phase offset mis-points the
+    dish from the next calibration on.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Encoder counts per revolution (antenna axis, then motor axis)
+    pAzEcr: float
+    pElEcr: float
+    pAzMEcr: float
+    pElMEcr: float
+
+    # Encoder phase offsets (deg)
+    pAzEpo: float
+    pElEpo: float
+
+
+class LprTuning(BaseModel):
+    """The rest of LPR: servo gains and limits. Runtime-editable
+    (RuntimeSettings.lpr). Field meanings are on LprParams.
+
+    Together with LprEncoderParams this must cover LprParams exactly;
+    tests/test_settings.py checks.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    pAzKo: float
+    pElKo: float
+    pAzKv: float
+    pElKv: float
+    pAze: float
+    pEle: float
+    pAzAmax: float
+    pElAmax: float
+    pAzVmax: float
+    pElVmax: float
+    pAzImax: float
+    pElImax: float
+    pAzKpp: float
+    pElKpp: float
+    pAzKpi: float
+    pElKpi: float
+    pAzKvp: float
+    pElKvp: float
+    pAzKvi: float
+    pElKvi: float
+    pAzKff: float
+    pElKff: float
+    pAzTmax: float
+    pElTmax: float
+    pAzTmin: float
+    pElTmin: float
+    pAzTsgn: float
+    pElTsgn: float
+    pAzTbias: float
+    pAzAr: float
+    pElAr: float
 
 
 # ---------------------------------------------------------------------------
@@ -310,38 +414,91 @@ class RotorState(BaseModel):
 # Spectrum analyzer types
 # ---------------------------------------------------------------------------
 
-class SpectrumConfig(BaseModel):
-    """All user-configurable settings. Live-updatable."""
+class SpecanSettings(BaseModel):
+    """Siglent spectrum analyzer instrument settings. Live-updatable.
 
-    instrument_serial: str = "SSA3PCED7R1040"
+    Down here rather than in radio_control/driver.py because SpectrumFrame
+    embeds it, and radio_control imports this module. driver.py re-exports.
+
+    Replaced the old SpectrumConfig, which also carried plot display
+    preferences (never reached the analyzer) and the instrument serial
+    (hardware identity — DaemonConfig.SPECTRUM_ANALYZER_SERIAL now).
+    """
+
+    # Typos in operator-typed updates should fail, not be silently dropped.
+    model_config = ConfigDict(extra="forbid")
+
+    driver: Literal["specan"] = "specan"
+
+    # Frequency can be expressed either way; the daemon currently runs in
+    # start_stop mode, so both pairs have to survive.
     freq_mode: Literal["start_stop", "center_span"] = "start_stop"
-    start_hz: float = 1.0e9
-    stop_hz: float = 1.9e9
-    center_hz: float = 1.4205e9
-    span_hz: float = 200.0e6
-    rbw_hz: float = 1.0e6
-    vbw_hz: float = 100.0e3
-    ref_level_dbm: float = -30.0
-    y_axis_mode: Literal["auto", "fixed_limits", "db_per_div"] = "db_per_div"
-    y_db_per_div: float = 10.0
-    y_num_divs: int = 10
-    y_lim_dbm: tuple[float, float] = (-120.0, -30.0)
-    atten_auto: bool = True
-    atten_db: float = 0.0
-    preamp_on: Optional[bool] = True
+    start_hz: Optional[float] = Field(default=None, gt=0)
+    stop_hz: Optional[float] = Field(default=None, gt=0)
+    center_frequency_hz: Optional[float] = Field(default=None, gt=0)
+    span_hz: Optional[float] = Field(default=None, gt=0)
+
+    resolution_bandwidth_hz: float = Field(gt=0)
+    video_bandwidth_hz: float = Field(gt=0)
+    reference_level_dbm: float
+    num_averages: int = Field(default=300, ge=1)
     trace_type: Literal["clear_write", "average"] = "clear_write"
-    num_averages: int = 300
-    x_units: Literal["Hz", "kHz", "MHz", "GHz"] = "MHz"
+
+    attenuation_db: Optional[float] = None
+    attenuation_auto: bool = True
+    preamp_on: Optional[bool] = True
+
+    # Not honored by SiglentDriver yet — it still sends :SWE:TIME:AUTO ON
+    # and takes the instrument's point count.
+    sweep_time_seconds: Optional[float] = None
+    number_of_points: Optional[int] = None
 
     @model_validator(mode="after")
-    def _check_freq_range(self) -> "SpectrumConfig":
-        if self.freq_mode == "start_stop" and self.start_hz >= self.stop_hz:
-            raise ValueError("start_hz must be less than stop_hz")
+    def _check_freq_range(self) -> "SpecanSettings":
+        if self.freq_mode == "start_stop":
+            if self.start_hz is None or self.stop_hz is None:
+                raise ValueError("start_stop mode needs start_hz and stop_hz")
+            if self.start_hz >= self.stop_hz:
+                raise ValueError("start_hz must be less than stop_hz")
+        elif self.center_frequency_hz is None or self.span_hz is None:
+            raise ValueError("center_span mode needs center_frequency_hz and span_hz")
         return self
+
+    @property
+    def center_hz(self) -> float:
+        if self.freq_mode == "center_span":
+            return cast(float, self.center_frequency_hz)
+        return (cast(float, self.start_hz) + cast(float, self.stop_hz)) / 2
+
+
+class RfsocSettings(BaseModel):
+    """RFSoC. Extend when the board arrives.
+
+    switch1/switch2 from the original sketch are band-select RF switches on
+    the board's GPIOs, so they're not fields here — `band` is what a person
+    chooses and the mapping belongs in the driver. Two ways to say one thing
+    is two ways to disagree.
+
+    The consequence that does reach the observing layer: throwing those
+    switches changes the RF path and invalidates calibration.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    driver: Literal["rfsoc"] = "rfsoc"
+
+    attenuation_db: float
+    # TODO(shaurya/danica): real field list once the interface is known.
+
+
+SpectrumSettings = Annotated[
+    Union[SpecanSettings, RfsocSettings],
+    Field(discriminator="driver"),
+]
 
 
 # Shared vocabulary lives in common.py — the bottom of the graph.
-from .common import Band, CommandState, OutputFormat  # noqa: F401  (re-export)
+from .common import Band, CommandState, FrameRole, OutputFormat  # noqa: F401  (re-export)
 
 
 class FrameMetadata(BaseModel):
@@ -363,7 +520,7 @@ class FrameMetadata(BaseModel):
     # Which leg of a switching cycle. Y-factor reduction is impossible
     # without it, and it cannot be reconstructed afterwards from pointing
     # alone once the dish has moved on.
-    role: Literal["source", "reference", "calibration"] = "source"
+    role: FrameRole = "source"
 
     object_id: Optional[str] = None
     band: Optional[Band] = None
@@ -382,9 +539,15 @@ class SpectrumFrame(BaseModel):
     power_dbm: list[float] = Field(default_factory=list)
     raw_dbm: list[float] = Field(default_factory=list)
     sweep_index: int = 0
+    # Unix time the integration ended.
     timestamp: float = 0.0
-    config: SpectrumConfig = Field(default_factory=SpectrumConfig)
+    # What the instrument was set to for this sweep. None only on the
+    # placeholder frame DaemonStatus defaults to.
+    config: Optional[SpectrumSettings] = None
     avg_count: int = 1
+    # Measured, not requested: the radiometer equation needs how long the
+    # receiver actually integrated. None only on the placeholder frame.
+    integration_seconds: Optional[float] = None
     connected: bool = False
     metadata: Optional[FrameMetadata] = None
 
@@ -457,23 +620,21 @@ class AzElPoint(BaseModel):
 
 
 class DaemonConfig(BaseModel):
-    """Top-level config.yaml structure. Load with:
+    """Top-level config.yaml structure: hardware and site facts, fixed at
+    startup. Load with config_loader.load_config(path).
 
-        DaemonConfig.model_validate(config_loader.load_yaml(path))
+    Knobs an operator changes mid-session live in settings.RuntimeSettings
+    (config/settings.yaml, machine-written) instead.
 
-    This replaces yamale's role (schema.yaml + validate_yaml_schema())
-    as well as the untyped dict that load_yaml() previously handed to
-    SmallRadioTelescopeDaemon.__init__ — every config_dict["KEY"] access
-    in __init__ becomes a typed, autocompleted, statically-checked
-    attribute access instead.
-
-    Required-ness mirrors schema.yaml's required=False markers exactly:
-    fields with no default below are required (yamale's default), and
-    fields with `= None` / `= <value>` correspond to schema.yaml's
-    explicit required=False entries, using the SAME fallback values
-    daemon.py's __init__ already applies via config_dict.get(key, default)
-    where one exists (e.g. OBSERVATION_DWELL_TIME defaults to 5).
+    AZLIMITS, ELLIMITS, STOW_LOCATION, CAL_LOCATION and HORIZON_POINTS stay
+    here on purpose: they're safety and site-survey values, and a web UI
+    that can widen the mount's limits at runtime is a way to drive the dish
+    into a hard stop.
     """
+
+    # Pydantic ignores unknown keys by default, which would let a field that
+    # moved to settings.yaml linger here, load fine, and do nothing.
+    model_config = ConfigDict(extra="forbid")
 
     STATION: Location
     EMERGENCY_CONTACT: EmergencyContact
@@ -486,44 +647,27 @@ class DaemonConfig(BaseModel):
     MOTOR_TYPE: Literal["NONE", "CALTECH6M"]
     MOTOR_BAUDRATE: int
     MOTOR_PORT: str
-    NUM_BEAMSWITCHES: int
-    BEAMWIDTH: float
 
-    OBSERVATION_DWELL_TIME: int = 5
-    SCAN_SETTLE_TIME: float = 1.0
-    ROTOR_MOVE_TIMEOUT: float = 180.0
-    TRACKING_COMMAND_DEADBAND_MDEG: float = 150.0
-    POINTING_ERROR_THRESHOLD_MDEG: float = 150.0
-    POINTING_ERROR_STABLE_CYCLES: int = 4
+    # Not a beamwidth: that depends on frequency, so it's derived per use —
+    # see beamwidth_deg().
+    DISH_DIAMETER_M: float = Field(gt=0)
 
     SAVE_DIRECTORY: str
     RUN_HEADLESS: bool
     DASHBOARD_PORT: int
-    DASHBOARD_HOST: str 
-    DASHBOARD_DOWNLOADS: bool
-    DASHBOARD_REFRESH_MS: int
+    DASHBOARD_HOST: str
     DASHBOARD_REQUIRE_AUTH: Optional[bool] = None
     DASHBOARD_USERNAME: Optional[str] = None
     DASHBOARD_PASSWORD: Optional[str] = None
 
     WEBCAM_ENABLE: Optional[bool] = None
     WEBCAM_DEVICE_INDEX: Optional[int] = None
-    WEBCAM_TARGET_FPS: Optional[float] = None
-    WEBCAM_JPEG_QUALITY: Optional[int] = None
-    WEBCAM_MAX_WIDTH: Optional[int] = None
 
-    SPECTRUM_ANALYZER: Optional[SpectrumConfig] = None
-    SPECTRUM_ANALYZER_SERIAL: Optional[str] = None
-    SPECTRUM_ANALYZER_START_HZ: Optional[float] = None
-    SPECTRUM_ANALYZER_STOP_HZ: Optional[float] = None
-    SPECTRUM_ANALYZER_RBW_HZ: Optional[float] = None
-    SPECTRUM_ANALYZER_VBW_HZ: Optional[float] = None
-    SPECTRUM_ANALYZER_REF_LEVEL_DBM: Optional[float] = None
+    SPECTRUM_ANALYZER_SERIAL: str
 
-    END_OBSERVATION_ON_OOB: Optional[bool] = True
-    STOW_ON_OOB: Optional[bool] = False
-
-    MOTOR_LPR_PARAMS: LprParams
+    # The static slice of the servo controller's LPR parameters; the tuning
+    # half is RuntimeSettings.lpr.
+    MOTOR_ENCODER_PARAMS: LprEncoderParams
 
     @model_validator(mode="after")
     def _check_az_limits_ordered(self) -> "DaemonConfig":
@@ -532,3 +676,9 @@ class DaemonConfig(BaseModel):
         if self.ELLIMITS.lower_bound >= self.ELLIMITS.upper_bound:
             raise ValueError("ELLIMITS.lower_bound must be less than upper_bound")
         return self
+
+    def beamwidth_deg(self, freq_hz: float) -> float:
+        """Half-power beamwidth. 1.22 λ/D is the usual figure for a
+        taper-illuminated dish, not a measurement of this one."""
+        wavelength_m = 299_792_458.0 / freq_hz
+        return math.degrees(1.22 * wavelength_m / self.DISH_DIAMETER_M)

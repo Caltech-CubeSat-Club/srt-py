@@ -8,6 +8,8 @@ stays free of driver and observing imports. `PrimitiveCommand` and
 **Submission**, when a `submit` operation comes off the queue:
 
     validate_observation_plan(plan, ...)   -> problems? reject
+    resolve_spectrum_settings(plan, ...)   -> every observing command concrete
+    resolve_integration_counts(plan, ...)  -> every Integrate a count
     expand(cmd, ...) for each aggregate    -> plan.steps
     span_for(step, ...) for each step      -> plan.spans
     timeline.conflicts(plan.spans)         -> double-booked? reject
@@ -27,14 +29,16 @@ reject double-bookings.
 The handler never blocks. Work happens in per-resource workers; `advance()`
 starts it and later calls check on it.
 
-STATUS: stubs.
+STATUS: stubs, except the two resolve_* functions.
 """
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from ..command_types import Integrate, ObservingCommand
 from ..common import Band
 from ..scheduling import Span
 from .settings import ObservingSettings
@@ -43,6 +47,36 @@ if TYPE_CHECKING:
     from ..command_types import AggregateCommand, ObservationPlan, PrimitiveCommand
     from ..radio_control.driver import SpectrumDriver
     from ..telescope_types import DaemonConfig
+
+
+def resolve_spectrum_settings(plan: "ObservationPlan", settings: ObservingSettings) -> None:
+    """Give every observing command without its own spectrum_settings its
+    band's default, in place.
+
+    At submission rather than run time, so a queued plan keeps its settings
+    if someone edits the band defaults, and its frames record what was used.
+    Runs after validation, which guarantees each band used has a default.
+    """
+    for cmd in plan.commands:
+        if isinstance(cmd, ObservingCommand) and cmd.spectrum_settings is None:
+            cmd.spectrum_settings = settings.spectrum_settings_per_band[cmd.band]
+
+
+def resolve_integration_counts(plan: "ObservationPlan", driver: "SpectrumDriver") -> None:
+    """Turn every Integrate given as total_seconds into a count, in place:
+    total_seconds over its driver integration duration, rounded up — asking
+    for 60 s of 7 s integrations gets 63 s, never less. total_seconds is
+    cleared, so afterwards every Integrate is just a count.
+
+    Runs after resolve_spectrum_settings, whose settings it needs.
+    """
+    for cmd in plan.commands:
+        if isinstance(cmd, Integrate) and cmd.total_seconds is not None:
+            assert cmd.spectrum_settings is not None, "resolve_spectrum_settings first"
+            per = driver.integration_duration(cmd.spectrum_settings)
+            # Rounded before ceil so 0.9 / 0.3 = 3.0000000000000004 is 3, not 4.
+            cmd.integrations = math.ceil(round(cmd.total_seconds / per, 9))
+            cmd.total_seconds = None
 
 
 def expand(
@@ -64,6 +98,13 @@ def expand(
         GridScan       slew then hold, once per grid point
         HotColdTest    ObserveObject's alternation against a calibrator
 
+    The receiver side is always `Integrate` primitives, each copying this
+    command's spectrum_settings — already concrete, since
+    resolve_spectrum_settings runs first — and a `role` for its leg. Times
+    become counts here: a switch period of `switching_time_seconds` is
+    `ceil(switching_time_seconds / driver.integration_duration(settings))`
+    integrations.
+
     Rotor spans must cover the whole time a pointing is depended on,
     including the holds. A gap invites another plan to take the dish.
 
@@ -75,14 +116,17 @@ def expand(
 def span_for(
     command: "PrimitiveCommand",
     start: datetime,
+    driver: "SpectrumDriver",
     config: "DaemonConfig",
 ) -> Span:
     """The single span a primitive occupies, starting at `start`.
 
-    Deterministic except slews. Integration duration is
-    `num_averages * sweep_time_seconds`, both chosen; waits are stated. Slew
-    time comes from `config.MOTOR_LPR_PARAMS` — distance over `pAzVmax` plus
-    the `pAzAmax` ramp, plus settle. Margin on top is open (see design doc).
+    Deterministic except slews. Waits state their durations; an `Integrate`
+    lasts `integrations * driver.integration_duration(spectrum_settings)`.
+    Slew time comes from the LPR params loaded on the controller
+    (`RotorState.lpr`, not the possibly-pending `settings.lpr`) — distance
+    over `pAzVmax` plus the `pAzAmax` ramp, plus settle. Margin on top is
+    open (see design doc).
 
     Rotor spans need a `rotor_mode`: TRACK for `PointAtObject` (dish keeps
     moving), HOLD for `PointAtAzEl` and `Wait` (stationary), SLEW for the
@@ -136,6 +180,11 @@ def needs_calibration(
     Track validity per band. One "last calibrated" timestamp would make a
     plan alternating L and S look continuously calibrated while being
     calibrated for neither.
+
+    Keyed on band only, for now — deliberately. An observation that
+    overrides spectrum_settings shares its band's calibration, and the
+    HotColdTest this triggers uses the band default, even though a Y-factor
+    at one RBW or reference level may not transfer to another.
     """
     raise NotImplementedError
 

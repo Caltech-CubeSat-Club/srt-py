@@ -4,7 +4,10 @@
   import { timeState } from '$lib/stores/time.svelte';
   import { uiState, type UIState } from '$lib/stores/ui.svelte';
   import { UI_COLORS } from '$lib/constants';
-  import type { DriverState, CalSts } from '$lib/generated/types';
+  import type { DriverState, RotorState } from '$lib/generated/types';
+
+  // The generator inlines field literals rather than naming them.
+  type CalSts = NonNullable<RotorState['cal_sts']>;
 
   const GRID_TOGGLES = [
     { key: 'azElGridVisible', lines: ['AZ', 'EL'], color: UI_COLORS.azElGrid },

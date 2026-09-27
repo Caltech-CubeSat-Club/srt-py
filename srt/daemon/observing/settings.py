@@ -1,24 +1,29 @@
 """
 Observing policy: what to calibrate against, how often, what to produce.
 
-The runtime-editable half — what an operator changes between observations,
-as opposed to hardware facts fixed at startup. The runtime-ish fields still
-in DaemonConfig belong here too; see CLAUDE.md.
+Part of the runtime-editable half — folded into daemon/settings.py's
+RuntimeSettings, alongside the knobs that moved out of DaemonConfig.
 
-Instrument settings live in radio_control/driver.py, not here.
+Instrument settings live in telescope_types (SpecanSettings), not here.
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..common import Band, OutputFormat
-from ..radio_control.driver import SpectrumSettings
+from ..telescope_types import SpectrumSettings
 
 
-class DataProcessingSettings(BaseModel):
+class _Strict(BaseModel):
+    # These are edited live through settings patches; a typo'd key should be
+    # rejected, not silently dropped.
+    model_config = ConfigDict(extra="forbid")
+
+
+class DataProcessingSettings(_Strict):
     """What the pipeline should produce from the accumulated spectra.
 
     Not independently valid: "stokes" needs two polarizations, which the
@@ -31,7 +36,7 @@ class DataProcessingSettings(BaseModel):
     time_resolution_seconds: Optional[float] = None
 
 
-class HotCalibrator(BaseModel):
+class HotCalibrator(_Strict):
     """One entry in the preference-ordered calibrator list.
 
     Tried in order; the first genuinely observable source wins. "Observable"
@@ -43,47 +48,45 @@ class HotCalibrator(BaseModel):
     min_elevation_deg: Optional[float] = None  # extra margin above terrain
 
 
-class ObservingSettings(BaseModel):
-    """Runtime-editable observing configuration."""
+class ObservingSettings(_Strict):
+    """Runtime-editable observing configuration. Values, and the shape to
+    fill in, are in config/settings.defaults.yaml."""
 
     switching_time_seconds: float = Field(
         gt=0, description="How long to dwell before switching source/reference."
     )
     desired_snr: float = Field(gt=0)
 
-    spectrum_settings_per_band: dict[Band, SpectrumSettings] = Field(default_factory=dict)
+    spectrum_settings_per_band: dict[Band, SpectrumSettings]
 
-    hot_calibrators: list[HotCalibrator] = Field(default_factory=list)
+    hot_calibrators: list[HotCalibrator]
 
     cold_offset_deg: float = Field(
-        default=5.0,
         gt=0,
         description="Angular offset from source for the reference pointing.",
     )
 
     calibration_integration_seconds: float = Field(
-        default=30.0,
         gt=0,
         description="Standard dwell for one calibration measurement.",
     )
 
     calibration_interval_seconds: float = Field(
-        default=360.0, 
-        gt=0, 
+        gt=0,
         description="""This interval should be a set fraction of the timescale on which receiver noise drifts. 
         Actual value pending the drift measurement that justifies it by Saren/Ruby.
         """,
     )
 
 
-class Radiometry(BaseModel):
+class Radiometry(_Strict):
     """Constants feeding the radiometer equation and Y-factor solution.
 
-    Taken from scripts/combined_data_collection.py.
+    Taken from scripts/combined_data_collection.py, minus dish diameter and
+    beamwidth: the diameter is hardware (DaemonConfig.DISH_DIAMETER_M) and
+    the beamwidth depends on frequency (DaemonConfig.beamwidth_deg()).
     """
 
-    t_receiver_k: float = 80.0
-    dish_diameter_m: float = 6.0
-    aperture_efficiency: float = 0.7
-    polarization_correction_factor: float = 2.0
-    beam_width_deg: float = 3.0
+    t_receiver_k: float
+    aperture_efficiency: float
+    polarization_correction_factor: float

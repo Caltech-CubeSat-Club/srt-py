@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .common import Band, CommandState, OutputFormat
+from .common import Band, CommandState, FrameRole, OutputFormat
 from .scheduling import PlanState, Span
-from .telescope_types import SpectrumFrame
+from .telescope_types import SpectrumFrame, SpectrumSettings
 
 class CommandBase(BaseModel):
     """Every command carries its own identity and execution status.
@@ -69,6 +69,12 @@ class ObservingCommand(CommandBase):
     band: Band
     frames: list[SpectrumFrame] = Field(default_factory=list)
 
+    # None means the band's default (ObservingSettings.spectrum_settings_per_band),
+    # filled in at submission by routines.resolve_spectrum_settings — so after
+    # that, every observing command carries the settings it actually uses, and
+    # editing the band defaults doesn't change a plan already queued.
+    spectrum_settings: Optional[SpectrumSettings] = None
+
 class PointAtObject(PrimitiveCommand):
     """Point telescope at named astronomical object."""
 
@@ -100,29 +106,6 @@ class PointAtOffset(PrimitiveCommand):
     elevation_offset: float = Field(
         description="Elevation offset in degrees"
     )
-
-class SpectrumConfigCommand(PrimitiveCommand):
-    """Configure spectrum analyzer settings.
-
-    Suffixed to avoid colliding with telescope_types.SpectrumConfig, which
-    is the analyzer's full live config. Same name in both modules silently
-    clobbered one of them in the generated TS types.
-    """
-
-    command: Literal["spectrum_config"] = "spectrum_config"
-    
-    start_hz: float | None = Field(default=None, gt=0)
-    stop_hz: float | None = Field(default=None, gt=0)
-
-    center_hz: float | None = Field(default=None, gt=0)
-    span_hz: float | None = Field(default=None, gt=0)
-
-    rbw_hz: float | None = Field(default=None, gt=0)
-    vbw_hz: float | None = Field(default=None, gt=0)
-
-    ref_level_dbm: float | None = None
-
-    num_averages: int | None = Field(default=None, ge=1)
 
 class Wait(PrimitiveCommand):
     """Wait for a specified duration."""
@@ -171,6 +154,46 @@ class EmergencyStop(PrimitiveCommand):
     """Emergency stop telescope."""
 
     command: Literal["emergency_stop"] = "emergency_stop"
+
+
+class Integrate(PrimitiveCommand, ObservingCommand):
+    """Integrate wherever the dish is pointing, producing `integrations`
+    frames.
+
+    Runs in whole integrations, because that's all the driver can do: each
+    lasts integration_duration(spectrum_settings) — for the Siglent,
+    num_averages sweeps. Give either the count or `total_seconds`; seconds
+    become a count at submission (routines.resolve_integration_counts),
+    rounded up, so after that every Integrate carries a concrete count and
+    the frame count and duration are exact.
+
+    The only primitive that uses the receiver during an observation.
+    Aggregates expand into these, interleaved with pointing commands; an
+    operator can also write them by hand between pointing steps.
+
+    Says nothing about pointing — `role` records what the pointing *meant*,
+    and goes into the frame's metadata.
+
+    Which polarization row it occupies is span_for's call for now; it needs
+    a field once a dual-polarization receiver exists.
+    """
+
+    command: Literal["integrate"] = "integrate"
+
+    # Exactly one of these. total_seconds is replaced by a count at submission.
+    integrations: Optional[int] = Field(
+        default=None, ge=1, description="Frames to produce, one per driver integration."
+    )
+    total_seconds: Optional[float] = Field(
+        default=None, gt=0, description="Minimum total; rounded up to whole integrations."
+    )
+    role: FrameRole = "source"
+
+    @model_validator(mode="after")
+    def _exactly_one_length(self) -> "Integrate":
+        if (self.integrations is None) == (self.total_seconds is None):
+            raise ValueError("set exactly one of integrations or total_seconds")
+        return self
 
 
 class ObserveObject(AggregateCommand, ObservingCommand):
@@ -244,7 +267,6 @@ TelescopeCommand = Annotated[
         PointAtObject,
         PointAtAzEl,
         PointAtOffset,
-        SpectrumConfigCommand,
         Wait,
         WaitUntil,
         Stow,
@@ -252,6 +274,7 @@ TelescopeCommand = Annotated[
         SpectrumStart,
         SpectrumStop,
         EmergencyStop,
+        Integrate,
         ObserveObject,
         ParkedScan,
         GridScan,
@@ -307,3 +330,94 @@ class ObservationPlan(BaseModel):
     # be a second answer that can disagree. Acquisition is atomic — taking
     # one, finding another busy and holding the first is how two plans
     # deadlock on each other's half.
+
+
+# ---------------------------------------------------------------------------
+# What the browser sends on /ws/command: one envelope, discriminated by
+# `kind`. The backend validates it, pre-checks it against the latest
+# DaemonStatus, and answers ok/error before anything reaches the daemon.
+# ---------------------------------------------------------------------------
+
+
+class CommandRequest(BaseModel):
+    """Run one command now, outside any plan."""
+
+    kind: Literal["command"] = "command"
+    command: TelescopeCommand
+
+
+class SettingsPatch(BaseModel):
+    """A partial settings.RuntimeSettings, e.g.
+    {"scans": {"dwell_time_seconds": 10}}. Nested dicts merge; anything else
+    replaces.
+
+    A dict rather than a model because a model would be a second copy of
+    RuntimeSettings with every field optional at every depth. It's validated
+    by merging into the current settings (settings.merge_settings) — in the
+    backend against the last status tick, and again in the daemon.
+    """
+
+    kind: Literal["settings"] = "settings"
+    patch: dict[str, Any] = Field(min_length=1)
+
+
+# Plan operations — the protocol is operations, not "here is a plan"; see
+# docs/command-execution-design.md. Commands are addressed by uuid, never by
+# index (see CommandBase.uuid). Only PENDING commands can be edited; cancel
+# works at any point.
+
+
+class _PlanOperationBase(BaseModel):
+    kind: Literal["plan"] = "plan"
+
+
+class SubmitPlan(_PlanOperationBase):
+    op: Literal["submit"] = "submit"
+    plan: ObservationPlan
+
+
+class CancelPlan(_PlanOperationBase):
+    """Cancel a whole plan, or one command in it if command_uuid is set."""
+
+    op: Literal["cancel"] = "cancel"
+    plan_uuid: UUID
+    command_uuid: Optional[UUID] = None
+
+
+class InsertCommand(_PlanOperationBase):
+    op: Literal["insert"] = "insert"
+    plan_uuid: UUID
+    after: Optional[UUID] = Field(default=None, description="None inserts at the start.")
+    command: TelescopeCommand
+
+
+class RemoveCommand(_PlanOperationBase):
+    op: Literal["remove"] = "remove"
+    plan_uuid: UUID
+    command_uuid: UUID
+
+
+class ReplaceCommand(_PlanOperationBase):
+    op: Literal["replace"] = "replace"
+    plan_uuid: UUID
+    command_uuid: UUID
+    command: TelescopeCommand
+
+
+class ReorderCommands(_PlanOperationBase):
+    """The plan's PENDING commands, by uuid, in their new order."""
+
+    op: Literal["reorder"] = "reorder"
+    plan_uuid: UUID
+    order: list[UUID] = Field(min_length=1)
+
+
+PlanOperation = Annotated[
+    Union[SubmitPlan, CancelPlan, InsertCommand, RemoveCommand, ReplaceCommand, ReorderCommands],
+    Field(discriminator="op"),
+]
+
+ClientRequest = Annotated[
+    Union[CommandRequest, SettingsPatch, PlanOperation],
+    Field(discriminator="kind"),
+]

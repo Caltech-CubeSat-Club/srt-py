@@ -75,9 +75,9 @@ Stuff managed by this script:
 
 - **`ZMQ PULL` socket** (port 5567) : reserved for telescope motor e-stop requests from the web app, processed immediately. The loop discards the message body and fires on anything that arrives, so the payload doesn't matter.
 
-- **`SRT daemon`** : main bit of the original `srt-py` code, runs all of the science logic — calculating and updating azimuth/elevation positions of sky objects, reading from the spectrum analyzer, planning recording and logging observations, etc. Of python type `threading.Thread`, so it can use the same `Moore6mDriver` instance. Stopped via `quit()`. More info below.
+- **`SRT daemon`** : main bit of the original `srt-py` code, runs all of the science logic — calculating and updating azimuth/elevation positions of sky objects, reading from the spectrum analyzer, planning recording and logging observations, etc. There's already some existing observation planning capability with basic beamswitching and n-point scan functionality, but it's kind of broken, **so this is the next area for active development.** Of python type `threading.Thread`, so it can use the same `Moore6mDriver` instance. Stopped via `quit()`. More info below.
 
-- **`FastAPI backend`** : the web server. Of python type `multiprocessing.Process` so we can kill it instantly when the main script exits, or restart it quickly. More info below.
+- **`FastAPI backend`** : the web server for the new web app, replacing the old dashboard. The script launches `srt/fastapi_backend/main.py`. Sends e-stop signals to the dedicated `ZMQ PULL` socket; all other info and commands go to/from the daemon over separate ZMQ sockets. Of python type `multiprocessing.Process` so we can kill it instantly when the main script exits, or restart it quickly. More info below.
 
 - **`Tkinter` GUI** : the "Moore 6m Dish Controller" desktop window. Barebones right now but can definitely be expanded out with more buttons. Runs on the main thread.
 
@@ -85,7 +85,7 @@ Stuff managed by this script:
 
 # Typing and schemas
 
-Main files: `srt/daemon/` — `common.py`, `telescope_types.py`, `scheduling.py`, `command_types.py`, `status.py`
+Main files: `srt/daemon/` — `common.py`, `telescope_types.py`, `scheduling.py`, `command_types.py`, `settings.py`, `status.py`
 
 There's a lot of information flowing between a lot of different functions, programs, and interfaces. To avoid mystery errors and unexpected behavior when integrating new bits of code, it's essential to have a schema defining the exact shape and type of all data being passed around.
 
@@ -95,15 +95,16 @@ The models are split by dependency depth, so each file only imports from the one
 
 ```
 common.py           shared vocabulary — Band, OutputFormat, CommandState, Resource
-telescope_types.py  hardware and domain models, plus DaemonConfig
+telescope_types.py  hardware and domain models, SpecanSettings, DaemonConfig
 scheduling.py       the timeline — Span, Timeline, PlanState
 command_types.py    commands and observation plans
+settings.py         RuntimeSettings, the runtime-editable half of the config
 status.py           DaemonStatus, which aggregates all of the above
 ```
 
 `DaemonStatus` sits at the top because it aggregates everything else, so it has to import from all of them.
 
-These type definitions also get exported into TypeScript for the web app frontend, so all our type definitions automatically stay in sync between python and typescript. This is pretty cool because now all communications sent between the server and client are validated against the ultimate source of truth for how it's supposed to work — which we've defined in the five model files above. See [Development](#development) below for how that generation works.
+These type definitions also get exported into TypeScript for the web app frontend, so all our type definitions automatically stay in sync between python and typescript. This is pretty cool because now all communications sent between the server and client are validated against the ultimate source of truth for how it's supposed to work — which we've defined in the model files above. See [Development](#development) below for how that generation works.
 
 Here's a good article explaining this a bit more, for a slightly different application — [Episode 8: JSON Schema Generation in Pydantic](https://medium.com/@kishanbabariya101/episode-8-json-schema-generation-in-pydantic-9a4c4fee02c8).
 
@@ -151,13 +152,13 @@ Loop function: `srt_daemon_main`
 
 Takes command strings out of `self.command_queue` and runs the corresponding code.
 
-**This is the entry point for new development, where we can add new commands and change behavior of old ones.** How it should work instead is written up in [docs/command-execution-design.md](docs/command-execution-design.md) — commands with UUIDs carrying their own progress, a timeline with one row per resource, and plans that expand into spans rather than executing as opaque blocks. The types for it exist as stubs under `srt/daemon/observing/`; none of it is wired in yet.
-
-Two known problems it's meant to fix:
+**This is the entry point for new development, where we can add new commands and change behavior of old ones.** Two known problems with it today:
 
 - I have not touched the n-point scan and beamswitch commands almost at all since I created this fork, and they almost definitely do not behave correctly anymore. In particular neither one ever reads from the spectrum analyzer — `pwr_list` is initialized empty, never appended to, and published as an empty list. There's no "integrate for N seconds and give me one frame" API anywhere yet.
 
-- Commands block the thread from processing further commands in the queue. The reason Saren experienced the daemon crashing after sending the n-point scan command is that the command handler thread got stuck in a long `time.sleep` inside the n-point scan loop, so it never looked at any further commands in the queue (like 'stop n-point scan'). There are lots of ways to fix this, we just need to pick one that makes sense.
+- Commands block the thread from processing further commands in the queue. The reason Saren experienced the daemon crashing after sending the n-point scan command is that the command handler thread got stuck in a long `time.sleep` inside the n-point scan loop, so it never looked at any further commands in the queue (like 'stop n-point scan').
+
+A replacement design for both problems — typed commands with their own progress, a timeline with one row per resource, plans that expand into spans — already exists at the type level in `common.py`/`command_types.py`/`status.py`, and is tested. None of it is wired into this loop yet. Current build-vs-stub status, a worked example, and what's still open are all in [docs/command-execution-design.md](docs/command-execution-design.md) — that file is the source of truth for where this effort actually stands, more so than this paragraph.
 
 ---
 
@@ -175,19 +176,19 @@ Implemented with the python **FastAPI** library, which makes it very easy to set
 
 `/ws/status` : the websocket over which the backend broadcasts status updates from the daemon every ~0.5 seconds. Browsers have to provide their authenticated token in order to connect.
 
-`/ws/command` : the reverse direction — browsers send commands, the backend validates them against the Pydantic models and forwards them to the daemon.
+`/ws/command` : the reverse direction. Everything browsers send is one envelope, `ClientRequest`, whose `kind` is `command`, `settings` or `plan`. The backend validates it, checks it against the latest daemon status, replies ok or with the reason, and forwards it to the daemon. See [docs/command-execution-design.md](docs/command-execution-design.md#the-request-envelope).
 
 `/` : for any other request path, the backend looks through the `svelte-frontend/build` folder for a matching page. Right now all that exists is `/index.html` and `/monitor`. Anything else returns 404.
 
 ### ZMQ bridge
 
-Main file: `srt/fastapi_backend/zmq_bridge/bridge.py`
+Main files: `srt/fastapi_backend/zmq_bridge/status.py` and `commands.py`
 
 Two classes sit between the websockets and the daemon's ZMQ sockets.
 
-- `StatusBroadcaster` subscribes once to the daemon's status PUB socket, validates each tick into a `DaemonStatus`, and fans the JSON out to every connected websocket. Doing it once avoids N redundant subscriptions and N redundant `model_validate()` calls for N tabs.
+- `StatusBroadcaster` (`status.py`) subscribes once to the daemon's status PUB socket, validates each tick into a `DaemonStatus`, and fans the JSON out to every connected websocket. Doing it once avoids N redundant subscriptions and N redundant `model_validate()` calls for N tabs.
 
-- `CommandListener` PUSHes in the other direction. Note the asymmetry: status is JSON end-to-end, but the daemon's command socket parses a whitespace-delimited text language, so `encode_command()` translates the Pydantic models into it. `EmergencyStop` is the exception — it goes to the controller's dedicated e-stop socket on 5567 instead, so it can't end up queued behind whatever the daemon is currently blocked on.
+- `CommandListener` (`commands.py`) PUSHes in the other direction. Each request goes through three steps, in the order they appear in the file: `check` it against the latest status, `encode` it into daemon lines, and send. Note the asymmetry: status is JSON end-to-end, but the daemon's command socket takes lines, a verb followed by arguments, with structured payloads as a single JSON argument (`update_settings {...}`). It's kept that way on purpose, so it stays typeable by hand. `EmergencyStop` is the exception — it goes to the controller's dedicated e-stop socket on 5567 instead, so it can't end up queued behind whatever the daemon is currently blocked on.
 
 ## Frontend
 
@@ -222,6 +223,17 @@ pytest
 `tests/test_command_encoding.py` covers the command translation layer, which is worth testing because mistakes there are silent — the daemon logs "Command Not Identified" into a status field and carries on, so a button in the UI just quietly does nothing.
 
 `tests/test_config.py` validates the real `config/config.yaml` against the `DaemonConfig` model, so a field added to the model without a matching config entry fails here rather than at daemon startup on the roof.
+
+`tests/test_settings.py` covers the runtime settings: layering over the defaults file, round-trips, partial updates, and rejection of typos and stale keys.
+
+## Configuration: static vs runtime
+
+The files in `config/`, split by who writes them:
+
+- **`config.yaml`** — hardware and site facts, edited by hand, read once at startup (`DaemonConfig`). Mount limits, stow and horizon stay here deliberately: they're safety values, and a web UI shouldn't be able to widen them.
+- **`settings.yaml`** — knobs an operator changes mid-session: pointing deadbands, scan dwell, the Siglent's live-view settings, observing policy, motor servo gains and limits (`RuntimeSettings`). The LPR encoder counts and phase offsets stay in `config.yaml` as calibration results. LPR edits are staged and reach the controller at the next encoder calibration, since it only accepts them as part of that sequence. Defaults live in the checked-in `config/settings.defaults.yaml`, hand-edited; `settings.yaml` holds only the daemon's overrides of them, written when the web app sends an edit, and is gitignored and optional. Because it holds only overrides, changing a default reaches every daemon that hasn't overridden it. `observing` is empty in the defaults until someone fills in the per-band spectrum settings; the file shows the shape.
+
+`config.yaml` rejects unknown keys, so a setting left behind after it moved fails at startup rather than silently doing nothing. To convert an old-style `config.yaml`, run `python scripts/migrate_settings.py config/config.yaml`.
 
 ## Dependencies
 

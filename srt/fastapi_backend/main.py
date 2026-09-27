@@ -9,7 +9,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from .routes import auth, websocket
-from .zmq_bridge.bridge import command_listener, status_broadcaster
+from .zmq_bridge.commands import command_listener
+from .zmq_bridge.status import status_broadcaster
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

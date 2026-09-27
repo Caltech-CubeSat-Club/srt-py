@@ -1,92 +1,37 @@
 """
-The contract every receiver driver implements, and each one's settings.
+The contract every receiver driver implements.
 
 Lives here rather than in `observing/` so the dependency runs one way:
-observing depends on drivers, not the reverse. An ABC rather than a
-Protocol because both implementations are ours — a missing method should
+observing depends on drivers, not the reverse. The per-driver settings
+models live in telescope_types, because SpectrumFrame embeds them and this
+package imports that module; they're re-exported here.
+
+An ABC rather than a Protocol because both implementations are ours — a missing method should
 fail at instantiation, not three hours into an observation.
 
-NOTE: SiglentDriver doesn't implement this yet. It has
-start/stop/get_latest/get_history — a free-running loop you sample
-asynchronously — and no way to say "integrate for N seconds, give me one
-frame". That's real driver work, not a wrapper.
-
-STATUS: stubs.
+Implementations: SiglentDriver (siglent_driver.py) and RfsocDriver
+(rfsoc_driver.py). Both subclass SpectrumDriver so the contract is enforced,
+but only SiglentDriver.capabilities is real; the rest raise
+NotImplementedError. The Siglent's existing start/stop/get_latest loop is
+a free-running live view, not this contract — "integrate for N seconds,
+give me one frame" is real driver work, not a wrapper.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Annotated, Literal, Optional, Union
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
 from ..common import DriverKind, OutputFormat
-from ..telescope_types import FrameMetadata, SpectrumFrame
-
-
-# --- per-driver settings -----------------------------------------------
-
-
-class SpecanSettings(BaseModel):
-    """Siglent spectrum analyzer.
-
-    Replaces `telescope_types.SpectrumConfig`, but not as a rename — that
-    model's 19 fields were three different things. Instrument settings are
-    below; the y-axis and x_units fields were plot display preferences that
-    never reach the analyzer and belong in UI state; `instrument_serial` is
-    hardware identity, so static config.
-
-    `SiglentDriver` reads the old model in 16 places and
-    `SpectrumFrame.config` embeds it, so retiring it is a real pass.
-    """
-
-    driver: Literal["specan"] = "specan"
-
-    # Frequency can be expressed either way; the daemon currently runs in
-    # start_stop mode, so both pairs have to survive the migration.
-    freq_mode: Literal["start_stop", "center_span"] = "start_stop"
-    start_hz: Optional[float] = None
-    stop_hz: Optional[float] = None
-    center_frequency_hz: Optional[float] = None
-    span_hz: Optional[float] = None
-
-    resolution_bandwidth_hz: float
-    video_bandwidth_hz: float
-    reference_level_dbm: float
-    num_averages: int = 300
-    trace_type: Literal["clear_write", "average"] = "clear_write"
-
-    attenuation_db: Optional[float] = None
-    attenuation_auto: bool = True
-    preamp_on: Optional[bool] = True
-
-    sweep_time_seconds: Optional[float] = None
-    number_of_points: Optional[int] = None
-
-
-class RfsocSettings(BaseModel):
-    """RFSoC. Extend when the board arrives.
-
-    switch1/switch2 from the original sketch are band-select RF switches on
-    the board's GPIOs, so they're not fields here — `band` is what a person
-    chooses and the mapping belongs in the driver. Two ways to say one thing
-    is two ways to disagree.
-
-    The consequence that does reach the observing layer: throwing those
-    switches changes the RF path and invalidates calibration.
-    """
-
-    driver: Literal["rfsoc"] = "rfsoc"
-
-    attenuation_db: float
-    # TODO(shaurya/danica): real field list once the interface is known.
-
-
-SpectrumSettings = Annotated[
-    Union[SpecanSettings, RfsocSettings],
-    Field(discriminator="driver"),
-]
+from ..telescope_types import (  # noqa: F401  (re-export)
+    FrameMetadata,
+    RfsocSettings,
+    SpecanSettings,
+    SpectrumFrame,
+    SpectrumSettings,
+)
 
 
 # --- the contract --------------------------------------------------------
@@ -113,15 +58,24 @@ class DriverCapabilities(BaseModel):
     supported_output_formats: list[OutputFormat]
 
 
-class SpectrumDriver(ABC):
-    """Everything an observation routine is allowed to ask of a receiver."""
+SettingsT = TypeVar("SettingsT", SpecanSettings, RfsocSettings)
+
+
+class SpectrumDriver(ABC, Generic[SettingsT]):
+    """Everything an observation routine is allowed to ask of a receiver.
+
+    Generic over the driver's own settings model, so SiglentDriver can take
+    SpecanSettings without an isinstance check or an override that narrows
+    the parameter type. Callers holding a driver of unknown kind pass the
+    settings for its `capabilities.driver`.
+    """
 
     @property
     @abstractmethod
     def capabilities(self) -> DriverCapabilities: ...
 
     @abstractmethod
-    def integration_duration(self, settings: SpectrumSettings) -> float:
+    def integration_duration(self, settings: SettingsT) -> float:
         """How long one integration will take with these settings, in seconds.
 
         A computation, NOT a hardware query — integration time is chosen,
@@ -132,7 +86,8 @@ class SpectrumDriver(ABC):
         A method only because the formula is per-backend; the RFSoC will use
         accumulation length, not sweeps.
 
-        Sets the granularity above it: a switch period is
+        The unit everything above counts in: an `Integrate` of n
+        integrations occupies n times this, and a switch period is
         `ceil(switching_time / this)` integrations.
 
         NEEDS A DRIVER FIX: `_configure_instrument` sends `:SWE:TIME:AUTO
@@ -145,12 +100,15 @@ class SpectrumDriver(ABC):
     @abstractmethod
     def do_one_integration(
         self,
-        duration_seconds: float,
-        settings: SpectrumSettings,
+        settings: SettingsT,
         metadata: FrameMetadata,
     ) -> SpectrumFrame:
-        """Integrate on the current pointing; return one frame with
-        `metadata` attached.
+        """Do exactly one integration on the current pointing — as long as
+        integration_duration(settings) says — and return its frame with
+        `metadata` attached and integration_seconds measured.
+
+        No duration argument: the settings fix it. An `Integrate` asking for
+        n frames calls this n times.
 
         Blocking, by design — it runs in the resource's worker thread, not
         in the daemon's command handler.

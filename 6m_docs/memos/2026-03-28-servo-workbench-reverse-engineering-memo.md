@@ -1,7 +1,8 @@
 # Servo Automation Workbench Reverse Engineering Memo
 
 Date: 2026-03-28  
-Source artifact: 6mv105c.saw (plaintext string extraction from binary container)
+Source artifact: 6mv105c.saw (plaintext string extraction from binary container)  
+Corrected 2026-09-26: glossary entries for Ko/Kv/e, Ecr/MEcr and Tsgn, and the command pre-filter section, checked against the recovered source in `2026-03-28-6mv105c-plaintext-strings.txt` (TaskPositionLoop, GetData, SetTorque).
 
 ## Scope and confidence
 
@@ -64,6 +65,22 @@ The structure is cascaded PI with feedforward and saturation at multiple stages.
 - Velocity errors: AzVelErr, ElVelErr
 - Velocity integral errors: AzVelIntErr, ElVelIntErr
 - Torque commands: CmdTorqueAz, CmdTorqueEl
+
+### Command pre-filter
+
+Before the position loop, the raw command (CmdAz) is smoothed into a filtered reference (Azrf, output as CppAz). Each tick:
+
+$$
+\mathrm{Aze} = \mathrm{Azr}_{k-1} - \mathrm{Azrf}_{k-1},\qquad
+K_p = \begin{cases} pAzKo & |\mathrm{Aze}| > pAze \\ pAzKv & \text{otherwise} \end{cases}
+$$
+
+$$
+\mathrm{Azu} = K_p\,\mathrm{Aze} + \dot{\mathrm{Azr}},\qquad
+\mathrm{Azrf}_k = \mathrm{Azrf}_{k-1} + 0.005\,\mathrm{Azu}
+$$
+
+with Azu rate-limited to $0.005 \cdot 0.8\,pAzAmax$ per tick and clamped to $\pm 0.9\,pAzVmax$. So `pAze` is a lag threshold that switches between a stiff gain for large moves (`pAzKo`) and a gentler one near the target (`pAzKv`). Azu is also the feedforward term fed through `pAzKff` below. Elevation is identical with the El parameters.
 
 ### Position error
 
@@ -554,18 +571,18 @@ $$
 | pElAr | $r_{el}$ | El axis-to-motor ratio | Yes |
 | pAzEpo | $\phi^{off}_{enc,az}$ | Az encoder phase/offset | Yes |
 | pElEpo | $\phi^{off}_{enc,el}$ | El encoder phase/offset | Yes |
-| pAzEcr | $c^{err}_{az}$ | Az calibration/error coefficient | Yes |
-| pElEcr | $c^{err}_{el}$ | El calibration/error coefficient | Yes |
-| pAzMEcr | $c^{err2}_{az}$ | Az secondary calibration coefficient | Yes |
-| pElMEcr | $c^{err2}_{el}$ | El secondary calibration coefficient | Yes |
-| pAzTsgn | $s_{\tau,az}$ | Az torque sign/polarity term | Yes |
-| pElTsgn | $s_{\tau,el}$ | El torque sign/polarity term | Yes |
-| pAzKo | $k^{model}_{0,az}$ | Legacy model/constraint coefficient | Yes |
-| pElKo | $k^{model}_{0,el}$ | Legacy model/constraint coefficient | Yes |
-| pAzKv | $k^{model}_{v,az}$ | Legacy model/constraint coefficient | Yes |
-| pElKv | $k^{model}_{v,el}$ | Legacy model/constraint coefficient | Yes |
-| pAze | $k^{model}_{e,az}$ | Legacy model/constraint coefficient | Yes |
-| pEle | $k^{model}_{e,el}$ | Legacy model/constraint coefficient | Yes |
+| pAzEcr | $c_{axis,az}$ | Az axis encoder counts per revolution (position = counts × 360/Ecr; 144000 on the 6 m) | Yes |
+| pElEcr | $c_{axis,el}$ | El axis encoder counts per revolution | Yes |
+| pAzMEcr | $c_{motor,az}$ | Az motor encoder counts per revolution (motor velocity = 360·ΔC / (T_s·MEcr); 20000 on the 6 m) | Yes |
+| pElMEcr | $c_{motor,el}$ | El motor encoder counts per revolution | Yes |
+| pAzTsgn | $s_{\tau,az}$ | Az torque sign. Loaded and displayed, but not read anywhere in the recovered control code (the sign reversal is commented out) | Yes |
+| pElTsgn | $s_{\tau,el}$ | El torque sign; same as above | Yes |
+| pAzKo | $K^{pf}_{o,az}$ | Az pre-filter gain while lag exceeds pAze (1/s) | Yes |
+| pElKo | $K^{pf}_{o,el}$ | El pre-filter gain while lag exceeds pEle (1/s) | Yes |
+| pAzKv | $K^{pf}_{v,az}$ | Az pre-filter gain once lag is within pAze (1/s) | Yes |
+| pElKv | $K^{pf}_{v,el}$ | El pre-filter gain once lag is within pEle (1/s) | Yes |
+| pAze | $e^{pf}_{az}$ | Az pre-filter lag threshold switching Ko/Kv (deg) | Yes |
+| pEle | $e^{pf}_{el}$ | El pre-filter lag threshold switching Ko/Kv (deg) | Yes |
 | pAzMrd | $m^{rd}_{az}$ | Additional model term seen in parser | Adjacent path |
 | pElMrd | $m^{rd}_{el}$ | Additional model term seen in parser | Adjacent path |
 | pAzMcr | $m^{cr}_{az}$ | Additional model term seen in parser | Adjacent path |
@@ -592,4 +609,6 @@ The repeated symbol structure can be read as:
 - Tbias: azimuth split-output bias
 - Ar: axis-to-motor scaling ratio
 - Epo: encoder phase offset
+- Ko / Kv / e: pre-filter gains and the lag threshold that switches between them
+- Ecr / MEcr: axis / motor encoder counts per revolution
 

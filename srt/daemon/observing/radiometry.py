@@ -35,9 +35,10 @@ def system_temperature_k(
 
 
 def sky_temperature_k(
-    azimuth_deg: float, elevation_deg: float, frequency_hz: float
+    azimuth_deg: float, elevation_deg: float, frequency_hz: float, beamwidth_deg: float
 ) -> float:
-    """Brightness temperature of blank sky at this pointing.
+    """Brightness temperature of blank sky at this pointing, averaged over
+    the beam — pass DaemonConfig.beamwidth_deg(frequency_hz).
 
     The script uses a SkyView lookup against the 1420MHz (Bonn) survey.
     That's a network call, so it needs caching before it goes anywhere near
@@ -62,8 +63,9 @@ def integration_time_for_snr(
     raise NotImplementedError
 
 
-def effective_area_m2(constants: Radiometry) -> float:
-    """Aperture efficiency times geometric area."""
+def effective_area_m2(constants: Radiometry, dish_diameter_m: float) -> float:
+    """Aperture efficiency times geometric area. Diameter is
+    DaemonConfig.DISH_DIAMETER_M."""
     raise NotImplementedError
 
 

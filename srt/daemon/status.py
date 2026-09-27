@@ -15,6 +15,7 @@ from typing import Optional, Union
 from pydantic import BaseModel, Field
 
 from .command_types import ObservationPlan
+from .settings import RuntimeSettings
 from .telescope_types import (
     AmpCurrent,
     Location,
@@ -57,6 +58,7 @@ class DaemonStatus(BaseModel):
     spectrum: Optional[SpectrumFrame] = Field(default_factory=SpectrumFrame)
 
     # ---- Antenna geometry ----
+    # Derived from DISH_DIAMETER_M at the live analyzer's center frequency.
     beam_width: float = 0.0
     az_limits: tuple[float, float] = (0.0, 360.0)
     el_limits: tuple[float, float] = (0.0, 90.0)
@@ -101,6 +103,11 @@ class DaemonStatus(BaseModel):
     n_point_data: list = Field(default_factory=list)
     beam_switch_data: list = Field(default_factory=list)
     cal_values: list[float] = Field(default_factory=list)
+
+    # ---- Runtime settings ----
+    # The daemon's current copy; the browser edits it with a partial patch.
+    # None only on a status not built by the daemon.
+    settings: Optional[RuntimeSettings] = None
 
     # ---- System ----
     emergency_contact: Optional[EmergencyContact] = None

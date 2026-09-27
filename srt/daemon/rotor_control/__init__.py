@@ -9,19 +9,19 @@ This is the only place that knows which driver class maps to which type string.
 
     from srt.daemon.rotor_control import make_driver
     driver = make_driver(
-        motor_type="MOORE6M",
-        port="COM3",
-        baudrate=115200,
-        az_limits=(-89, 449),
-        el_limits=(15, 81),
-        lpr_params=LprParams.from_dict(config_dict["MOTOR_LPR_PARAMS"]),
+        motor_type=config.MOTOR_TYPE,
+        port=config.MOTOR_PORT,
+        baudrate=config.MOTOR_BAUDRATE,
+        az_limits=config.AZLIMITS,      # Limit objects, not tuples
+        el_limits=config.ELLIMITS,
+        lpr_params=settings.lpr,        # runtime settings, not config
         safe_mode=False,
     )
     state: RotorState = driver.get_state()
 
 """
 
-from ..telescope_types import LprParams
+from ..telescope_types import Limit, LprParams
 from .moore6m_driver import Moore6mDriver
 from .testing_driver import TestingDriver
 
@@ -30,8 +30,8 @@ def make_driver(
     motor_type: str,
     port: str,
     baudrate: int,
-    az_limits,
-    el_limits,
+    az_limits: Limit,
+    el_limits: Limit,
     lpr_params: LprParams,
     safe_mode: bool = False,
 ):
@@ -47,13 +47,14 @@ def make_driver(
         Ignored for TestingDriver.
     baudrate : int
         Serial baudrate. Ignored for TestingDriver.
-    az_limits : (float, float)
-        Lower and upper azimuth limits in degrees.
-    el_limits : (float, float)
+    az_limits : Limit
+        Lower and upper azimuth limits in degrees. Both drivers read
+        .lower_bound/.upper_bound, so not a tuple.
+    el_limits : Limit
         Lower and upper elevation limits in degrees.
     lpr_params : LprParams
         Servo loop parameters. Must be fully loaded (lpr_params.is_loaded).
-        Pass LprParams.from_dict(config_dict["MOTOR_LPR_PARAMS"]).
+        Pass RuntimeSettings.lpr.
     safe_mode : bool
         If True, motion commands are blocked on startup.
 

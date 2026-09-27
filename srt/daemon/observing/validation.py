@@ -84,6 +84,7 @@ def validate_observation_plan(
       - every commanded az/el is within mount limits and clear of terrain
       - requested output format is producible by the chosen driver
         (stokes needs two polarizations; the Siglent has one)
-      - per-band spectrum settings exist for every band the plan uses
+      - every observing command has spectrum settings: its own override, or
+        a default for its band
     """
     raise NotImplementedError

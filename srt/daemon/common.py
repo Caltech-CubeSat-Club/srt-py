@@ -13,6 +13,10 @@ Band = Literal["L", "S", "C"]
 # Which kind of receiver is attached.
 DriverKind = Literal["specan", "rfsoc"]
 
+# What a frame's pointing meant: which leg of a switching cycle. Y-factor
+# reduction is impossible without it.
+FrameRole = Literal["source", "reference", "calibration"]
+
 class Resource(Enum):
     """Independently schedulable hardware — one timeline row each.
 

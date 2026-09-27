@@ -1,35 +1,41 @@
 """siglent_driver.py
 
 Threaded Siglent spectrum analyzer driver for the daemon process.
+
+Two faces: the free-running live view (start/stop/get_latest/set_settings)
+the daemon uses today, and the SpectrumDriver contract observation routines
+will use. Only the first works yet.
 """
 
 from __future__ import annotations
 
-import copy
 import logging
 import time
 from collections import deque
 from threading import Event, RLock, Thread
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
 import pyvisa
 
-from ..telescope_types import SpectrumConfig, SpectrumFrame
+from ..telescope_types import FrameMetadata, SpecanSettings, SpectrumFrame
+from .driver import DriverCapabilities, SpectrumDriver
 
 
-class SiglentDriver:
+class SiglentDriver(SpectrumDriver[SpecanSettings]):
     """Owns VISA connection and acquisition loop for a Siglent analyzer."""
 
-    def __init__(self, config: SpectrumConfig, history_limit: int = 200):
-        self._config = config
-        self._config_lock = RLock()
+    def __init__(self, serial: str, settings: SpecanSettings, history_limit: int = 200):
+        self._serial = serial
+        self._settings = settings
+        self._settings_lock = RLock()
 
         self._latest: Optional[SpectrumFrame] = None
         self._frame_lock = RLock()
         self._history: deque[SpectrumFrame] = deque(maxlen=history_limit)
 
-        self._average_buffer_mw: List[np.ndarray] = []
+        # (power in mW, how long that sweep took) for each sweep in the average.
+        self._average_buffer: List[tuple[np.ndarray, float]] = []
 
         self._reconfigure_flag = Event()
         self._stop_event = Event()
@@ -40,7 +46,7 @@ class SiglentDriver:
         self._sweep_index = 0
 
     # ------------------------------------------------------------------
-    # Public API
+    # Live view
     # ------------------------------------------------------------------
 
     def start(self) -> None:
@@ -56,35 +62,19 @@ class SiglentDriver:
             self._thread.join(timeout=5)
         self._set_connected(False)
 
-    def update_config(self, partial_dict: Dict[str, Any]) -> None:
-        if not partial_dict:
-            return
-        with self._config_lock:
-            # Catch typo'd keys explicitly rather than letting model_validate
-            # silently drop them — this is operator-typed input from the
-            # daemon's "spectrum_config key=value ..." command, so a typo
-            # should be visible, not silently ignored.
-            known_fields = set(SpectrumConfig.model_fields.keys())
-            unknown = set(partial_dict) - known_fields
-            if unknown:
-                logging.warning(
-                    "spectrum_config: ignoring unrecognized key(s) %s — known fields: %s",
-                    sorted(unknown), sorted(known_fields),
-                )
-                partial_dict = {k: v for k, v in partial_dict.items() if k in known_fields}
-                if not partial_dict:
-                    return
-
-            merged = self._config.model_dump()
-            merged.update(partial_dict)
-            new_config = SpectrumConfig.model_validate(merged)
-            if new_config != self._config:
-                self._config = new_config
+    def set_settings(self, settings: SpecanSettings) -> None:
+        """Swap in new instrument settings; the acquisition loop reconfigures
+        before its next sweep. Merging and validating partial updates is the
+        daemon's job — see settings.merge_settings."""
+        with self._settings_lock:
+            if settings != self._settings:
+                self._settings = settings
                 self._reconfigure_flag.set()
 
-    def get_config(self) -> SpectrumConfig:
-        with self._config_lock:
-            return copy.copy(self._config)
+    def get_settings(self) -> SpecanSettings:
+        # Settings are replaced, never mutated, so the reference is safe to hand out.
+        with self._settings_lock:
+            return self._settings
 
     def get_latest(self) -> Optional[SpectrumFrame]:
         with self._frame_lock:
@@ -106,6 +96,46 @@ class SiglentDriver:
         return bool(self._thread and self._thread.is_alive())
 
     # ------------------------------------------------------------------
+    # SpectrumDriver contract
+    # ------------------------------------------------------------------
+
+    @property
+    def capabilities(self) -> DriverCapabilities:
+        # One trace per sweep, so one polarization; everything but stokes.
+        return DriverCapabilities(
+            driver="specan",
+            polarizations=1,
+            supported_output_formats=[
+                "raw_spectra",
+                "power_spectral_density",
+                "flux_density",
+                "brightness_temperature",
+            ],
+        )
+
+    def integration_duration(self, settings: SpecanSettings) -> float:
+        """`num_averages * sweep_time_seconds`. Not implemented because the
+        answer would be wrong: _configure_instrument sends :SWE:TIME:AUTO ON,
+        so the instrument picks sweep time and ignores sweep_time_seconds.
+        Fix that first, and require sweep_time_seconds to be set.
+        """
+        raise NotImplementedError
+
+    def do_one_integration(
+        self,
+        settings: SpecanSettings,
+        metadata: FrameMetadata,
+    ) -> SpectrumFrame:
+        """Not implemented. The acquisition thread owns the VISA session, so
+        this can't open its own — it has to take over that loop: apply
+        `settings`, clear the averaging buffer, average `num_averages`
+        sweeps (whatever `trace_type` says — that's a live-view display
+        choice), and return the frame with `metadata` attached. Meanwhile
+        the live view either pauses or shows these frames.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
@@ -118,8 +148,9 @@ class SiglentDriver:
             inst = None
             rm = None
             try:
-                config = self.get_config()
-                resource_name = self._find_instrument_by_serial(config.instrument_serial)
+                self._reconfigure_flag.clear()
+                settings = self.get_settings()
+                resource_name = self._find_instrument_by_serial(self._serial)
 
                 rm = pyvisa.ResourceManager()
                 inst = rm.open_resource(resource_name)
@@ -133,24 +164,25 @@ class SiglentDriver:
                 except Exception:
                     pass
 
-                self._configure_instrument(inst, config)
-                self._average_buffer_mw = []
+                self._configure_instrument(inst, settings)
+                self._average_buffer = []
                 self._sweep_index = 0
                 self._set_connected(True)
 
                 while not self._stop_event.is_set():
                     if self._reconfigure_flag.is_set():
-                        config = self.get_config()
-                        self._configure_instrument(inst, config)
-                        self._average_buffer_mw = []
-                        self._sweep_index = 0
+                        # Clear before reading, so an update landing mid-configure re-arms it.
                         self._reconfigure_flag.clear()
+                        settings = self.get_settings()
+                        self._configure_instrument(inst, settings)
+                        self._average_buffer = []
+                        self._sweep_index = 0
 
-                    freq_hz, raw_dbm = self._acquire_one_trace(inst)
+                    freq_hz, raw_dbm, sweep_seconds = self._acquire_one_trace(inst)
                     self._sweep_index += 1
 
-                    power_dbm, avg_count = self._apply_averaging(
-                        raw_dbm, config.trace_type, config.num_averages
+                    power_dbm, avg_count, integration_seconds = self._apply_averaging(
+                        raw_dbm, sweep_seconds, settings.trace_type, settings.num_averages
                     )
 
                     frame = SpectrumFrame(
@@ -159,8 +191,9 @@ class SiglentDriver:
                         raw_dbm=raw_dbm.tolist(),
                         sweep_index=self._sweep_index,
                         timestamp=time.time(),
-                        config=config,
+                        config=settings,
                         avg_count=avg_count,
+                        integration_seconds=integration_seconds,
                     )
 
                     with self._frame_lock:
@@ -225,50 +258,52 @@ class SiglentDriver:
         except Exception as exc:
             logging.debug("SCPI command failed: %s (%s)", command, exc)
 
-    def _configure_frequency(self, inst, config: SpectrumConfig) -> None:
-        mode = config.freq_mode.lower().strip()
-        if mode == "start_stop":
-            inst.write(f":FREQ:STAR {config.start_hz}")
-            inst.write(f":FREQ:STOP {config.stop_hz}")
-        elif mode == "center_span":
-            inst.write(f":FREQ:CENT {config.center_hz}")
-            inst.write(f":FREQ:SPAN {config.span_hz}")
+    def _configure_frequency(self, inst, settings: SpecanSettings) -> None:
+        # SpecanSettings' validator guarantees the pair for the mode is set.
+        if settings.freq_mode == "start_stop":
+            inst.write(f":FREQ:STAR {settings.start_hz}")
+            inst.write(f":FREQ:STOP {settings.stop_hz}")
         else:
-            raise ValueError("freq_mode must be 'start_stop' or 'center_span'.")
+            inst.write(f":FREQ:CENT {settings.center_frequency_hz}")
+            inst.write(f":FREQ:SPAN {settings.span_hz}")
 
-    def _configure_instrument(self, inst, config: SpectrumConfig) -> None:
-        self._configure_frequency(inst, config)
+    def _configure_instrument(self, inst, settings: SpecanSettings) -> None:
+        self._configure_frequency(inst, settings)
 
-        inst.write(f":BAND {config.rbw_hz}")
-        inst.write(f":BAND:VID {config.vbw_hz}")
-        inst.write(f":DISP:WIND:TRAC:Y:RLEV {config.ref_level_dbm}")
+        inst.write(f":BAND {settings.resolution_bandwidth_hz}")
+        inst.write(f":BAND:VID {settings.video_bandwidth_hz}")
+        inst.write(f":DISP:WIND:TRAC:Y:RLEV {settings.reference_level_dbm}")
 
         inst.write(":SWE:TIME:AUTO ON")
         inst.write(":INIT:CONT OFF")
         inst.write(":FORM:TRAC:DATA ASCii")
 
-        if config.atten_auto:
+        if settings.attenuation_auto:
             self._scpi_write_ignore_error(inst, ":POW:ATT:AUTO ON")
         else:
             self._scpi_write_ignore_error(inst, ":POW:ATT:AUTO OFF")
-            self._scpi_write_ignore_error(inst, f":POW:ATT {config.atten_db}")
+            if settings.attenuation_db is not None:
+                self._scpi_write_ignore_error(inst, f":POW:ATT {settings.attenuation_db}")
 
-        if config.preamp_on is True:
+        if settings.preamp_on is True:
             self._scpi_write_ignore_error(inst, ":POW:GAIN ON")
-        elif config.preamp_on is False:
+        elif settings.preamp_on is False:
             self._scpi_write_ignore_error(inst, ":POW:GAIN OFF")
 
-        trace_type = config.trace_type.lower().strip()
-        if trace_type in {"clear_write", "average"}:
-            self._scpi_write_ignore_error(inst, ":TRAC1:MODE WRIT")
-        else:
-            raise ValueError("trace_type must be 'clear_write' or 'average'.")
+        # Both trace types acquire in write mode; averaging is done here in
+        # _apply_averaging, not on the instrument.
+        self._scpi_write_ignore_error(inst, ":TRAC1:MODE WRIT")
 
         time.sleep(0.2)
 
-    def _acquire_one_trace(self, inst) -> tuple[np.ndarray, np.ndarray]:
+    def _acquire_one_trace(self, inst) -> tuple[np.ndarray, np.ndarray, float]:
+        """One sweep: (freq_hz, power_dbm, seconds the sweep took). Timed
+        around the trigger and completion wait only, so trace readout and
+        the frequency queries don't count as integration."""
+        started = time.monotonic()
         inst.write(":INIT:IMM")
         inst.query("*OPC?")
+        sweep_seconds = time.monotonic() - started
 
         raw = inst.query(":TRAC:DATA?")
         power_dbm = np.array(
@@ -282,23 +317,25 @@ class SiglentDriver:
         actual_stop_hz = float(inst.query(":FREQ:STOP?"))
         freq_hz = np.linspace(actual_start_hz, actual_stop_hz, len(power_dbm))
 
-        return freq_hz, power_dbm
+        return freq_hz, power_dbm, sweep_seconds
 
     def _apply_averaging(
-        self, raw_dbm: np.ndarray, trace_type: str, num_averages: int
-    ) -> tuple[np.ndarray, int]:
+        self, raw_dbm: np.ndarray, sweep_seconds: float, trace_type: str, num_averages: int
+    ) -> tuple[np.ndarray, int, float]:
+        """(power_dbm, sweeps averaged, total seconds those sweeps took)."""
         if trace_type.lower().strip() != "average":
-            return raw_dbm, 1
+            return raw_dbm, 1, sweep_seconds
 
-        current_mw = self._dbm_to_mw(raw_dbm)
-        self._average_buffer_mw.append(current_mw)
+        current = (self._dbm_to_mw(raw_dbm), sweep_seconds)
+        self._average_buffer.append(current)
 
-        if len(self._average_buffer_mw) > max(1, int(num_averages)):
-            self._average_buffer_mw.pop(0)
+        if len(self._average_buffer) > max(1, int(num_averages)):
+            self._average_buffer.pop(0)
 
-        lengths = [len(arr) for arr in self._average_buffer_mw]
-        if len(set(lengths)) != 1:
-            self._average_buffer_mw = [current_mw]
+        lengths = {len(mw) for mw, _ in self._average_buffer}
+        if len(lengths) != 1:
+            self._average_buffer = [current]
 
-        avg_mw = np.mean(np.stack(self._average_buffer_mw, axis=0), axis=0)
-        return self._mw_to_dbm(avg_mw), len(self._average_buffer_mw)
+        avg_mw = np.mean(np.stack([mw for mw, _ in self._average_buffer], axis=0), axis=0)
+        integration_seconds = sum(secs for _, secs in self._average_buffer)
+        return self._mw_to_dbm(avg_mw), len(self._average_buffer), integration_seconds

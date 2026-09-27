@@ -9,7 +9,7 @@ dashboard's status_fetcher.py, which does exactly this with one
 ZMQ SUB. 
 
 ZMQ <-> Pydantic conversion happens exactly once per tick, in
-zmq_bridge.bridge.StatusBroadcaster — a single background task shared
+zmq_bridge.status.StatusBroadcaster — a single background task shared
 by the whole FastAPI process, not one ZMQ subscription per browser
 tab. This route just registers/unregisters each WebSocket with that
 shared broadcaster; it never touches ZMQ directly.
@@ -22,12 +22,12 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import TypeAdapter, ValidationError
 
 from .auth import get_current_user_ws
-from ..zmq_bridge.bridge import CommandError, status_broadcaster, command_listener
-from ...daemon.command_types import ObservationPlan, TelescopeCommand
+from ..zmq_bridge.commands import CommandError, command_listener
+from ..zmq_bridge.status import status_broadcaster
+from ...daemon.command_types import ClientRequest
 
 router = APIRouter()
-_command_adapter = TypeAdapter(TelescopeCommand)
-_plan_adapter = TypeAdapter(ObservationPlan)
+_request_adapter = TypeAdapter(ClientRequest)
 
 
 @router.websocket("/ws/status")
@@ -88,19 +88,18 @@ async def command_ws(websocket: WebSocket, token: str | None = None):
                 }))
                 continue
 
-            # A "commands" list means ObservationPlan, otherwise a single
-            # command — by shape, since ObservationPlan has no discriminator.
+            # One envelope for everything: command_types.ClientRequest,
+            # discriminated by `kind`.
             try:
-                if isinstance(data, dict) and "commands" in data:
-                    plan = _plan_adapter.validate_python(data)
-                    lines = await command_listener.submit_plan(plan)
-                else:
-                    cmd = _command_adapter.validate_python(data)
-                    lines = [await command_listener.submit(cmd)]
+                lines = await command_listener.submit_request(
+                    _request_adapter.validate_python(data)
+                )
             except ValidationError as e:
+                # Context can hold the raising exception itself (model-level
+                # validators), which json.dumps can't serialize.
                 await websocket.send_text(json.dumps({
                     "ok": False,
-                    "error": e.errors(),
+                    "error": e.errors(include_url=False, include_context=False, include_input=False),
                 }))
                 continue
             except CommandError as e:

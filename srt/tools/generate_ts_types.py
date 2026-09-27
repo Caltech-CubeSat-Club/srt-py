@@ -27,14 +27,15 @@ sys.path.insert(0, str(SRT_ROOT / "daemon"))
 from srt.daemon.telescope_types import (
     LprParams,
     RotorState,
-    SpectrumConfig,
     SpectrumFrame,
     DaemonConfig
 )
 
 from srt.daemon.status import DaemonStatus
+from srt.daemon.settings import RuntimeSettings
 
 from srt.daemon.command_types import (
+    ClientRequest,
     TelescopeCommand,
     ObservationPlan
 )
@@ -57,12 +58,14 @@ REF_TEMPLATE = "#/definitions/{model}"
 MODELS: list[tuple[str, Any]] = [
     ("LprParams", LprParams),
     ("RotorState", RotorState),
-    ("SpectrumConfig", SpectrumConfig),
     ("SpectrumFrame", SpectrumFrame),
     ("DaemonStatus", DaemonStatus),
     ("DaemonConfig", DaemonConfig),
+    ("RuntimeSettings", RuntimeSettings),
     ("TelescopeCommand", TelescopeCommand),
     ("ObservationPlan", ObservationPlan),
+    # What the browser sends on /ws/command.
+    ("ClientRequest", ClientRequest),
     ("SpectrumSettings", SpectrumSettings),
     ("DataProcessingSettings", DataProcessingSettings),
     ("ObservingSettings", ObservingSettings),
@@ -141,6 +144,40 @@ def _inline_property_types(definitions: dict) -> dict:
     return definitions
 
 
+def _inline_enum_refs(definitions: dict) -> list[str]:
+    """Replace every `$ref` to an enum that carries sibling keys with the
+    enum's literal values inline. Returns the enum names, so the caller can
+    still export each once as a named alias.
+
+    Pydantic writes a defaulted enum field as `{"$ref": ..., "default": ...}`.
+    json-schema-to-typescript merges the siblings into a fresh copy of the
+    target at each such site and mints a new alias per copy — which is where
+    CommandState1..CommandState15 came from, one per command class. Inlined,
+    the field reads `state?: "pending" | "running" | ...`.
+    """
+    enums = {
+        name: {k: v for k, v in schema.items() if k in ("enum", "type")}
+        for name, schema in definitions.items()
+        if "enum" in schema and "properties" not in schema
+    }
+
+    def walk(node):
+        if isinstance(node, dict):
+            ref = node.get("$ref", "")
+            target = ref.removeprefix("#/definitions/")
+            if target in enums and len(node) > 1:
+                node.pop("$ref")
+                node.update(enums[target])
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(definitions)
+    return list(enums)
+
+
 def build_combined_schema() -> dict:
     """
     Combine all models into one JSON Schema document with each model
@@ -169,12 +206,15 @@ def build_combined_schema() -> dict:
             add(sub_name, sub_schema)
         add(name, schema)
 
+    enum_names = _inline_enum_refs(definitions)
+    exported = [name for name, _ in MODELS] + [n for n in enum_names if n not in dict(MODELS)]
+
     combined = {
         "title": "GeneratedTypes",
         "definitions": _inline_property_types(definitions),
         "type": "object",
         "properties": {
-            name: {"$ref": f"#/definitions/{name}"} for name, _ in MODELS
+            name: {"$ref": f"#/definitions/{name}"} for name in exported
         },
     }
 

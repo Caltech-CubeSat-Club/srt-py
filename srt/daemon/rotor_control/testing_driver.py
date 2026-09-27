@@ -81,6 +81,10 @@ class TestingDriver:
     def startup(self):
         pass
 
+    def set_lpr_params(self, lpr_params: LprParams) -> None:
+        # Staged until calibrate(), like Moore6mDriver.
+        self.lpr_params = lpr_params
+
     def calibrate(self):
         with self._lock:
             self._state.cal_sts   = "Calibration OK"

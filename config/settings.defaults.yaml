@@ -1,0 +1,108 @@
+# Defaults for the runtime-editable settings (srt/daemon/settings.py,
+# RuntimeSettings). The only place default values live — the Python models
+# hold types and bounds, nothing more.
+#
+# Hand-edited and checked in. The daemon's own settings.yaml (gitignored,
+# machine-written) is layered on top of this: a key there wins, a key missing
+# there falls back to here, so a field added later doesn't break an existing
+# settings.yaml. An unknown key in either file is an error.
+
+pointing:
+  tracking_command_deadband_mdeg: 150.0
+  error_threshold_mdeg: 150.0
+  error_stable_cycles: 4
+  move_timeout_seconds: 180.0
+  settle_time_seconds: 1.0        # nothing reads this yet
+  stow_on_out_of_bounds: false
+
+# The legacy n-point and beam-switch scans.
+scans:
+  dwell_time_seconds: 5.0
+  num_beamswitches: 25
+
+# The Siglent's free-running live view. Siglent-only; observations never use
+# it — each Integrate carries its own settings.
+specan_live_view:
+  driver: specan
+  freq_mode: start_stop
+  start_hz: 1.0e9
+  stop_hz: 1.9e9
+  resolution_bandwidth_hz: 1.0e6
+  video_bandwidth_hz: 1.0e5
+  reference_level_dbm: -30.0
+  num_averages: 300
+  trace_type: clear_write
+  attenuation_auto: false
+  attenuation_db: 0.0
+  preamp_on: true
+
+webcam:
+  target_fps: 10.0
+  jpeg_quality: 70
+  max_width: 960
+
+# Observing policy. Empty until someone who knows the values fills it in;
+# plans can't be validated until then. The shape, with example values only:
+#
+# observing:
+#   switching_time_seconds: 60              # dwell before switching source/reference
+#   desired_snr: 10
+#   cold_offset_deg: 5.0                    # reference pointing's offset from source
+#   calibration_integration_seconds: 30.0
+#   calibration_interval_seconds: 360.0     # pending the receiver-drift measurement
+#   hot_calibrators:                        # in order of preference
+#     - object_id: CasA
+#     - object_id: CygA
+#   spectrum_settings_per_band:             # one per band in use; driver must match the receiver
+#     L:
+#       driver: specan
+#       start_hz: 1.0e9
+#       stop_hz: 1.9e9
+#       resolution_bandwidth_hz: 1.0e6
+#       video_bandwidth_hz: 1.0e5
+#       reference_level_dbm: -30.0
+observing: null
+
+# Radiometer equation and Y-factor constants, from
+# scripts/combined_data_collection.py.
+radiometry:
+  t_receiver_k: 80.0
+  aperture_efficiency: 0.7
+  polarization_correction_factor: 2.0
+
+# Servo gains and limits: LPR minus the encoder geometry, which stays in
+# config.yaml (MOTOR_ENCODER_PARAMS). Loaded onto the controller at the next
+# encoder calibration, not immediately. Field meanings are on LprParams in
+# srt/daemon/telescope_types.py.
+lpr:
+  pAzKo: 0.4
+  pElKo: 0.4
+  pAzKv: 2.0
+  pElKv: 2.0
+  pAze: 0.01
+  pEle: 0.01
+  pAzAmax: 1.5
+  pElAmax: 1.0
+  pAzVmax: 2.5
+  pElVmax: 1.0
+  pAzImax: 1.0
+  pElImax: 5.0
+  pAzKpp: 2.0
+  pElKpp: 1.2
+  pAzKpi: 1.0
+  pElKpi: 1.0
+  pAzKvp: 0.8
+  pElKvp: 1.5
+  pAzKvi: 0.0
+  pElKvi: 0.0
+  pAzKff: 1.0
+  pElKff: 1.0
+  pAzTmax: 800.0
+  pElTmax: 1200.0
+  pAzTmin: -800.0
+  pElTmin: -1300.0
+  pAzTsgn: 1.0
+  pElTsgn: 1.0
+  pAzTbias: 150.0
+  pAzAr: 1522.5
+  pElAr: 19749.0

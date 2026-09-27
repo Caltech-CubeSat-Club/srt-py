@@ -30,83 +30,23 @@ HORIZON_POINTS:
 MOTOR_TYPE: NONE
 MOTOR_PORT: COM1
 MOTOR_BAUDRATE: 115200
-NUM_BEAMSWITCHES: 25
-BEAMWIDTH: 3  # degrees
-OBSERVATION_DWELL_TIME: 5
-SCAN_SETTLE_TIME: 1.0
-ROTOR_MOVE_TIMEOUT: 180
-TRACKING_COMMAND_DEADBAND_MDEG: 150
-END_OBSERVATION_ON_OOB: true
-STOW_ON_OOB: false
-POINTING_ERROR_THRESHOLD_MDEG: 150
-POINTING_ERROR_STABLE_CYCLES: 4
+DISH_DIAMETER_M: 6.0
 SAVE_DIRECTORY: ~/SRT-Saves
 RUN_HEADLESS: No
 DASHBOARD_PORT: 8080
 DASHBOARD_HOST: 127.0.0.1
-DASHBOARD_DOWNLOADS: Yes
-DASHBOARD_REFRESH_MS: 500
 DASHBOARD_REQUIRE_AUTH: true
 DASHBOARD_USERNAME: dsa
 DASHBOARD_PASSWORD: not2000
 WEBCAM_ENABLE: false
 WEBCAM_DEVICE_INDEX: 0
-WEBCAM_TARGET_FPS: 10
-WEBCAM_JPEG_QUALITY: 70
-WEBCAM_MAX_WIDTH: 960
-SPECTRUM_ANALYZER:
-  instrument_serial: "SSA3PCED7R1040"
-  freq_mode: "start_stop"
-  start_hz: 1000000000
-  stop_hz: 1900000000
-  rbw_hz: 1000000
-  vbw_hz: 100000
-  ref_level_dbm: -30
-  y_axis_mode: "db_per_div"
-  y_db_per_div: 10
-  y_num_divs: 10
-  y_lim_dbm: [-120, -30]
-  atten_auto: false
-  atten_db: 0
-  preamp_on: true
-  trace_type: "clear_write"
-  num_averages: 300
-  x_units: "MHz"
-MOTOR_LPR_PARAMS:
-  pAzKo:    0.4
-  pElKo:    0.4
-  pAzKv:    2.0
-  pElKv:    2.0
-  pAze:     0.01
-  pEle:     0.01
-  pAzAmax:  1.5
-  pElAmax:  1.0
-  pAzVmax:  2.5
-  pElVmax:  1.0
-  pAzImax:  1.0
-  pElImax:  5.0
-  pAzKpp:   2.0
-  pElKpp:   1.2
-  pAzKpi:   1.0
-  pElKpi:   1.0
-  pAzKvp:   0.8
-  pElKvp:   1.5
-  pAzKvi:   0.0
-  pElKvi:   0.0
-  pAzKff:   1.0
-  pElKff:   1.0
-  pAzTmax:  800.0
-  pElTmax:  1200.0
-  pAzTmin:  -800.0
-  pElTmin:  -1300.0
-  pAzTsgn:  1.0
-  pElTsgn:  1.0
-  pAzTbias: 150.0
+SPECTRUM_ANALYZER_SERIAL: "SSA3PCED7R1040"
+# Encoder geometry slice of the servo controller's LPR parameters. The
+# gains and limits are runtime settings (settings.yaml).
+MOTOR_ENCODER_PARAMS:
   pAzEcr:   144000.0
   pElEcr:   144000.0
   pAzMEcr:  20000.0
   pElMEcr:  20000.0
   pAzEpo:   -301.087
   pElEpo:   118.5
-  pAzAr:    1522.5
-  pElAr:    19749.0

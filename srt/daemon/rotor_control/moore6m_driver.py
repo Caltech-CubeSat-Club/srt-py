@@ -119,8 +119,8 @@ class Moore6mDriver:
     ):
         if not lpr_params.is_loaded:
             raise ValueError(
-                "lpr_params is not fully loaded — ensure all MOTOR_LPR_PARAMS "
-                "are present in config before constructing Moore6mDriver."
+                "lpr_params is not fully loaded — RuntimeSettings.lpr "
+                "should guarantee all 37 values."
             )
 
         self.port      = port
@@ -650,9 +650,8 @@ class Moore6mDriver:
         """Return a thread-safe snapshot of current rotor state."""
         with self._state_lock:
             s = copy.copy(self._state)
-            # LprParams is only written during calibrate(), not during polling,
-            # so shallow copy is safe. Keep lpr reference pointing to the
-            # same object — it won't mutate under us.
+            # LprParams is only replaced (in calibrate()), never mutated,
+            # so sharing the reference in a shallow copy is safe.
             return s
 
     # ------------------------------------------------------------------
@@ -756,12 +755,23 @@ class Moore6mDriver:
     # Calibration
     # ------------------------------------------------------------------
 
+    def set_lpr_params(self, lpr_params: LprParams) -> None:
+        """Stage new servo parameters. The controller only accepts LPR as
+        part of the SPA/LPR/CLE sequence, so they reach it at the next
+        calibrate(); until then _state.lpr keeps reporting what's loaded."""
+        if not lpr_params.is_loaded:
+            raise ValueError("lpr_params is not fully loaded")
+        self.lpr_params = lpr_params
+
     def calibrate(self):
-        if not self.lpr_params.is_loaded:
+        # One reference for the whole sequence: a set_lpr_params() landing
+        # mid-calibration must not make _state.lpr report values never sent.
+        lpr_params = self.lpr_params
+        if not lpr_params.is_loaded:
             self._set_fault("Cannot calibrate: LPR parameters not fully loaded")
             return
 
-        lpr_cmd = self.lpr_params.to_command_string()
+        lpr_cmd = lpr_params.to_command_string()
         seq = [
             ("SPA", "SPA"),
             (lpr_cmd, "LPR"),
@@ -797,7 +807,7 @@ class Moore6mDriver:
 
         # Update lpr field in state now that calibration is confirmed
         with self._state_lock:
-            self._state.lpr = self.lpr_params
+            self._state.lpr = lpr_params
 
         self.enqueue_blocking("TMD,0", expected_prefix="TMD")
         self.brakes_off()

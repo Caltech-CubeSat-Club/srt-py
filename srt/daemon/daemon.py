@@ -4,9 +4,10 @@ Main Control and Orchestration Class for the Small Radio Telescope
 
 """
 
+import json
 from time import sleep, time
 from datetime import timedelta, datetime, timezone
-from threading import Thread
+from threading import Lock, Thread
 from queue import Queue
 from collections import deque
 from typing import Any, Dict, Tuple, Union, cast
@@ -22,7 +23,9 @@ from srt.daemon.rotor_control.testing_driver import TestingDriver
 
 from .rotor_control import make_driver
 from .radio_control import SiglentDriver
-from .telescope_types import AmpCurrent, Location, LprParams, DaemonConfig, RotorState, SpectrumConfig, SpectrumFrame
+from .telescope_types import AmpCurrent, Location, LprParams, DaemonConfig, RotorState, SpectrumFrame
+from .settings import RuntimeSettings, merge_settings
+from ..config_loader import load_settings, save_settings
 from .status import DaemonStatus
 from .utilities.object_tracker import EphemerisTracker
 from .utilities.functions import azel_within_range
@@ -46,6 +49,13 @@ class SmallRadioTelescopeDaemon:
         # Store Individual Settings In Object
         self.config_directory = config_directory
         self.config = config
+
+        # The runtime-editable half. Replaced wholesale on every edit, never
+        # mutated, so a reader holding a reference always sees one coherent
+        # version. The lock only serializes writers.
+        self.settings_path = Path(config_directory, "settings.yaml")
+        self.settings: RuntimeSettings = load_settings(self.settings_path)
+        self._settings_lock = Lock()
         # Create Helper Object Which Tracks Celestial Objects
         self.ephemeris_tracker = EphemerisTracker(
             self.config.STATION.latitude,
@@ -67,10 +77,13 @@ class SmallRadioTelescopeDaemon:
                 motor_type=self.config.MOTOR_TYPE,
                 port=self.config.MOTOR_PORT,
                 baudrate=self.config.MOTOR_BAUDRATE,
-                az_limits=self.config.AZLIMITS.to_tuple(),
-                el_limits=self.config.ELLIMITS.to_tuple(),
-                lpr_params=self.config.MOTOR_LPR_PARAMS,
+                az_limits=self.config.AZLIMITS,
+                el_limits=self.config.ELLIMITS,
+                lpr_params=self._lpr_params(),
             )
+        # A rotor handed in by Moore6mController was built from its own read
+        # of settings.yaml; make sure it has ours.
+        self.rotor.set_lpr_params(self._lpr_params())
         try:
             current_azel = (self.rotor.get_state().az, self.rotor.get_state().el)
         except Exception:
@@ -96,24 +109,42 @@ class SmallRadioTelescopeDaemon:
         self.pointing_error_history = deque(maxlen=900)
         self.amp_current_history: deque[dict[str, Union[float,AmpCurrent]]] = deque(maxlen=900)
         self._rotor_state = RotorState()
-        self.observation_events = deque(maxlen=1200)
-        self.active_observation = None
 
-        spectrum_config = self.config.SPECTRUM_ANALYZER or SpectrumConfig()
-        self.spectrum_driver = SiglentDriver(spectrum_config)
+        self.spectrum_driver = SiglentDriver(
+            self.config.SPECTRUM_ANALYZER_SERIAL, self.settings.specan_live_view
+        )
 
-    @staticmethod
-    def _parse_key_value_pairs(parts):
-        updates = {}
-        for part in parts:
-            if "=" not in part:
-                continue
-            key, value = part.split("=", 1)
-            key = key.strip()
-            if not key:
-                continue
-            updates[key] = value.strip().strip("\"").strip("'")
-        return updates
+    def update_settings(self, patch: dict) -> None:
+        """Validate, persist, then apply a partial settings update.
+
+        Persisted before it's applied, so the daemon never runs on settings
+        that a restart would lose. A bad patch raises ValidationError (a
+        ValueError, which the command loop logs) and changes nothing.
+        """
+        with self._settings_lock:
+            new = merge_settings(self.settings, patch)
+            if new == self.settings:
+                return
+            try:
+                save_settings(new, self.settings_path)
+            except OSError as e:
+                # Not a ValueError, so it would escape the command loop and
+                # kill the daemon's main thread.
+                self.log_message(f"Settings not applied — could not write {self.settings_path}: {e}")
+                return
+            old, self.settings = self.settings, new
+        self.spectrum_driver.set_settings(new.specan_live_view)
+        if new.lpr != old.lpr:
+            self.rotor.set_lpr_params(self._lpr_params())
+            self.log_message("LPR parameters staged; they take effect at the next encoder calibration")
+        self.log_message(f"Settings updated: {json.dumps(patch)}")
+
+    def _lpr_params(self) -> LprParams:
+        return LprParams.from_parts(self.settings.lpr, self.config.MOTOR_ENCODER_PARAMS)
+
+    def _beamwidth_deg(self) -> float:
+        # At whatever the analyzer is currently tuned to.
+        return self.config.beamwidth_deg(self.settings.specan_live_view.center_hz)
 
     def log_message(self, message):
         """Writes Contents to a Logging List and Prints
@@ -137,22 +168,24 @@ class SmallRadioTelescopeDaemon:
         if self.rotor._state.safe_mode:
             self.log_message("Motion disabled (safe mode): skipping wait for rotor target")
             return False
-        timeout = max(0.1, self.config.ROTOR_MOVE_TIMEOUT)
+        pointing = self.settings.pointing
+        timeout = pointing.move_timeout_seconds
+        deadband_deg = pointing.tracking_command_deadband_mdeg / 1000.0
         start_time = time()
 
-        stable_needed = max(1, self.config.POINTING_ERROR_STABLE_CYCLES)
+        stable_needed = pointing.error_stable_cycles
         stable_count = 0
 
         while self.keep_running:
             state = self.rotor.get_state()
             reached_by_position = azel_within_range(
-                (state.az, state.el), (state.az_cmd, state.el_cmd), (self.config.TRACKING_COMMAND_DEADBAND_MDEG / 1000.0, self.config.TRACKING_COMMAND_DEADBAND_MDEG / 1000.0)
+                (state.az, state.el), (state.az_cmd, state.el_cmd), (deadband_deg, deadband_deg)
             )
             point_err = (state.az_err, state.el_err)
             reached_by_error = False
             if point_err is not None:
                 azerr_mdeg, elerr_mdeg = point_err
-                threshold = abs(float(self.config.POINTING_ERROR_THRESHOLD_MDEG))
+                threshold = pointing.error_threshold_mdeg
                 if abs(azerr_mdeg) <= threshold and abs(elerr_mdeg) <= threshold:
                     stable_count += 1
                 else:
@@ -197,19 +230,20 @@ class SmallRadioTelescopeDaemon:
         pwr_list = []
         scan_center = self.ephemeris_locations[object_id]
         np_sides = [5, 5]
+        beamwidth = self._beamwidth_deg()
         for scan in range(N_pnt_default):
             scan_center = self.ephemeris_locations[object_id]
             self.log_message(
                 "{0} of {1} point scan.".format(scan, N_pnt_default))
             i = (scan // 5) - 2
             j = (scan % 5) - 2
-            el_dif = i * self.config.BEAMWIDTH * 0.5
+            el_dif = i * beamwidth * 0.5
             az_dif_scalar = np.cos((scan_center[1] + el_dif) * np.pi / 180.0)
             # Avoid issues where you get close to the zenith
             if np.abs(az_dif_scalar) < 1e-4:
                 az_dif = 0
             else:
-                az_dif = j * self.config.BEAMWIDTH * 0.5 / az_dif_scalar
+                az_dif = j * beamwidth * 0.5 / az_dif_scalar
 
             new_rotor_offsets = (az_dif, el_dif)
 
@@ -230,7 +264,7 @@ class SmallRadioTelescopeDaemon:
                     continue
             rotor_loc.append(self.rotor_location)
             
-            sleep(max(0.0, float(self.config.OBSERVATION_DWELL_TIME)))
+            sleep(self.settings.scans.dwell_time_seconds)
                 
         maxdiff = (az_dif, el_dif)
         self.n_point_data = [scan_center, maxdiff,
@@ -260,10 +294,12 @@ class SmallRadioTelescopeDaemon:
         self.current_vlsr = cur_vlsr
         rotor_loc = []
         pwr_list = []
-        for j in range(0, 3 * self.config.NUM_BEAMSWITCHES):
+        beamwidth = self._beamwidth_deg()
+        num_beamswitches = self.settings.scans.num_beamswitches
+        for j in range(0, 3 * num_beamswitches):
             new_rotor_destination = self.ephemeris_locations[object_id]
             az_dif_scalar = np.cos(new_rotor_destination[1] * np.pi / 180.0)
-            az_dif = (j % 3 - 1) * self.config.BEAMWIDTH / az_dif_scalar
+            az_dif = (j % 3 - 1) * beamwidth / az_dif_scalar
             new_rotor_offsets = (az_dif, 0)
             if (
                 self.rotor.az_limits.lower_bound <= new_rotor_destination[0] <= self.rotor.az_limits.upper_bound
@@ -276,13 +312,13 @@ class SmallRadioTelescopeDaemon:
                         "sequence": "beam_switch",
                         "object": object_id,
                         "point_index": int(j + 1),
-                        "point_total": int(3 * self.config.NUM_BEAMSWITCHES),
+                        "point_total": int(3 * num_beamswitches),
                     },
                 ):
                     continue
             rotor_loc.append(self.rotor_location)
             
-            sleep(max(0.0, float(self.config.OBSERVATION_DWELL_TIME)))
+            sleep(self.settings.scans.dwell_time_seconds)
                 
         self.rotor_offsets = (0.0, 0.0)
         self.ephemeris_cmd_location = object_id
@@ -512,7 +548,7 @@ class SmallRadioTelescopeDaemon:
                         f"Object {self.ephemeris_cmd_location} moved out of motor bounds"
                     )
 
-                    if self.config.STOW_ON_OOB:
+                    if self.settings.pointing.stow_on_out_of_bounds:
                         self.log_message("Object out of bounds: commanding stow")
                         self.rotor_offsets = (0.0, 0.0)
                         self.rotor_destination = self.config.STOW_LOCATION.to_tuple()
@@ -534,14 +570,12 @@ class SmallRadioTelescopeDaemon:
             try:
                 current_rotor_cmd_location = self.rotor_cmd_location
                 state = self.rotor.get_state()
+                deadband_deg = self.settings.pointing.tracking_command_deadband_mdeg / 1000.0
 
                 if not azel_within_range(
                     (state.az, state.el),
                     current_rotor_cmd_location,
-                    bounds=(
-                        self.config.TRACKING_COMMAND_DEADBAND_MDEG / 1000.0,
-                        self.config.TRACKING_COMMAND_DEADBAND_MDEG / 1000.0
-                    ),
+                    bounds=(deadband_deg, deadband_deg),
                 ):
                     if not state.safe_mode:
                         self.rotor.point(*current_rotor_cmd_location)
@@ -606,7 +640,7 @@ class SmallRadioTelescopeDaemon:
                 status = DaemonStatus(
                     rotor = self._rotor_state,
                     spectrum = frame,
-                    beam_width = self.config.BEAMWIDTH,
+                    beam_width = self._beamwidth_deg(),
                     az_limits = self.config.AZLIMITS.to_tuple(),
                     el_limits = self.config.ELLIMITS.to_tuple(),
                     stow_loc = self.config.STOW_LOCATION.to_tuple(),
@@ -627,6 +661,7 @@ class SmallRadioTelescopeDaemon:
                     n_point_data = self.n_point_data,
                     beam_switch_data = self.beam_switch_data,
                     emergency_contact = self.config.EMERGENCY_CONTACT,
+                    settings = self.settings,
                     time = time()
                 )
 
@@ -750,10 +785,10 @@ class SmallRadioTelescopeDaemon:
                     self.point_at_offset(
                         float(command_parts[1]), float(command_parts[2])
                     )
-                elif command_name == "spectrum_config":
-                    updates = self._parse_key_value_pairs(command_parts[1:])
-                    if updates:
-                        self.spectrum_driver.update_config(updates)
+                elif command_name == "update_settings":
+                    # JSON, not key=value: settings nest. Taken from the raw
+                    # line since values may contain spaces.
+                    self.update_settings(json.loads(command.split(" ", 1)[1]))
                 elif command_name == "spectrum_start":
                     self.spectrum_driver.start()
                 elif command_name == "spectrum_stop":

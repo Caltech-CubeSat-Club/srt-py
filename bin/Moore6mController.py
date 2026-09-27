@@ -54,7 +54,7 @@ except Exception:
 
 from srt.daemon.rotor_control import make_driver
 from srt.daemon import daemon as srt_d
-from srt.daemon.telescope_types import LprParams, DaemonConfig
+from srt.daemon.telescope_types import DaemonConfig, LprParams
 from srt import config_loader
 
 
@@ -141,10 +141,12 @@ class Moore6mController:
         self._log_lines : list = []
         self._log_dirty = False
 
-        lpr_dict = self.config.MOTOR_LPR_PARAMS
-        if not lpr_dict:
-            raise RuntimeError("MOTOR_LPR_PARAMS missing from config")
-        lpr_params = LprParams.model_validate(lpr_dict)
+        # LPR params are runtime settings; the daemon re-applies its own copy
+        # when it starts, and stages edits from then on.
+        lpr_params = LprParams.from_parts(
+            config_loader.load_settings(Path(config_dir) / "settings.yaml").lpr,
+            self.config.MOTOR_ENCODER_PARAMS,
+        )
 
         self.moore6m = make_driver(
             motor_type=self.config.MOTOR_TYPE,
