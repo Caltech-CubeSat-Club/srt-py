@@ -77,7 +77,7 @@ class Span(BaseModel):
     def overlaps(self, other: "Span") -> bool:
         """Determines whether `self` overlaps with `other`, i.e. same resource and intersecting time. 
         A rotor span and a polarization span at the same instant don't overlap since they occupy different resources."""
-        raise NotImplementedError
+        return self.resource == other.resource and not(self.end<=other.start or other.end<=self.start)
 
 
 class Timeline(BaseModel):
